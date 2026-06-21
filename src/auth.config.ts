@@ -33,8 +33,8 @@ export const authConfig = {
       },
     }),
     TikTok({
-      clientId: process.env.AUTH_TIKTOK_ID,
-      clientSecret: process.env.AUTH_TIKTOK_SECRET,
+      clientId: process.env.TIKTOK_CLIENT_KEY,
+      clientSecret: process.env.TIKTOK_CLIENT_SECRET,
     }),
   ],
 } satisfies NextAuthConfig;
