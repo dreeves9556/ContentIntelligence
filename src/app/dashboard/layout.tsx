@@ -1,0 +1,209 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
+import { Button } from "@/components/ui/button";
+import {
+  BarChart3,
+  Calendar,
+  Library,
+  Plug,
+  Settings,
+  Sparkles,
+  Menu,
+  X,
+  LogOut,
+  Shield,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { name: "Analytics", href: "/dashboard", icon: BarChart3 },
+  { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar },
+  { name: "Content Library", href: "/dashboard/library", icon: Library },
+  { name: "Integrations", href: "/dashboard/integrations", icon: Plug },
+  { name: "Brand Settings", href: "/dashboard/settings", icon: Settings },
+];
+
+const adminNavItem = { name: "Admin", href: "/admin", icon: Shield };
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/login" });
+  };
+
+  return (
+    <div className="min-h-screen bg-background-primary">
+      {/* Mobile menu overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile navigation drawer */}
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-background-secondary transform transition-transform duration-200 ease-in-out lg:hidden",
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-background-primary">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-accent-primary" />
+            <span className="font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+              CIP
+            </span>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="p-2 rounded-md text-text-muted hover:text-text-primary"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <nav className="p-4 space-y-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-accent-primary/10 text-accent-primary"
+                    : "text-text-muted hover:text-text-primary hover:bg-background-card"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {item.name}
+              </Link>
+            );
+          })}
+          {session?.user?.role === "ADMIN" && (
+            <Link
+              href={adminNavItem.href}
+              onClick={() => setMobileMenuOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                pathname === adminNavItem.href
+                  ? "bg-accent-primary/10 text-accent-primary"
+                  : "text-accent-primary hover:text-accent-primary hover:bg-accent-primary/10"
+              )}
+            >
+              <Shield className="h-5 w-5" />
+              {adminNavItem.name}
+            </Link>
+          )}
+        </nav>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-2">
+          <div className="px-3 py-2">
+            <p className="text-xs text-text-muted">Role</p>
+            <p className="text-sm font-medium text-accent-primary">{session?.user?.role || "Unknown"}</p>
+          </div>
+          <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+            <LogOut className="h-5 w-5 mr-2" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
+
+      {/* Desktop layout */}
+      <div className="flex min-h-screen">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:flex w-64 flex-col bg-background-secondary border-r border-background-primary">
+          <div className="flex items-center gap-2 p-6 border-b border-background-primary">
+            <Sparkles className="h-6 w-6 text-accent-primary" />
+            <span className="font-bold text-lg" style={{ fontFamily: "var(--font-playfair)" }}>
+              Content Intelligence
+            </span>
+          </div>
+          <nav className="flex-1 p-4 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-accent-primary/10 text-accent-primary"
+                      : "text-text-muted hover:text-text-primary hover:bg-background-card"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+            {session?.user?.role === "ADMIN" && (
+              <Link
+                href={adminNavItem.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                  pathname === adminNavItem.href
+                    ? "bg-accent-primary/10 text-accent-primary"
+                    : "text-accent-primary hover:text-accent-primary hover:bg-accent-primary/10"
+                )}
+              >
+                <Shield className="h-5 w-5" />
+                {adminNavItem.name}
+              </Link>
+            )}
+          </nav>
+          <div className="p-4 border-t border-background-primary space-y-2">
+            <div className="px-3 py-2">
+              <p className="text-xs text-text-muted">Role</p>
+              <p className="text-sm font-medium text-accent-primary">{session?.user?.role || "Unknown"}</p>
+            </div>
+            <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+              <LogOut className="h-5 w-5 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col">
+          {/* Mobile header */}
+          <header className="lg:hidden flex items-center justify-between p-4 border-b border-background-secondary bg-background-primary/95 backdrop-blur">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-accent-primary" />
+              <span className="font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+                Content Intelligence
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted">{session?.user?.role}</span>
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="p-2 rounded-md text-text-muted hover:text-text-primary"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            </div>
+          </header>
+
+          {/* Page content */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        </div>
+      </div>
+    </div>
+  );
+}

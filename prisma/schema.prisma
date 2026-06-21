@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String?        @unique
+  emailVerified DateTime?
+  name          String?
+  password      String?        // For credentials auth, nullable for OAuth
+  image         String?
+  role          UserRole       @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  questionnaires Questionnaire[]
+  calendars     Calendar[]
+  socialTokens  SocialToken[]
+  adminMessages AdminMessage[]
+  socialProfiles   SocialProfile[]
+  postAnalytics    PostAnalytics[]
+  contentArchives  ContentArchive[]
+  accounts      Account[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Questionnaire {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  content     Json     // Store questionnaire structure as JSON
+  isPublished Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("questionnaires")
+}
+
+model Calendar {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekNumber  Int      @default(1)
+  contentJson Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("calendars")
+}
+
+model AnalyticsCache {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  data       Json
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("analytics_cache")
+}
+
+model SocialToken {
+  id           String       @id @default(uuid())
+  provider     SocialProvider
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([userId, provider])
+  @@map("social_tokens")
+}
+
+model AdminMessage {
+  id        String   @id @default(uuid())
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admin_messages")
+}
+
+model InviteToken {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("invite_tokens")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model SocialProfile {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String   // e.g., "INSTAGRAM"
+  accountId    String   // The external ID
+  accessToken  String?
+  handle       String?
+  connectedAt  DateTime @default(now())
+
+  @@map("social_profiles")
+}
+
+model ContentArchive {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStarting   String
+  dayIndex       Int
+  day            String
+  format         String
+  bucket         String
+  title          String
+  hook           String
+  body           String
+  cta            String
+  caption        String
+  musicSuggestion String?
+  duration       String?
+  archivedAt     DateTime @default(now())
+
+  @@unique([userId, weekStarting, dayIndex])
+  @@map("content_archives")
+}
+
+model PostAnalytics {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId   String?  // Meta's ID for the post
+  title        String
+  format       String   // REEL, CAROUSEL, STATIC
+  publishedAt  DateTime
+  views        Int      @default(0)
+  likes        Int      @default(0)
+  comments     Int      @default(0)
+
+  @@map("post_analytics")
+}
+
+enum SocialProvider {
+  GOOGLE
+  FACEBOOK
+  TWITTER
+  LINKEDIN
+  GITHUB
+}

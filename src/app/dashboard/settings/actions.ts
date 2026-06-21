@@ -1,0 +1,46 @@
+"use server";
+
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
+
+export type UpdateQuestionnaireResult =
+  | { success: true }
+  | { success: false; error: string };
+
+export async function updateQuestionnaire(
+  questionnaireId: string,
+  data: QuestionnaireFormData
+): Promise<UpdateQuestionnaireResult> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Not authenticated." };
+  }
+
+  const existing = await prisma.questionnaire.findUnique({
+    where: { id: questionnaireId },
+    select: { userId: true },
+  });
+
+  if (!existing) {
+    return { success: false, error: "Questionnaire not found." };
+  }
+
+  if (existing.userId !== session.user.id) {
+    return { success: false, error: "Not authorised to edit this questionnaire." };
+  }
+
+  await prisma.questionnaire.update({
+    where: { id: questionnaireId },
+    data: {
+      content: data as object,
+      title: `Brand Questionnaire — ${data.name || "Unnamed"}`,
+    },
+  });
+
+  revalidatePath("/dashboard/settings");
+
+  return { success: true };
+}
