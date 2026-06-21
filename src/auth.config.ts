@@ -11,15 +11,35 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
+      const userRole = (auth?.user as { role?: string })?.role;
       const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
-      const isOnAdmin = nextUrl.pathname.startsWith("/onboarding/admin");
+      const isOnOnboardingAdmin = nextUrl.pathname.startsWith("/onboarding/admin");
+      const isOnAdmin = nextUrl.pathname.startsWith("/admin");
 
-      if (isOnDashboard || isOnAdmin) {
+      if (isOnAdmin) {
+        if (!isLoggedIn) return Response.redirect(new URL("/login", nextUrl));
+        if (userRole !== "ADMIN") return Response.redirect(new URL("/dashboard", nextUrl));
+        return true;
+      }
+
+      if (isOnDashboard || isOnOnboardingAdmin) {
         if (isLoggedIn) return true;
         return false;
       }
 
       return true;
+    },
+    jwt({ token, user }) {
+      if (user) {
+        token.role = (user as { role?: string }).role;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (token) {
+        session.user.role = token.role as "USER" | "ADMIN";
+      }
+      return session;
     },
   },
   providers: [
