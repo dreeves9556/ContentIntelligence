@@ -12,18 +12,20 @@ export const authConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const userRole = (auth?.user as { role?: string })?.role;
+      const sessionExpiry = (auth?.user as { sessionExpiry?: number } | undefined)?.sessionExpiry;
+      const isExpired = sessionExpiry ? Date.now() > sessionExpiry : false;
       const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
       const isOnOnboardingAdmin = nextUrl.pathname.startsWith("/onboarding/admin");
       const isOnAdmin = nextUrl.pathname.startsWith("/admin");
 
       if (isOnAdmin) {
-        if (!isLoggedIn) return Response.redirect(new URL("/login", nextUrl));
+        if (!isLoggedIn || isExpired) return Response.redirect(new URL("/login", nextUrl));
         if (userRole !== "ADMIN") return Response.redirect(new URL("/dashboard", nextUrl));
         return true;
       }
 
       if (isOnDashboard || isOnOnboardingAdmin) {
-        if (isLoggedIn) return true;
+        if (isLoggedIn && !isExpired) return true;
         return false;
       }
 
@@ -38,6 +40,7 @@ export const authConfig = {
     session({ session, token }) {
       if (token) {
         session.user.role = token.role as "USER" | "ADMIN";
+        (session.user as { sessionExpiry?: number }).sessionExpiry = token.sessionExpiry as number | undefined;
       }
       return session;
     },

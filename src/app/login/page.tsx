@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setError(null);
@@ -21,6 +22,7 @@ export default function LoginPage() {
     const result = await signIn("credentials", {
       email,
       password,
+      rememberMe: rememberMe ? "true" : "false",
       redirect: false,
       callbackUrl: "/dashboard",
     });
@@ -111,6 +113,23 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-background-secondary bg-background-secondary accent-accent-primary cursor-pointer"
+              />
+              <label
+                htmlFor="rememberMe"
+                className="text-sm text-text-muted cursor-pointer select-none"
+                style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+              >
+                Stay signed in for 30 days
+              </label>
             </div>
 
             <button

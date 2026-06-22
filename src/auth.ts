@@ -21,6 +21,7 @@ export const {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember Me", type: "text" },
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
@@ -38,12 +39,16 @@ export const {
 
         if (!isPasswordValid) return null;
 
+        const rememberMe = credentials?.rememberMe === "true";
+        const sessionExpiry = Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           image: user.image,
           role: user.role,
+          sessionExpiry,
         };
       },
     }),
@@ -94,6 +99,7 @@ export const {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+        token.sessionExpiry = (user as { sessionExpiry?: number }).sessionExpiry;
       }
 
       if (account?.provider && account.access_token) {
