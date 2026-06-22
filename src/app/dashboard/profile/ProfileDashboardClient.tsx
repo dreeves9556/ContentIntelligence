@@ -735,6 +735,15 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
         {/* Right column — Profile surveys */}
         <div className="lg:col-span-2 space-y-6">
           <CoreFoundationCard questionnaire={questionnaire} />
+
+          {/* Deep Dive intro callout */}
+          <div className="rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-5 py-4 space-y-1">
+            <p className="text-sm font-semibold text-accent-primary">The more you put in, the more bespoke your posts become.</p>
+            <p className="text-sm text-text-muted leading-relaxed">
+              Each Deep Dive survey below feeds the AI hyper-specific details about your personality, market, and clients that no generic tool will ever have. A half-filled answer still helps — but the agents who complete every section get posts that sound like <em>them</em>, not like a template.
+            </p>
+          </div>
+
           {SURVEYS.map((survey) => (
             <SurveyCard
               key={survey.type}
