@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function createInviteLink(email: string): Promise<{ url: string } | { error: string }> {
+export async function createInviteLink(email: string): Promise<{ url: string; error?: string } | { error: string }> {
   if (!email || !email.includes("@")) {
     return { error: "A valid email address is required." };
   }
@@ -27,9 +27,11 @@ export async function createInviteLink(email: string): Promise<{ url: string } |
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const url = `${baseUrl}/register?token=${token}`;
 
+  const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+
   try {
-    await resend.emails.send({
-      from: "Core OS <onboarding@resend.dev>",
+    const result = await resend.emails.send({
+      from: `Core OS <${fromAddress}>`,
       to: email,
       subject: "You've been invited to Core OS",
       html: `
@@ -54,8 +56,13 @@ export async function createInviteLink(email: string): Promise<{ url: string } |
         </div>
       `,
     });
+    if (result.error) {
+      console.error("[INVITE] Resend error:", result.error);
+      return { error: `Email failed to send: ${result.error.message}. Copy the link manually.`, url };
+    }
   } catch (emailError) {
     console.error("[INVITE] Failed to send email:", emailError);
+    return { error: "Email failed to send. Copy the link below to share manually.", url };
   }
 
   return { url };

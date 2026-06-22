@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 
-const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Local Expert", "Content Preferences"];
+const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Content Preferences"];
 
 const INDUSTRY_OPTIONS = [
   "Real Estate",
@@ -206,15 +206,12 @@ export default function OnboardingForm() {
     industry: "",
     brandType: "",
     personalStory: "",
-    hobbies: "",
-    idealClient: "",
-    bestClientCommonalities: "",
     industryAnswers: {},
-    localSpots: "",
-    communityUniqueness: "",
     onCameraPersonality: [],
     contentEnjoyed: [],
     daysToPost: 3,
+    primaryGoal: "",
+    antiBrandWords: "",
   });
 
   const set = (key: keyof QuestionnaireFormData, value: unknown) =>
@@ -363,36 +360,6 @@ export default function OnboardingForm() {
                   className={textareaClass}
                 />
               </div>
-              <div>
-                <FieldLabel>Hobbies & Interests Outside Work</FieldLabel>
-                <textarea
-                  rows={3}
-                  placeholder="What do you do for fun? What lights you up beyond the business?"
-                  value={formData.hobbies}
-                  onChange={(e) => set("hobbies", e.target.value)}
-                  className={textareaClass}
-                />
-              </div>
-              <div>
-                <FieldLabel>Describe Your Ideal Client</FieldLabel>
-                <textarea
-                  rows={4}
-                  placeholder="Paint a picture of who you serve best — demographics, mindset, situation, goals..."
-                  value={formData.idealClient}
-                  onChange={(e) => set("idealClient", e.target.value)}
-                  className={textareaClass}
-                />
-              </div>
-              <div>
-                <FieldLabel>What Do Your Best Clients Have in Common?</FieldLabel>
-                <textarea
-                  rows={3}
-                  placeholder="Patterns you've noticed — values, backgrounds, challenges, traits..."
-                  value={formData.bestClientCommonalities}
-                  onChange={(e) => set("bestClientCommonalities", e.target.value)}
-                  className={textareaClass}
-                />
-              </div>
             </div>
           </>
         );
@@ -435,36 +402,7 @@ export default function OnboardingForm() {
       case 3:
         return (
           <>
-            {sectionHeading("D", "Local Expert", "Anchor your brand to your community.")}
-            <div className="space-y-5">
-              <div>
-                <FieldLabel>Favorite Local Spots</FieldLabel>
-                <textarea
-                  rows={4}
-                  placeholder="Coffee shops, restaurants, parks, venues you love — places that reflect your lifestyle..."
-                  value={formData.localSpots}
-                  onChange={(e) => set("localSpots", e.target.value)}
-                  className={textareaClass}
-                />
-              </div>
-              <div>
-                <FieldLabel>What Makes Your Community Unique?</FieldLabel>
-                <textarea
-                  rows={4}
-                  placeholder="What do you love about where you operate? What would you want clients to know about your market or city?"
-                  value={formData.communityUniqueness}
-                  onChange={(e) => set("communityUniqueness", e.target.value)}
-                  className={textareaClass}
-                />
-              </div>
-            </div>
-          </>
-        );
-
-      case 4:
-        return (
-          <>
-            {sectionHeading("E", "Content Preferences", "How you show up — and how often.")}
+            {sectionHeading("D", "Content Preferences", "How you show up — and how often.")}
             <div className="space-y-7">
               <div>
                 <FieldLabel>On-Camera Personality</FieldLabel>
@@ -489,6 +427,32 @@ export default function OnboardingForm() {
                 <div className="mt-4">
                   <DaysSlider value={formData.daysToPost} onChange={(v) => set("daysToPost", v)} />
                 </div>
+              </div>
+              <div>
+                <FieldLabel required>Primary marketing goal this month</FieldLabel>
+                <select
+                  value={formData.primaryGoal}
+                  onChange={(e) => set("primaryGoal", e.target.value)}
+                  className={inputClass}
+                  style={{ backgroundImage: "none" }}
+                >
+                  <option value="" disabled>Select your goal...</option>
+                  <option value="Brand Awareness">Brand Awareness</option>
+                  <option value="Lead Generation">Lead Generation</option>
+                  <option value="Event/Webinar Signups">Event / Webinar Signups</option>
+                  <option value="Recruitment/Partnerships">Recruitment / Partnerships</option>
+                  <option value="Education/Authority">Education / Authority</option>
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Words or phrases the AI should NEVER use</FieldLabel>
+                <textarea
+                  rows={3}
+                  placeholder={`e.g. "hustle", "dream home", "boss babe" — anything that feels off-brand or cliché to you`}
+                  value={formData.antiBrandWords}
+                  onChange={(e) => set("antiBrandWords", e.target.value)}
+                  className={textareaClass}
+                />
               </div>
             </div>
           </>

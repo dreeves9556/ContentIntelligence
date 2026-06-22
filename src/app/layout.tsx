@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Playfair_Display, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
@@ -18,6 +19,19 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Content Intelligence Platform",
   description: "Premium content strategy and analytics platform",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CoreOS",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -31,7 +45,10 @@ export default function RootLayout({
       className={`${playfair.variable} ${dmSans.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-background-primary text-text-primary" suppressHydrationWarning>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <ServiceWorkerRegister />
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

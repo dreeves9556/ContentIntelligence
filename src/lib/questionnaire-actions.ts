@@ -6,13 +6,10 @@ export interface QuestionnaireFormData {
   industry: string;
   brandType: string;
   personalStory: string;
-  hobbies: string;
-  idealClient: string;
-  bestClientCommonalities: string;
   industryAnswers: Record<string, string>;
-  localSpots: string;
-  communityUniqueness: string;
   onCameraPersonality: string[];
   contentEnjoyed: string[];
   daysToPost: number;
+  primaryGoal: string;
+  antiBrandWords: string;
 }

@@ -364,36 +364,6 @@ export default function SettingsForm({
             className={textareaClass}
           />
         </div>
-        <div>
-          <FieldLabel>Hobbies & Interests Outside Work</FieldLabel>
-          <textarea
-            rows={3}
-            placeholder="What do you do for fun? What lights you up beyond the business?"
-            value={formData.hobbies}
-            onChange={(e) => set("hobbies", e.target.value)}
-            className={textareaClass}
-          />
-        </div>
-        <div>
-          <FieldLabel>Describe Your Ideal Client</FieldLabel>
-          <textarea
-            rows={4}
-            placeholder="Paint a picture of who you serve best — demographics, mindset, situation, goals..."
-            value={formData.idealClient}
-            onChange={(e) => set("idealClient", e.target.value)}
-            className={textareaClass}
-          />
-        </div>
-        <div>
-          <FieldLabel>What Do Your Best Clients Have in Common?</FieldLabel>
-          <textarea
-            rows={3}
-            placeholder="Patterns you've noticed — values, backgrounds, challenges, traits..."
-            value={formData.bestClientCommonalities}
-            onChange={(e) => set("bestClientCommonalities", e.target.value)}
-            className={textareaClass}
-          />
-        </div>
       </SectionCard>
 
       {/* Section C — Industry Deep-Dive */}
@@ -429,39 +399,10 @@ export default function SettingsForm({
         )}
       </SectionCard>
 
-      {/* Section D — Local Expert */}
+      {/* Section D — Content Preferences */}
       <SectionCard>
         <SectionHeading
           letter="D"
-          title="Local Expert"
-          subtitle="Anchor your brand to your community."
-        />
-        <div>
-          <FieldLabel>Favourite Local Spots</FieldLabel>
-          <textarea
-            rows={4}
-            placeholder="Coffee shops, restaurants, parks, venues you love..."
-            value={formData.localSpots}
-            onChange={(e) => set("localSpots", e.target.value)}
-            className={textareaClass}
-          />
-        </div>
-        <div>
-          <FieldLabel>What Makes Your Community Unique?</FieldLabel>
-          <textarea
-            rows={4}
-            placeholder="What would you want clients to know about your market or city?"
-            value={formData.communityUniqueness}
-            onChange={(e) => set("communityUniqueness", e.target.value)}
-            className={textareaClass}
-          />
-        </div>
-      </SectionCard>
-
-      {/* Section E — Content Preferences */}
-      <SectionCard>
-        <SectionHeading
-          letter="E"
           title="Content Preferences"
           subtitle="How you show up — and how often."
         />
@@ -491,6 +432,34 @@ export default function SettingsForm({
               onChange={(v) => set("daysToPost", v)}
             />
           </div>
+        </div>
+        <div>
+          <FieldLabel required>Primary marketing goal this month</FieldLabel>
+          <div className="relative">
+            <select
+              value={formData.primaryGoal}
+              onChange={(e) => set("primaryGoal", e.target.value)}
+              className={inputClass + " appearance-none pr-10"}
+            >
+              <option value="" disabled>Select your goal...</option>
+              <option value="Brand Awareness">Brand Awareness</option>
+              <option value="Lead Generation">Lead Generation</option>
+              <option value="Event/Webinar Signups">Event / Webinar Signups</option>
+              <option value="Recruitment/Partnerships">Recruitment / Partnerships</option>
+              <option value="Education/Authority">Education / Authority</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          </div>
+        </div>
+        <div>
+          <FieldLabel>Words or phrases the AI should NEVER use</FieldLabel>
+          <textarea
+            rows={3}
+            placeholder={`e.g. "hustle", "dream home", "boss babe" — anything that feels off-brand or cliché to you`}
+            value={formData.antiBrandWords}
+            onChange={(e) => set("antiBrandWords", e.target.value)}
+            className={textareaClass}
+          />
         </div>
       </SectionCard>
 

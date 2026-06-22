@@ -25,6 +25,8 @@ model User {
   socialProfiles   SocialProfile[]
   postAnalytics    PostAnalytics[]
   contentArchives  ContentArchive[]
+  pushSubscriptions PushSubscription[]
+  profileSurveys   ProfileSurvey[]
   accounts      Account[]
   sessions      Session[]
 
@@ -199,10 +201,36 @@ model PostAnalytics {
   @@map("post_analytics")
 }
 
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("push_subscriptions")
+}
+
 enum SocialProvider {
   GOOGLE
   FACEBOOK
   TWITTER
   LINKEDIN
   GITHUB
+}
+
+model ProfileSurvey {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  surveyType  String
+  answersJson Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, surveyType])
+  @@map("profile_surveys")
 }

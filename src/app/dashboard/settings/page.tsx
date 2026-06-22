@@ -14,15 +14,12 @@ const DEFAULT_FORM_DATA: QuestionnaireFormData = {
   industry: "",
   brandType: "",
   personalStory: "",
-  hobbies: "",
-  idealClient: "",
-  bestClientCommonalities: "",
   industryAnswers: {},
-  localSpots: "",
-  communityUniqueness: "",
   onCameraPersonality: [],
   contentEnjoyed: [],
   daysToPost: 3,
+  primaryGoal: "",
+  antiBrandWords: "",
 };
 
 function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
@@ -38,15 +35,10 @@ function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
     industry: typeof r.industry === "string" ? r.industry : DEFAULT_FORM_DATA.industry,
     brandType: typeof r.brandType === "string" ? r.brandType : DEFAULT_FORM_DATA.brandType,
     personalStory: typeof r.personalStory === "string" ? r.personalStory : DEFAULT_FORM_DATA.personalStory,
-    hobbies: typeof r.hobbies === "string" ? r.hobbies : DEFAULT_FORM_DATA.hobbies,
-    idealClient: typeof r.idealClient === "string" ? r.idealClient : DEFAULT_FORM_DATA.idealClient,
-    bestClientCommonalities: typeof r.bestClientCommonalities === "string" ? r.bestClientCommonalities : DEFAULT_FORM_DATA.bestClientCommonalities,
     industryAnswers:
       r.industryAnswers && typeof r.industryAnswers === "object" && !Array.isArray(r.industryAnswers)
         ? (r.industryAnswers as Record<string, string>)
         : DEFAULT_FORM_DATA.industryAnswers,
-    localSpots: typeof r.localSpots === "string" ? r.localSpots : DEFAULT_FORM_DATA.localSpots,
-    communityUniqueness: typeof r.communityUniqueness === "string" ? r.communityUniqueness : DEFAULT_FORM_DATA.communityUniqueness,
     onCameraPersonality: Array.isArray(r.onCameraPersonality)
       ? (r.onCameraPersonality as string[])
       : DEFAULT_FORM_DATA.onCameraPersonality,
@@ -54,6 +46,8 @@ function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
       ? (r.contentEnjoyed as string[])
       : DEFAULT_FORM_DATA.contentEnjoyed,
     daysToPost: typeof r.daysToPost === "number" ? r.daysToPost : DEFAULT_FORM_DATA.daysToPost,
+    primaryGoal: typeof r.primaryGoal === "string" ? r.primaryGoal : DEFAULT_FORM_DATA.primaryGoal,
+    antiBrandWords: typeof r.antiBrandWords === "string" ? r.antiBrandWords : DEFAULT_FORM_DATA.antiBrandWords,
   };
 }
 

@@ -65,6 +65,11 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
 
   const answersJson = questionnaire.content;
 
+  const profileSurveys = await prisma.profileSurvey.findMany({
+    where: { userId: session.user.id },
+    select: { surveyType: true, answersJson: true },
+  });
+
   const recentArchived = await prisma.contentArchive.findMany({
     where: { userId: session.user.id },
     orderBy: { archivedAt: "desc" },
@@ -84,7 +89,23 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     ? `\n\nPreviously used post titles — do NOT repeat or closely paraphrase any of these:\n${recentArchived.map((p: { title: string }, i: number) => `${i + 1}. ${p.title}`).join("\n")}\n`
     : "";
 
-  const prompt = `You are an elite real estate and personal brand content strategist. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}
+  const deepDiveBlock = profileSurveys.length > 0
+    ? `\n\nThe user has also provided optional deep-dive profile surveys to give you hyper-specific local and personal context. Use these details to make the content highly authentic: ${JSON.stringify(profileSurveys)}`
+    : "";
+
+  const answers = answersJson as Record<string, unknown>;
+  const primaryGoal = typeof answers.primaryGoal === "string" && answers.primaryGoal ? answers.primaryGoal : null;
+  const antiBrandWords = typeof answers.antiBrandWords === "string" && answers.antiBrandWords ? answers.antiBrandWords : null;
+
+  const goalBlock = primaryGoal
+    ? `\n\nThe user's PRIMARY MARKETING GOAL this month is: "${primaryGoal}". Every piece of content — especially the CTA — should ladder up to this goal.`
+    : "";
+
+  const guardrailBlock = antiBrandWords
+    ? `\n\nVOCABULARY GUARDRAILS — the user has explicitly banned these words and phrases from ALL content. Do NOT use them anywhere (hook, body, cta, caption, directions): ${antiBrandWords}`
+    : "";
+
+  const prompt = `You are an elite real estate and personal brand content strategist. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}
 Generate a 7-day content calendar starting today, which is ${currentDay}, and running for the next 7 consecutive days.
 
 The mix must be approx 60% Reels, 30% Carousels, 10% Static posts. Include Personal, Expert, and Local buckets. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.

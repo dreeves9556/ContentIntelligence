@@ -25,10 +25,13 @@ export function InviteClientButton() {
     setError(null);
     startTransition(async () => {
       const result = await createInviteLink(email);
-      if ("error" in result) {
-        setError(result.error);
-      } else {
+      if ("url" in result) {
         setGeneratedUrl(result.url);
+        if (result.error) {
+          setError(result.error);
+        }
+      } else if ("error" in result) {
+        setError(result.error);
       }
     });
   }

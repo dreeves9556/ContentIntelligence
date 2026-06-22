@@ -31,7 +31,13 @@ export default function LoginPage() {
       setError("Invalid email or password");
       setIsPending(false);
     } else if (result?.ok) {
-      window.location.href = "/dashboard";
+      try {
+        const statusRes = await fetch("/api/user/onboarding-status");
+        const { onboardingComplete } = await statusRes.json();
+        window.location.href = onboardingComplete ? "/dashboard" : "/onboarding";
+      } catch {
+        window.location.href = "/dashboard";
+      }
     }
   }
 

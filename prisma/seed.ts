@@ -20,7 +20,19 @@ async function main() {
     },
   });
 
+  const dylanUser = await prisma.user.upsert({
+    where: { email: "dylan@coreos.app" },
+    update: {},
+    create: {
+      email: "dylan@coreos.app",
+      name: "Dylan Ballard",
+      password: hashedPassword,
+      role: "USER",
+    },
+  });
+
   console.log(`✓ Seed complete — test user: ${testUser.email} (id: ${testUser.id})`);
+  console.log(`✓ Dylan Ballard: ${dylanUser.email} (id: ${dylanUser.id})`);
 }
 
 main()
