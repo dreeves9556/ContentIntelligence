@@ -43,7 +43,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-background-primary">
+    <div className="min-h-screen bg-background-primary overflow-x-hidden">
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div
@@ -180,7 +180,7 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
           {/* Mobile header */}
           <header className="lg:hidden flex items-center justify-between p-4 border-b border-background-secondary bg-background-primary/95 backdrop-blur">
             <div className="flex items-center gap-2">
@@ -201,7 +201,7 @@ export default function DashboardLayout({
           </header>
 
           {/* Page content */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">{children}</main>
         </div>
       </div>
     </div>
