@@ -278,7 +278,7 @@ function CoreFoundationPanel({ questionnaire }: { questionnaire: Props["question
           {PRIMARY_GOAL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       </div>
-      <div className="flex gap-3 pt-1">
+      <div className="flex flex-wrap gap-3 pt-1">
         {questionnaire && (
           <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-white/10 hover:bg-white/5 transition-colors">
             Cancel
@@ -365,7 +365,7 @@ function DeepDivePanel({
             );
           })}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setIsEditing(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-white/15 text-text-muted hover:text-white hover:border-white/30 transition-colors"
@@ -401,7 +401,7 @@ function DeepDivePanel({
           />
         </div>
       ))}
-      <div className="flex gap-3 pt-1">
+      <div className="flex flex-wrap gap-3 pt-1">
         {existing && (
           <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-white/10 hover:bg-white/5 transition-colors">
             Cancel
@@ -445,24 +445,29 @@ function AccordionRow({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
       >
-        <div className="shrink-0 p-2.5 rounded-xl" style={{ background: `${color}20` }}>
-          <Icon className="h-5 w-5" style={{ color }} />
+        <div className="shrink-0 p-2 sm:p-2.5 rounded-xl" style={{ background: `${color}20` }}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color }} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-white text-sm" style={{ fontFamily: "var(--font-playfair)" }}>{title}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {isCompleted ? (
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/20">
+            <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/20 sm:inline-flex">
               Completed
             </span>
           ) : (
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-text-muted border border-white/10">
+            <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-text-muted border border-white/10 sm:inline-flex">
               Not started
             </span>
+          )}
+          {isCompleted ? (
+            <CheckCircle2 className="h-4 w-4 text-green-400 sm:hidden" />
+          ) : (
+            <div className="h-4 w-4 rounded-full border border-white/20 sm:hidden" />
           )}
           {open ? (
             <ChevronUp className="h-4 w-4 text-text-muted" />
@@ -473,7 +478,7 @@ function AccordionRow({
       </button>
 
       {open && (
-        <div className="border-t border-white/7 px-5 pb-5">
+        <div className="border-t border-white/7 px-4 sm:px-5 pb-4 sm:pb-5">
           {children}
         </div>
       )}
@@ -494,9 +499,9 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
     : session?.user?.email?.[0]?.toUpperCase() ?? "U";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
       {/* ── Personal Info Header ── */}
-      <div className="rounded-2xl border border-white/7 bg-[#111111] p-6">
+      <div className="rounded-2xl border border-white/7 bg-[#111111] p-4 sm:p-6">
         <div className="flex items-center gap-4 mb-5">
           {/* Avatar */}
           {session?.user?.image ? (
@@ -515,23 +520,23 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
         </div>
 
         {/* Info pills */}
-        <div className="flex flex-wrap gap-3 text-sm text-text-muted mb-5">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 text-sm text-text-muted mb-5">
           {session?.user?.email && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 min-w-0">
               <Mail className="h-4 w-4 shrink-0" />
-              {session.user.email}
+              <span className="truncate">{session.user.email}</span>
             </span>
           )}
           {questionnaire?.content?.city && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 min-w-0">
               <MapPin className="h-4 w-4 shrink-0" />
-              {questionnaire.content.city}
+              <span className="truncate">{questionnaire.content.city}</span>
             </span>
           )}
           {questionnaire?.content?.businessName && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 min-w-0">
               <Building2 className="h-4 w-4 shrink-0" />
-              {questionnaire.content.businessName}
+              <span className="truncate">{questionnaire.content.businessName}</span>
             </span>
           )}
         </div>
@@ -564,7 +569,7 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
       </div>
 
       {/* ── Deep Dive callout ── */}
-      <div className="rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-5 py-4">
+      <div className="rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-4 sm:px-5 py-4">
         <p className="text-sm font-semibold text-accent-primary mb-1">The more you put in, the more bespoke your posts become.</p>
         <p className="text-sm text-text-muted leading-relaxed">
           Each section below feeds the AI hyper-specific details about your personality, market, and clients that no generic tool will ever have. A half-filled answer still helps — but those who complete every section get posts that sound like <em>them</em>, not a template.
