@@ -10,7 +10,7 @@ import {
   Calendar,
   Library,
   Plug,
-  Settings,
+  User,
   Sparkles,
   Menu,
   X,
@@ -24,7 +24,7 @@ const navItems = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar },
   { name: "Content Library", href: "/dashboard/library", icon: Library },
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug },
-  { name: "Brand Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Profile", href: "/dashboard/profile", icon: User },
 ];
 
 const adminNavItem = { name: "Admin", href: "/admin", icon: Shield };
