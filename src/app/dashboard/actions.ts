@@ -123,7 +123,17 @@ export async function getCachedInsight(): Promise<AIInsightResult> {
   });
 
   if (!cached) {
-    return { success: true, insight: "Generate your weekly content calendar to get personalized AI insights about your content performance." };
+    // No cached insight yet — check if user has posts to generate one
+    const postCount = await prisma.postAnalytics.count({
+      where: { userId: session.user.id },
+    });
+
+    if (postCount > 0) {
+      // Generate insight on the spot (one-time catch-up)
+      return generateAIInsight(session.user.id);
+    }
+
+    return { success: true, insight: "Connect your social accounts and sync analytics to get personalized AI insights about your content performance." };
   }
 
   const data = cached.data as { insight: string };
