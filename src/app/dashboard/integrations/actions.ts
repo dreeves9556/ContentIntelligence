@@ -57,22 +57,23 @@ export async function syncAnalytics() {
       );
 
       for (const post of analytics.posts ?? []) {
+        const m = post.analytics;
         await prisma.postAnalytics.upsert({
           where: { externalId_userId: { externalId: post._id, userId: session.user.id } } as never,
           update: {
-            views: post.metrics.impressions ?? 0,
-            likes: post.metrics.likes ?? 0,
-            comments: post.metrics.comments ?? 0,
+            views: m.impressions ?? m.views ?? 0,
+            likes: m.likes ?? 0,
+            comments: m.comments ?? 0,
           },
           create: {
             userId: session.user.id,
             externalId: post._id,
             title: post.content.slice(0, 120),
-            format: account.platform.toUpperCase(),
+            format: (post.platform ?? account.platform).toUpperCase(),
             publishedAt: new Date(post.publishedAt),
-            views: post.metrics.impressions ?? 0,
-            likes: post.metrics.likes ?? 0,
-            comments: post.metrics.comments ?? 0,
+            views: m.impressions ?? m.views ?? 0,
+            likes: m.likes ?? 0,
+            comments: m.comments ?? 0,
           },
         });
         synced++;

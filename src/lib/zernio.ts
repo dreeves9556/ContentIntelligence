@@ -62,17 +62,19 @@ export interface ZernioPostAnalytics {
 }
 
 export interface ZernioAccountAnalytics {
-  accountId: string;
-  platform: string;
   posts: Array<{
     _id: string;
     content: string;
     publishedAt: string;
-    metrics: {
+    platform: string;
+    analytics: {
       impressions?: number;
       likes?: number;
       comments?: number;
       clicks?: number;
+      shares?: number;
+      views?: number;
+      reach?: number;
     };
   }>;
 }
@@ -119,14 +121,8 @@ export const zernio = {
       startDate: string,
       endDate: string
     ): Promise<ZernioAccountAnalytics> {
-      const params = new URLSearchParams({ startDate, endDate });
-      return zernioFetch<ZernioAccountAnalytics>(
-        `/analytics/account/${zernioAccountId}?${params.toString()}`
-      );
-    },
-
-    async getForPost(zernioPostId: string): Promise<ZernioPostAnalytics> {
-      return zernioFetch<ZernioPostAnalytics>(`/analytics/${zernioPostId}`);
+      const params = new URLSearchParams({ accountId: zernioAccountId, startDate, endDate });
+      return zernioFetch<ZernioAccountAnalytics>(`/analytics?${params.toString()}`);
     },
   },
 };

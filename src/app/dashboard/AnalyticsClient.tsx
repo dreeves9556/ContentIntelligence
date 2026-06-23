@@ -27,17 +27,27 @@ import {
 } from "recharts";
 import { seedPostAnalytics } from "./actions";
 
-// Mock data for 8-week trend chart (kept as-is — will be wired to real data in a future phase)
-const trendData = [
-  { week: "Week 1", reach: 45000, engagement: 3200 },
-  { week: "Week 2", reach: 52000, engagement: 4100 },
-  { week: "Week 3", reach: 48000, engagement: 3800 },
-  { week: "Week 4", reach: 61000, engagement: 5200 },
-  { week: "Week 5", reach: 58000, engagement: 4800 },
-  { week: "Week 6", reach: 72000, engagement: 6500 },
-  { week: "Week 7", reach: 68000, engagement: 5900 },
-  { week: "Week 8", reach: 85000, engagement: 7800 },
-];
+function buildTrendData(posts: PostData[]) {
+  const now = new Date();
+  const weeks: { week: string; reach: number; engagement: number }[] = [];
+  for (let i = 7; i >= 0; i--) {
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - i * 7 - 6);
+    const weekEnd = new Date(now);
+    weekEnd.setDate(now.getDate() - i * 7);
+    const label = `Wk ${8 - i}`;
+    const weekPosts = posts.filter((p) => {
+      const d = new Date(p.publishedAt);
+      return d >= weekStart && d <= weekEnd;
+    });
+    weeks.push({
+      week: label,
+      reach: weekPosts.reduce((s, p) => s + p.views, 0),
+      engagement: weekPosts.reduce((s, p) => s + p.likes + p.comments, 0),
+    });
+  }
+  return weeks;
+}
 
 export interface PostData {
   id: string;
@@ -65,6 +75,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [seeding, setSeeding] = useState(false);
+  const trendData = buildTrendData(posts);
 
   const totalViews = posts.reduce((sum, p) => sum + p.views, 0);
   const totalLikes = posts.reduce((sum, p) => sum + p.likes, 0);
