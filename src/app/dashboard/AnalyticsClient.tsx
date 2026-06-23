@@ -118,6 +118,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string>("ALL");
+  const [insightExpanded, setInsightExpanded] = useState(false);
 
   const platformTabs = useMemo(() => {
     const present = new Set(posts.map((p) => derivePlatform(p.format)));
@@ -318,10 +319,29 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               <Sparkles className="h-6 w-6 text-accent-primary" />
             )}
           </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-accent-primary mb-2">
-              AI Insight
-            </h3>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-lg font-semibold text-accent-primary">
+                AI Insight
+              </h3>
+              {aiInsight && !aiLoading && (
+                <button
+                  onClick={() => setInsightExpanded((v) => !v)}
+                  className="sm:hidden flex items-center gap-1 text-xs text-accent-primary/70 hover:text-accent-primary transition-colors shrink-0"
+                  aria-label={insightExpanded ? "Collapse insight" : "Expand insight"}
+                >
+                  {insightExpanded ? (
+                    <>
+                      Less <ChevronUp className="h-3.5 w-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      More <ChevronDown className="h-3.5 w-3.5" />
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
             {aiLoading && (
               <p className="text-text-muted leading-relaxed">Analyzing your content performance...</p>
             )}
@@ -329,7 +349,16 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               <p className="text-text-muted leading-relaxed">{aiError}</p>
             )}
             {aiInsight && !aiLoading && (
-              <p className="text-text-primary leading-relaxed">{aiInsight}</p>
+              <>
+                {/* Mobile: collapsed shows first sentence only */}
+                <p className="sm:hidden text-text-primary leading-relaxed">
+                  {insightExpanded
+                    ? aiInsight
+                    : (aiInsight.match(/^[^.!?]+[.!?]/)?.[0] ?? aiInsight.slice(0, 120) + (aiInsight.length > 120 ? "…" : ""))}
+                </p>
+                {/* Desktop: always show full insight */}
+                <p className="hidden sm:block text-text-primary leading-relaxed">{aiInsight}</p>
+              </>
             )}
           </div>
         </div>
