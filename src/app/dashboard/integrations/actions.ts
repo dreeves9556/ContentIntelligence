@@ -59,7 +59,7 @@ export async function syncAnalytics() {
       for (const post of analytics.posts ?? []) {
         const m = post.analytics;
         await prisma.postAnalytics.upsert({
-          where: { externalId_userId: { externalId: post._id, userId: session.user.id } } as never,
+          where: { externalId_userId: { externalId: post._id, userId: session.user.id } },
           update: {
             views: m.impressions ?? m.views ?? 0,
             likes: m.likes ?? 0,
