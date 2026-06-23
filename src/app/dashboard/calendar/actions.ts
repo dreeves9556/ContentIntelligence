@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
+import { generateAIInsight } from "../actions";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -227,7 +228,13 @@ Buckets must be: Personal, Expert, Local.`;
       });
     }
 
+    // Generate AI insight in the background (uses cheap Haiku model)
+    generateAIInsight(session.user.id).catch((err) =>
+      console.error("Background AI insight generation failed:", err)
+    );
+
     revalidatePath("/dashboard/calendar");
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
     console.error("Error generating calendar:", error);

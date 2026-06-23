@@ -29,7 +29,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { seedPostAnalytics, generateAIInsight } from "./actions";
+import { seedPostAnalytics, getCachedInsight } from "./actions";
 
 function ConditionalLink({ href, className, children }: { href: string | null; className?: string; children: React.ReactNode }) {
   if (!href) return <span className={className}>{children}</span>;
@@ -93,20 +93,11 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
     setAiLoading(true);
     setAiError(null);
     try {
-      const result = await generateAIInsight(
-        posts.map((p) => ({
-          title: p.title,
-          format: p.format,
-          publishedAt: p.publishedAt,
-          views: p.views,
-          likes: p.likes,
-          comments: p.comments,
-        }))
-      );
+      const result = await getCachedInsight();
       if (result.success && result.insight) {
         setAiInsight(result.insight);
       } else {
-        setAiError(result.error || "Unable to generate insight");
+        setAiError(result.error || "Unable to load insight");
       }
     } catch (e) {
       console.error("AI Insight fetch error:", e);
@@ -114,7 +105,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
     } finally {
       setAiLoading(false);
     }
-  }, [posts]);
+  }, []);
 
   useEffect(() => {
     fetchInsight();
@@ -255,19 +246,9 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
             )}
           </div>
           <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-accent-primary mb-2">
-                AI Insight
-              </h3>
-              {!aiLoading && aiInsight && (
-                <button
-                  onClick={fetchInsight}
-                  className="text-xs text-text-muted hover:text-accent-primary transition-colors"
-                >
-                  Refresh
-                </button>
-              )}
-            </div>
+            <h3 className="text-lg font-semibold text-accent-primary mb-2">
+              AI Insight
+            </h3>
             {aiLoading && (
               <p className="text-text-muted leading-relaxed">Analyzing your content performance...</p>
             )}

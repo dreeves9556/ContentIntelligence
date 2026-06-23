@@ -110,22 +110,49 @@ export async function seedPostAnalytics() {
 export interface AIInsightResult {
   success: boolean;
   insight?: string;
+  generatedAt?: string;
   error?: string;
 }
 
-export async function generateAIInsight(posts: {
-  title: string;
-  format: string;
-  publishedAt: string;
-  views: number;
-  likes: number;
-  comments: number;
-}[]): Promise<AIInsightResult> {
+export async function getCachedInsight(): Promise<AIInsightResult> {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
+  const cached = await prisma.analyticsCache.findUnique({
+    where: { key: `ai_insight_${session.user.id}` },
+  });
+
+  if (!cached) {
+    return { success: true, insight: "Generate your weekly content calendar to get personalized AI insights about your content performance." };
+  }
+
+  const data = cached.data as { insight: string };
+  return { success: true, insight: data.insight, generatedAt: cached.updatedAt.toISOString() };
+}
+
+export async function generateAIInsight(userId: string): Promise<AIInsightResult> {
+  const posts = await prisma.postAnalytics.findMany({
+    where: { userId },
+    orderBy: { publishedAt: "desc" },
+    take: 30,
+    select: {
+      title: true,
+      format: true,
+      publishedAt: true,
+      views: true,
+      likes: true,
+      comments: true,
+    },
+  });
+
   if (posts.length === 0) {
-    return { success: true, insight: "Connect your social accounts and sync analytics to get personalized AI insights about your content performance." };
+    const fallback = "Connect your social accounts and sync analytics to get personalized AI insights about your content performance.";
+    await prisma.analyticsCache.upsert({
+      where: { key: `ai_insight_${userId}` },
+      update: { data: { insight: fallback } },
+      create: { key: `ai_insight_${userId}`, data: { insight: fallback } },
+    });
+    return { success: true, insight: fallback };
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -133,7 +160,7 @@ export async function generateAIInsight(posts: {
     return { success: false, error: "AI service not configured" };
   }
 
-  // Compute summary stats for the prompt
+  // Compute summary stats
   const totalViews = posts.reduce((s, p) => s + p.views, 0);
   const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
   const totalComments = posts.reduce((s, p) => s + p.comments, 0);
@@ -149,11 +176,10 @@ export async function generateAIInsight(posts: {
     byFormat[p.format].comments += p.comments;
   }
 
-  // Recent vs older comparison (split in half)
-  const sorted = [...posts].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-  const mid = Math.ceil(sorted.length / 2);
-  const recent = sorted.slice(0, mid);
-  const older = sorted.slice(mid);
+  // Recent vs older comparison
+  const mid = Math.ceil(posts.length / 2);
+  const recent = posts.slice(0, mid);
+  const older = posts.slice(mid);
   const recentAvgViews = recent.reduce((s, p) => s + p.views, 0) / (recent.length || 1);
   const olderAvgViews = older.reduce((s, p) => s + p.views, 0) / (older.length || 1);
   const viewsTrend = olderAvgViews > 0 ? (((recentAvgViews - olderAvgViews) / olderAvgViews) * 100).toFixed(0) : "0";
@@ -162,7 +188,7 @@ export async function generateAIInsight(posts: {
     .map(([fmt, d]) => `${fmt}: ${d.count} posts, ${d.views} views, ${((d.likes + d.comments) / (d.views || 1) * 100).toFixed(1)}% engagement`)
     .join("\n");
 
-  const topPosts = sorted.slice(0, 5).map((p, i) =>
+  const topPosts = posts.slice(0, 5).map((p, i) =>
     `${i + 1}. "${p.title}" (${p.format}) — ${p.views} views, ${p.likes} likes, ${p.comments} comments`
   ).join("\n");
 
@@ -191,15 +217,15 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-8",
-        max_tokens: 300,
+        model: "claude-haiku-3-5-20241022",
+        max_tokens: 250,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Anthropic API error:", errorText);
+      console.error("Anthropic API error (insight):", errorText);
       return { success: false, error: `AI service error (${response.status})` };
     }
 
@@ -209,6 +235,13 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
     if (!insight) {
       return { success: false, error: "No insight generated" };
     }
+
+    // Cache the insight
+    await prisma.analyticsCache.upsert({
+      where: { key: `ai_insight_${userId}` },
+      update: { data: { insight } },
+      create: { key: `ai_insight_${userId}`, data: { insight } },
+    });
 
     return { success: true, insight };
   } catch (err) {

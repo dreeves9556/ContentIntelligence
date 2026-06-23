@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Plug, Share2, Music2, BarChart2, PlayCircle, Zap } from "lucide-react";
+import { Plug, Share2, Music2, Facebook, PlayCircle, Zap } from "lucide-react";
 import ZernioCard from "./ZernioCard";
 import SyncButton from "./SyncButton";
 
@@ -21,11 +21,11 @@ const PLATFORMS = [
     icon: <Music2 className="h-6 w-6 text-white" />,
   },
   {
-    platform: "linkedin",
-    label: "LinkedIn",
-    description: "Sync post impressions & engagement",
-    iconBg: "bg-blue-700",
-    icon: <BarChart2 className="h-6 w-6 text-white" />,
+    platform: "facebook",
+    label: "Facebook",
+    description: "Sync page posts, reach & engagement",
+    iconBg: "bg-blue-600",
+    icon: <Facebook className="h-6 w-6 text-white" />,
   },
   {
     platform: "youtube",
@@ -113,7 +113,7 @@ export default async function IntegrationsPage() {
               <Plug className="h-6 w-6 text-text-muted" />
             </div>
             <p className="text-sm font-medium text-text-muted">More platforms coming soon</p>
-            <p className="text-xs text-text-muted mt-1">Facebook, Pinterest, Threads, and more</p>
+            <p className="text-xs text-text-muted mt-1">LinkedIn, Pinterest, Threads, and more</p>
           </div>
         </div>
       </div>
