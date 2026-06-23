@@ -11,7 +11,11 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
-  Image,
+  Music2,
+  Share2,
+  BarChart2,
+  PlayCircle,
+  MonitorPlay,
   Loader2,
   Database,
 } from "lucide-react";
@@ -29,7 +33,7 @@ import { seedPostAnalytics } from "./actions";
 
 function buildTrendData(posts: PostData[]) {
   const now = new Date();
-  const weeks: { week: string; reach: number; engagement: number }[] = [];
+  const weeks: { week: string; views: number; engagement: number }[] = [];
   for (let i = 7; i >= 0; i--) {
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - i * 7 - 6);
@@ -42,7 +46,7 @@ function buildTrendData(posts: PostData[]) {
     });
     weeks.push({
       week: label,
-      reach: weekPosts.reduce((s, p) => s + p.views, 0),
+      views: weekPosts.reduce((s, p) => s + p.views, 0),
       engagement: weekPosts.reduce((s, p) => s + p.likes + p.comments, 0),
     });
   }
@@ -136,6 +140,26 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
     ) : (
       <ChevronDown className="h-4 w-4 text-accent-primary" />
     );
+  };
+
+  const platformIcon = (format: string) => {
+    const f = format.toUpperCase();
+    if (f === "INSTAGRAM") return <Share2 className="h-5 w-5 text-white" />;
+    if (f === "TIKTOK") return <Music2 className="h-5 w-5 text-white" />;
+    if (f === "LINKEDIN") return <BarChart2 className="h-5 w-5 text-white" />;
+    if (f === "YOUTUBE") return <PlayCircle className="h-5 w-5 text-white" />;
+    if (f === "FACEBOOK") return <Share2 className="h-5 w-5 text-white" />;
+    return <MonitorPlay className="h-5 w-5 text-white" />;
+  };
+
+  const platformBg = (format: string) => {
+    const f = format.toUpperCase();
+    if (f === "INSTAGRAM") return "bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500";
+    if (f === "TIKTOK") return "bg-neutral-800";
+    if (f === "LINKEDIN") return "bg-blue-700";
+    if (f === "YOUTUBE") return "bg-red-600";
+    if (f === "FACEBOOK") return "bg-blue-600";
+    return "bg-background-secondary";
   };
 
   const formatBadge = (format: string) => {
@@ -235,7 +259,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
             8-Week Performance Trend
           </h3>
           <p className="text-sm text-text-muted mt-1">
-            Reach and engagement over the past 8 weeks
+            Views and engagement over the past 8 weeks
           </p>
         </div>
         <div className="h-80 w-full">
@@ -249,8 +273,17 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
                 tickLine={false}
               />
               <YAxis
+                yAxisId="left"
                 stroke="#787878"
                 tick={{ fill: "#787878", fontSize: 12 }}
+                tickLine={false}
+                tickFormatter={(value) => formatNumber(value)}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#0fcfe3"
+                tick={{ fill: "#0fcfe3", fontSize: 12 }}
                 tickLine={false}
                 tickFormatter={(value) => formatNumber(value)}
               />
@@ -269,8 +302,9 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               />
               <Line
                 type="monotone"
-                dataKey="reach"
-                name="Reach"
+                yAxisId="left"
+                dataKey="views"
+                name="Views"
                 stroke="#c8952a"
                 strokeWidth={3}
                 dot={{ fill: "#c8952a", strokeWidth: 2, r: 4 }}
@@ -278,6 +312,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               />
               <Line
                 type="monotone"
+                yAxisId="right"
                 dataKey="engagement"
                 name="Engagement"
                 stroke="#0fcfe3"
@@ -313,8 +348,8 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               {sortedPosts.map((post) => (
                 <div key={post.id} className="p-4 space-y-3">
                   <div className="flex items-start gap-3">
-                    <div className="h-12 w-16 bg-background-secondary rounded-lg flex items-center justify-center shrink-0">
-                      <Image className="h-4 w-4 text-text-muted" />
+                    <div className={`h-12 w-16 rounded-lg flex items-center justify-center shrink-0 ${platformBg(post.format)}`}>
+                      {platformIcon(post.format)}
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-text-primary text-sm leading-snug line-clamp-2">
@@ -390,8 +425,8 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="h-14 w-20 bg-background-secondary rounded-lg flex items-center justify-center shrink-0">
-                            <Image className="h-5 w-5 text-text-muted" />
+                          <div className={`h-14 w-20 rounded-lg flex items-center justify-center shrink-0 ${platformBg(post.format)}`}>
+                            {platformIcon(post.format)}
                           </div>
                           <span className="font-medium text-text-primary line-clamp-2">
                             {post.title}
