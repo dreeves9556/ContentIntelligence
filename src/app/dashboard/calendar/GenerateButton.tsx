@@ -7,7 +7,7 @@ import { Sparkles, Loader2, RefreshCw } from "lucide-react";
 const statusSteps = [
   { label: "Analyzing your questionnaire...", progress: 15 },
   { label: "Building your content strategy...", progress: 35 },
-  { label: "Generating 7-day content calendar...", progress: 60 },
+  { label: "Generating your content calendar...", progress: 60 },
   { label: "Writing captions and hooks...", progress: 80 },
   { label: "Saving to your dashboard...", progress: 95 },
 ];

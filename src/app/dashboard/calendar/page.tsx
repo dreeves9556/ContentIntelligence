@@ -31,7 +31,7 @@ export default async function CalendarPage() {
           Generate Your First Content Calendar
         </h2>
         <p className="text-text-muted max-w-md mb-8">
-          Our AI will analyze your questionnaire responses and create a personalized 7-day content calendar tailored to your brand and goals.
+          Our AI will analyze your questionnaire responses and create a personalized content calendar tailored to your brand and goals.
         </p>
         <GenerateButton />
       </div>

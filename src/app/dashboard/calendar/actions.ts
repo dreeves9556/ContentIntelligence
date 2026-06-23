@@ -83,8 +83,6 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     return { success: false, error: "API key not configured" };
   }
 
-  const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-
   const usedTitlesBlock = recentArchived.length > 0
     ? `\n\nPreviously used post titles — do NOT repeat or closely paraphrase any of these:\n${recentArchived.map((p: { title: string }, i: number) => `${i + 1}. ${p.title}`).join("\n")}\n`
     : "";
@@ -97,6 +95,18 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   const primaryGoal = typeof answers.primaryGoal === "string" && answers.primaryGoal ? answers.primaryGoal : null;
   const antiBrandWords = typeof answers.antiBrandWords === "string" && answers.antiBrandWords ? answers.antiBrandWords : null;
 
+  const parsedDaysToPost = Number(answers.daysToPost);
+  const daysToPost =
+    Number.isInteger(parsedDaysToPost) && parsedDaysToPost >= 1 && parsedDaysToPost <= 7
+      ? parsedDaysToPost
+      : 3;
+
+  const today = new Date();
+  const currentDay = today.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+  const DAY_NAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
+  const targetDays = Array.from({ length: daysToPost }, (_, i) => DAY_NAMES[(today.getDay() + i) % 7]);
+  const weekStarting = today.toISOString().split('T')[0];
+
   const goalBlock = primaryGoal
     ? `\n\nThe user's PRIMARY MARKETING GOAL this month is: "${primaryGoal}". Every piece of content — especially the CTA — should ladder up to this goal.`
     : "";
@@ -105,10 +115,17 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     ? `\n\nVOCABULARY GUARDRAILS — the user has explicitly banned these words and phrases from ALL content. Do NOT use them anywhere (hook, body, cta, caption, directions): ${antiBrandWords}`
     : "";
 
-  const prompt = `You are an elite real estate and personal brand content strategist. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}
-Generate a 7-day content calendar starting today, which is ${currentDay}, and running for the next 7 consecutive days.
+  const prompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}
+Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
-The mix must be approx 60% Reels, 30% Carousels, 10% Static posts. Include Personal, Expert, and Local buckets. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.
+The days must be, in order: ${targetDays.join(", ")}.
+
+The mix must be: ${daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`}. Include Personal, Expert, and Local buckets. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.
+
+BUCKET DEFINITIONS — read these carefully:
+- "Personal" = genuine off-duty human content. Hobbies, passions, family moments, opinions on life, things they geek out about, who they are when they're NOT working. Do NOT tie Personal posts back to their business or add a work lesson at the end. The post should feel like it could exist even if they had a completely different career.
+- "Expert" = professional knowledge, hard-won lessons, industry insights, tips, myth-busting, client stories — their work expertise front and centre.
+- "Local" = hyper-local content about their city, community, favourite spots, local events, neighbourhood energy — builds a sense of place and belonging.
 
 Content field definitions:
 - "hook": the opening line the creator should say on camera (for Reels) or the headline of the post (for Carousel/Static). This should be copy-pasteable spoken text.
@@ -121,10 +138,10 @@ Content field definitions:
 
 The JSON schema must be:
 {
-  "weekStarting": "2026-06-16",
+  "weekStarting": "${weekStarting}",
   "days": [
     {
-      "day": "MONDAY",
+      "day": "${targetDays[0]}",
       "format": "Reel",
       "bucket": "Local",
       "title": "...",
@@ -139,7 +156,7 @@ The JSON schema must be:
   ]
 }
 
-Days must be: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY.
+Days must be one of: ${targetDays.join(", ")}.
 Formats must be: Reel, Carousel, Static.
 Buckets must be: Personal, Expert, Local.`;
 
@@ -174,6 +191,17 @@ Buckets must be: Personal, Expert, Local.`;
       console.error("Failed to parse Claude response:", responseText);
       return { success: false, error: "Failed to parse AI response. Please try again." };
     }
+
+    if (!Array.isArray(calendarData.days) || calendarData.days.length < daysToPost) {
+      console.error("AI returned insufficient days:", JSON.stringify(calendarData));
+      return { success: false, error: "AI returned an incomplete calendar. Please try again." };
+    }
+
+    calendarData.weekStarting = weekStarting;
+    calendarData.days = targetDays.map((dayName, index) => ({
+      ...calendarData.days[index],
+      day: dayName,
+    }));
 
     const existing = await prisma.calendar.findFirst({
       where: { userId: session.user.id },
