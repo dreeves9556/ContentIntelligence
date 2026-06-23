@@ -411,10 +411,10 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
                 tick={({ x, y, payload, index }: { x: string | number; y: string | number; payload: { value: string }; index: number }) => (
                   <g transform={`translate(${x},${y})`}>
                     <text x={0} y={0} dy={14} textAnchor="middle" fill="#e8e8e8" fontSize={12} fontWeight={600}>{payload.value}</text>
-                    <text x={0} y={0} dy={28} textAnchor="middle" fill="#787878" fontSize={10}>{trendData[index]?.dateRange ?? ""}</text>
+                    <text x={0} y={0} dy={22} textAnchor="end" fill="#787878" fontSize={10} transform="rotate(-35)">{trendData[index]?.dateRange ?? ""}</text>
                   </g>
                 )}
-                height={50}
+                height={65}
                 tickLine={false}
               />
               <YAxis
