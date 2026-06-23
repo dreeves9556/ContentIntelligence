@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { zernio } from "@/lib/zernio";
+import { generateAIInsight } from "../actions";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -83,6 +84,13 @@ export async function syncAnalytics() {
     } catch (err) {
       console.error(`Failed to sync analytics for ${account.platform}:`, err);
     }
+  }
+
+  // Regenerate AI insight with fresh data (cheap Haiku call)
+  if (synced > 0) {
+    generateAIInsight(session.user.id).catch((err) =>
+      console.error("Background AI insight generation failed:", err)
+    );
   }
 
   revalidatePath("/dashboard");
