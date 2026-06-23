@@ -1,28 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, Loader2, Music2, Unplug } from "lucide-react";
+import { CheckCircle, Loader2, Unplug } from "lucide-react";
 import { disconnectZernioAccount } from "./actions";
 
-interface TikTokCardProps {
+interface ZernioCardProps {
+  platform: string;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  iconBg: string;
   connected: boolean;
+  handle?: string | null;
 }
 
-export default function TikTokCard({ connected: initialConnected }: TikTokCardProps) {
+export default function ZernioCard({
+  platform,
+  label,
+  description,
+  icon,
+  iconBg,
+  connected: initialConnected,
+  handle,
+}: ZernioCardProps) {
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(initialConnected);
+  const [connectedHandle, setConnectedHandle] = useState(handle);
 
   const handleConnect = () => {
     setLoading(true);
-    window.location.href = "/api/zernio/connect?platform=tiktok";
+    window.location.href = `/api/zernio/connect?platform=${platform}`;
   };
 
   const handleDisconnect = async () => {
     setLoading(true);
     try {
-      const result = await disconnectZernioAccount("tiktok");
+      const result = await disconnectZernioAccount(platform);
       if (result.success) {
         setIsConnected(false);
+        setConnectedHandle(null);
       }
     } finally {
       setLoading(false);
@@ -33,16 +49,10 @@ export default function TikTokCard({ connected: initialConnected }: TikTokCardPr
     <div className="bg-background-card rounded-xl border border-background-secondary p-6 hover:border-accent-primary/30 transition-colors">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-black to-neutral-800 rounded-xl border border-neutral-700">
-            <Music2 className="h-6 w-6 text-white" />
-          </div>
+          <div className={`p-3 rounded-xl ${iconBg}`}>{icon}</div>
           <div>
-            <h3 className="font-semibold text-text-primary text-lg">
-              TikTok Creator
-            </h3>
-            <p className="text-sm text-text-muted mt-0.5">
-              Sync video performance &amp; audience analytics
-            </p>
+            <h3 className="font-semibold text-text-primary text-lg">{label}</h3>
+            <p className="text-sm text-text-muted mt-0.5">{description}</p>
           </div>
         </div>
 
@@ -58,12 +68,14 @@ export default function TikTokCard({ connected: initialConnected }: TikTokCardPr
         {isConnected ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-gradient-to-br from-black to-neutral-800 rounded-full border border-neutral-700 flex items-center justify-center">
-                <Music2 className="h-5 w-5 text-white" />
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${iconBg}`}>
+                {icon}
               </div>
               <div>
-                <p className="text-sm font-medium text-text-primary">TikTok account linked</p>
-                <p className="text-xs text-text-muted">Ready to sync video analytics</p>
+                <p className="text-sm font-medium text-text-primary">
+                  {connectedHandle ? `@${connectedHandle}` : `${label} linked`}
+                </p>
+                <p className="text-xs text-text-muted">Syncing analytics via Zernio</p>
               </div>
             </div>
             <button
@@ -89,9 +101,9 @@ export default function TikTokCard({ connected: initialConnected }: TikTokCardPr
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Music2 className="h-4 w-4" />
+              icon
             )}
-            Connect TikTok Creator
+            Connect {label}
           </button>
         )}
       </div>

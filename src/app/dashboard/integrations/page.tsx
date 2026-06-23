@@ -1,9 +1,39 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Music2, Plug, Zap } from "lucide-react";
-import InstagramCard from "./InstagramCard";
-import TikTokCard from "./TikTokCard";
+import { Plug, Share2, Music2, BarChart2, PlayCircle, Zap } from "lucide-react";
+import ZernioCard from "./ZernioCard";
+
+const PLATFORMS = [
+  {
+    platform: "instagram",
+    label: "Instagram",
+    description: "Sync feed, Reels, and Story analytics",
+    iconBg: "bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500",
+    icon: <Share2 className="h-6 w-6 text-white" />,
+  },
+  {
+    platform: "tiktok",
+    label: "TikTok",
+    description: "Sync video performance & audience analytics",
+    iconBg: "bg-gradient-to-br from-black to-neutral-800 border border-neutral-700",
+    icon: <Music2 className="h-6 w-6 text-white" />,
+  },
+  {
+    platform: "linkedin",
+    label: "LinkedIn",
+    description: "Sync post impressions & engagement",
+    iconBg: "bg-blue-700",
+    icon: <BarChart2 className="h-6 w-6 text-white" />,
+  },
+  {
+    platform: "youtube",
+    label: "YouTube",
+    description: "Sync video views, likes & comments",
+    iconBg: "bg-red-600",
+    icon: <PlayCircle className="h-6 w-6 text-white" />,
+  },
+];
 
 export default async function IntegrationsPage() {
   const session = await auth();
@@ -12,13 +42,13 @@ export default async function IntegrationsPage() {
     redirect("/login");
   }
 
-  const facebookAccount = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "facebook" },
+  const zernioAccounts = await prisma.zernioAccount.findMany({
+    where: { userId: session.user.id },
   });
 
-  const tiktokAccount = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "tiktok" },
-  });
+  const connectedMap: Record<string, { handle: string | null }> = Object.fromEntries(
+    zernioAccounts.map((a: { platform: string; handle: string | null }) => [a.platform, a])
+  );
 
   return (
     <div className="space-y-8">
@@ -62,15 +92,24 @@ export default async function IntegrationsPage() {
           Available Integrations
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <InstagramCard connected={!!facebookAccount} />
-          <TikTokCard connected={!!tiktokAccount} />
-          {/* More integrations */}
+          {PLATFORMS.map((p) => (
+            <ZernioCard
+              key={p.platform}
+              platform={p.platform}
+              label={p.label}
+              description={p.description}
+              iconBg={p.iconBg}
+              icon={p.icon}
+              connected={!!connectedMap[p.platform]}
+              handle={connectedMap[p.platform]?.handle}
+            />
+          ))}
           <div className="bg-background-card rounded-xl border border-dashed border-background-secondary p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
             <div className="p-3 bg-background-secondary rounded-xl mb-3">
               <Plug className="h-6 w-6 text-text-muted" />
             </div>
-            <p className="text-sm font-medium text-text-muted">More integrations coming soon</p>
-            <p className="text-xs text-text-muted mt-1">YouTube, LinkedIn, and more</p>
+            <p className="text-sm font-medium text-text-muted">More platforms coming soon</p>
+            <p className="text-xs text-text-muted mt-1">Facebook, Pinterest, Threads, and more</p>
           </div>
         </div>
       </div>

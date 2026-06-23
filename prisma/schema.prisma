@@ -27,6 +27,7 @@ model User {
   contentArchives  ContentArchive[]
   pushSubscriptions PushSubscription[]
   profileSurveys   ProfileSurvey[]
+  zernioAccounts   ZernioAccount[]
   accounts      Account[]
   sessions      Session[]
 
@@ -190,14 +191,15 @@ model PostAnalytics {
   id           String   @id @default(cuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  externalId   String?  // Meta's ID for the post
+  externalId   String?  // Platform post ID from Zernio
   title        String
-  format       String   // REEL, CAROUSEL, STATIC
+  format       String   // REEL, CAROUSEL, STATIC or platform name
   publishedAt  DateTime
   views        Int      @default(0)
   likes        Int      @default(0)
   comments     Int      @default(0)
 
+  @@unique([externalId, userId])
   @@map("post_analytics")
 }
 
@@ -233,4 +235,18 @@ model ProfileSurvey {
 
   @@unique([userId, surveyType])
   @@map("profile_surveys")
+}
+
+model ZernioAccount {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zernioProfileId String
+  zernioAccountId String
+  platform        String   // e.g. "instagram", "tiktok", "linkedin"
+  handle          String?
+  connectedAt     DateTime @default(now())
+
+  @@unique([userId, platform])
+  @@map("zernio_accounts")
 }

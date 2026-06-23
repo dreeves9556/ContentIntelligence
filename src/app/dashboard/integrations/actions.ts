@@ -3,27 +3,85 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { zernio } from "@/lib/zernio";
 
-export async function disconnectInstagram() {
+export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  await prisma.account.deleteMany({
-    where: { userId: session.user.id, provider: "facebook" },
+  const account = await prisma.zernioAccount.findUnique({
+    where: { userId_platform: { userId: session.user.id, platform } },
   });
+
+  if (account) {
+    try {
+      await zernio.accounts.delete(account.zernioAccountId);
+    } catch {
+      // Continue even if Zernio-side deletion fails
+    }
+    await prisma.zernioAccount.delete({
+      where: { userId_platform: { userId: session.user.id, platform } },
+    });
+  }
 
   revalidatePath("/dashboard/integrations");
   return { success: true };
 }
 
-export async function disconnectTikTok() {
+export async function syncAnalytics() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  await prisma.account.deleteMany({
-    where: { userId: session.user.id, provider: "tiktok" },
+  const zernioAccounts = await prisma.zernioAccount.findMany({
+    where: { userId: session.user.id },
   });
 
-  revalidatePath("/dashboard/integrations");
-  return { success: true };
+  if (zernioAccounts.length === 0) {
+    return { success: false, message: "No connected accounts" };
+  }
+
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() - 90);
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = now.toISOString().split("T")[0];
+
+  let synced = 0;
+
+  for (const account of zernioAccounts) {
+    try {
+      const analytics = await zernio.analytics.getForAccount(
+        account.zernioAccountId,
+        startStr,
+        endStr
+      );
+
+      for (const post of analytics.posts ?? []) {
+        await prisma.postAnalytics.upsert({
+          where: { externalId_userId: { externalId: post._id, userId: session.user.id } } as never,
+          update: {
+            views: post.metrics.impressions ?? 0,
+            likes: post.metrics.likes ?? 0,
+            comments: post.metrics.comments ?? 0,
+          },
+          create: {
+            userId: session.user.id,
+            externalId: post._id,
+            title: post.content.slice(0, 120),
+            format: account.platform.toUpperCase(),
+            publishedAt: new Date(post.publishedAt),
+            views: post.metrics.impressions ?? 0,
+            likes: post.metrics.likes ?? 0,
+            comments: post.metrics.comments ?? 0,
+          },
+        });
+        synced++;
+      }
+    } catch (err) {
+      console.error(`Failed to sync analytics for ${account.platform}:`, err);
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return { success: true, synced };
 }

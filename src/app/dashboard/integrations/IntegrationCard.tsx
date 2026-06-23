@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { disconnectInstagram } from "./actions";
+import { disconnectZernioAccount } from "./actions";
 import { Camera, CheckCircle, Loader2, Unplug } from "lucide-react";
 
 interface IntegrationCardProps {
@@ -21,7 +21,7 @@ export default function IntegrationCard({ connected, handle }: IntegrationCardPr
   const handleDisconnect = async () => {
     setLoading(true);
     try {
-      const result = await disconnectInstagram();
+      const result = await disconnectZernioAccount("instagram");
       if (result.success) {
         setIsConnected(false);
         setCurrentHandle(null);

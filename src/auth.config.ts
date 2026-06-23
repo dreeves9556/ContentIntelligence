@@ -1,6 +1,4 @@
 import type { NextAuthConfig } from "next-auth";
-import Facebook from "next-auth/providers/facebook";
-import TikTok from "next-auth/providers/tiktok";
 
 // Edge-safe config: no Prisma, no bcrypt.
 // Credentials provider and all DB callbacks live in auth.ts (Node.js only).
@@ -45,19 +43,5 @@ export const authConfig = {
       return session;
     },
   },
-  providers: [
-    Facebook({
-      clientId: process.env.META_CLIENT_ID,
-      clientSecret: process.env.META_CLIENT_SECRET,
-      authorization: {
-        params: {
-          scope: "public_profile",
-        },
-      },
-    }),
-    TikTok({
-      clientId: process.env.TIKTOK_CLIENT_KEY,
-      clientSecret: process.env.TIKTOK_CLIENT_SECRET,
-    }),
-  ],
+  providers: [],
 } satisfies NextAuthConfig;

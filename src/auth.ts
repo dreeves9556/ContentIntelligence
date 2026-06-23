@@ -55,46 +55,6 @@ export const {
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async signIn({ user, account }) {
-      // For OAuth providers, link the account to the existing user
-      // if one already exists with the same email, instead of creating a duplicate.
-      if (account?.provider === "facebook" || account?.provider === "tiktok") {
-        const existingUser = user.email
-          ? await prisma.user.findUnique({ where: { email: user.email } })
-          : null;
-
-        if (existingUser) {
-          // Check if this OAuth account is already linked
-          const existingAccount = await prisma.account.findUnique({
-            where: {
-              provider_providerAccountId: {
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-              },
-            },
-          });
-
-          if (!existingAccount) {
-            // Link the OAuth account to the existing user
-            await prisma.account.create({
-              data: {
-                userId: existingUser.id,
-                type: account.type,
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-                access_token: account.access_token,
-                token_type: account.token_type,
-                scope: account.scope,
-              },
-            });
-          }
-
-          // Point user.id to the existing user so JWT gets the right ID
-          user.id = existingUser.id;
-        }
-      }
-      return true;
-    },
     async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;

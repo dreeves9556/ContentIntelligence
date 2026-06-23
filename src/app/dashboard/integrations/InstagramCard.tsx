@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { CheckCircle, Loader2, Share2, Unplug } from "lucide-react";
-import { disconnectInstagram } from "./actions";
+import { disconnectZernioAccount } from "./actions";
 
 interface InstagramCardProps {
   connected: boolean;
@@ -21,7 +21,7 @@ export default function InstagramCard({ connected: initialConnected }: Instagram
   const handleDisconnect = async () => {
     setLoading(true);
     try {
-      const result = await disconnectInstagram();
+      const result = await disconnectZernioAccount("instagram");
       if (result.success) {
         setIsConnected(false);
       }
