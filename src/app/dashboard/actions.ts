@@ -227,7 +227,7 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-3-5-haiku-20241022",
+        model: "claude-opus-4-8",
         max_tokens: 250,
         messages: [{ role: "user", content: prompt }],
       }),
