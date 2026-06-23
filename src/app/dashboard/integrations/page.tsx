@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Plug, Share2, Music2, BarChart2, PlayCircle, Zap } from "lucide-react";
 import ZernioCard from "./ZernioCard";
+import SyncButton from "./SyncButton";
 
 const PLATFORMS = [
   {
@@ -53,16 +54,19 @@ export default async function IntegrationsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1
-          className="text-3xl font-bold text-text-primary"
-          style={{ fontFamily: "var(--font-playfair)" }}
-        >
-          Integrations
-        </h1>
-        <p className="text-text-muted mt-1">
-          Connect your social accounts to pull real analytics data
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1
+            className="text-3xl font-bold text-text-primary"
+            style={{ fontFamily: "var(--font-playfair)" }}
+          >
+            Integrations
+          </h1>
+          <p className="text-text-muted mt-1">
+            Connect your social accounts to pull real analytics data
+          </p>
+        </div>
+        {zernioAccounts.length > 0 && <SyncButton />}
       </div>
 
       {/* Info banner */}
