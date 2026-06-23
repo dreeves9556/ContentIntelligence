@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, BookOpen } from "lucide-react";
+import { Archive, BookOpen, GraduationCap } from "lucide-react";
 import LibraryClient from "./LibraryClient";
 import ResourcesTab from "./ResourcesTab";
+import Social101Tab from "./Social101Tab";
 import type { ResourcePostData } from "@/app/admin/resources/actions";
 
 interface SavedCalendar {
@@ -18,6 +19,7 @@ interface SavedCalendar {
 const TABS = [
   { id: "archive", label: "My Posts", icon: Archive },
   { id: "resources", label: "Resources", icon: BookOpen },
+  { id: "social101", label: "Social 101", icon: GraduationCap },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -34,7 +36,7 @@ export default function LibraryTabs({
   return (
     <div className="space-y-6">
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-background-secondary">
+      <div className="flex items-center gap-1 border-b border-background-secondary overflow-x-auto scrollbar-none">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -42,14 +44,14 @@ export default function LibraryTabs({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0 ${
                 isActive
                   ? "border-accent-primary text-text-primary"
                   : "border-transparent text-text-muted hover:text-text-primary"
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {tab.label}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="sm:inline">{tab.label}</span>
             </button>
           );
         })}
@@ -75,8 +77,10 @@ export default function LibraryTabs({
         ) : (
           <LibraryClient calendars={calendars} />
         )
-      ) : (
+      ) : activeTab === "resources" ? (
         <ResourcesTab posts={resourcePosts} />
+      ) : (
+        <Social101Tab />
       )}
     </div>
   );
