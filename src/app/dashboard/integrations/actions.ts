@@ -64,6 +64,7 @@ export async function syncAnalytics() {
             views: m.impressions ?? m.views ?? 0,
             likes: m.likes ?? 0,
             comments: m.comments ?? 0,
+            postUrl: post.platformPostUrl ?? null,
           },
           create: {
             userId: session.user.id,
@@ -74,6 +75,7 @@ export async function syncAnalytics() {
             views: m.impressions ?? m.views ?? 0,
             likes: m.likes ?? 0,
             comments: m.comments ?? 0,
+            postUrl: post.platformPostUrl ?? null,
           },
         });
         synced++;

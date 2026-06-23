@@ -198,6 +198,7 @@ model PostAnalytics {
   views        Int      @default(0)
   likes        Int      @default(0)
   comments     Int      @default(0)
+  postUrl      String?  // Direct URL to the post on the platform
 
   @@unique([externalId, userId])
   @@map("post_analytics")

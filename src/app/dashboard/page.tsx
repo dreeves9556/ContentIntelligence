@@ -21,6 +21,7 @@ export default async function AnalyticsPage() {
       views: true,
       likes: true,
       comments: true,
+      postUrl: true,
     },
   });
 

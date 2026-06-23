@@ -31,6 +31,11 @@ import {
 } from "recharts";
 import { seedPostAnalytics } from "./actions";
 
+function ConditionalLink({ href, className, children }: { href: string | null; className?: string; children: React.ReactNode }) {
+  if (!href) return <span className={className}>{children}</span>;
+  return <a href={href} target="_blank" rel="noopener noreferrer" className={className}>{children}</a>;
+}
+
 function buildTrendData(posts: PostData[]) {
   const now = new Date();
   const weeks: { week: string; views: number; engagement: number }[] = [];
@@ -61,6 +66,7 @@ export interface PostData {
   views: number;
   likes: number;
   comments: number;
+  postUrl: string | null;
 }
 
 interface AnalyticsClientProps {
@@ -348,13 +354,13 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               {sortedPosts.map((post) => (
                 <div key={post.id} className="p-4 space-y-3">
                   <div className="flex items-start gap-3">
-                    <div className={`h-12 w-16 rounded-lg flex items-center justify-center shrink-0 ${platformBg(post.format)}`}>
+                    <ConditionalLink href={post.postUrl} className={`h-12 w-16 rounded-lg flex items-center justify-center shrink-0 ${platformBg(post.format)}`}>
                       {platformIcon(post.format)}
-                    </div>
+                    </ConditionalLink>
                     <div className="min-w-0">
-                      <p className="font-medium text-text-primary text-sm leading-snug line-clamp-2">
+                      <ConditionalLink href={post.postUrl} className="font-medium text-text-primary text-sm leading-snug line-clamp-2 hover:text-accent-primary transition-colors">
                         {post.title}
-                      </p>
+                      </ConditionalLink>
                       <div className="mt-1">{formatBadge(post.format)}</div>
                     </div>
                   </div>
@@ -424,14 +430,14 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
                       className="border-b border-background-secondary last:border-b-0 hover:bg-background-secondary/50 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
+                        <ConditionalLink href={post.postUrl} className="flex items-center gap-4 group">
                           <div className={`h-14 w-20 rounded-lg flex items-center justify-center shrink-0 ${platformBg(post.format)}`}>
                             {platformIcon(post.format)}
                           </div>
-                          <span className="font-medium text-text-primary line-clamp-2">
+                          <span className="font-medium text-text-primary line-clamp-2 group-hover:text-accent-primary transition-colors">
                             {post.title}
                           </span>
-                        </div>
+                        </ConditionalLink>
                       </td>
                       <td className="px-6 py-4">
                         {formatBadge(post.format)}

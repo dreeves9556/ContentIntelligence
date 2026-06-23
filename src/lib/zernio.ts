@@ -67,6 +67,7 @@ export interface ZernioAccountAnalytics {
     content: string;
     publishedAt: string;
     platform: string;
+    platformPostUrl?: string;
     analytics: {
       impressions?: number;
       likes?: number;
