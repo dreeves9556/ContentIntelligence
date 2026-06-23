@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   LayoutDashboard,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -19,6 +20,7 @@ import { useState } from "react";
 const adminNavItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Client Roster", href: "/admin", icon: Users },
+  { name: "Resources", href: "/admin/resources", icon: BookOpen },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

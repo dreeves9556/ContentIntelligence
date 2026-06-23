@@ -1,15 +1,18 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { BookOpen, Library } from "lucide-react";
-import LibraryClient from "./LibraryClient";
+import { BookOpen } from "lucide-react";
+import LibraryTabs from "./LibraryTabs";
+import { getPublishedResourcePosts } from "@/app/admin/resources/actions";
 import type { WeeklyCalendar } from "@/app/dashboard/calendar/actions";
+
+export const dynamic = "force-dynamic";
 
 export default async function LibraryPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [rawCalendars, archivedPosts] = await Promise.all([
+  const [rawCalendars, archivedPosts, resourcePosts] = await Promise.all([
     prisma.calendar.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
@@ -18,6 +21,7 @@ export default async function LibraryPage() {
       where: { userId: session.user.id },
       select: { weekStarting: true, dayIndex: true },
     }),
+    getPublishedResourcePosts(),
   ]);
 
   const postedKeys = new Set(archivedPosts.map((a) => `${a.weekStarting}:${a.dayIndex}`));
@@ -44,34 +48,18 @@ export default async function LibraryPage() {
             Content Library
           </h1>
           <p className="text-text-muted mt-1">
-            Every calendar ever generated for you — organized by week
+            Your post archive and coaching resources — all in one place
           </p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-background-secondary self-start">
           <BookOpen className="h-4 w-4 text-accent-primary" />
           <span className="text-sm text-text-primary font-medium">
-            {calendars.length} week{calendars.length !== 1 ? "s" : ""} generated
+            {calendars.length} week{calendars.length !== 1 ? "s" : ""} · {resourcePosts.length} article{resourcePosts.length !== 1 ? "s" : ""}
           </span>
         </div>
       </div>
 
-      {/* Empty state */}
-      {calendars.length === 0 && (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
-          <div className="p-4 bg-accent-primary/10 rounded-full mb-4">
-            <Library className="h-8 w-8 text-accent-primary" />
-          </div>
-          <h2 className="text-xl font-bold text-text-primary mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
-            Your library is empty
-          </h2>
-          <p className="text-text-muted max-w-sm">
-            Once you generate your first content calendar, every week will be saved here automatically.
-          </p>
-        </div>
-      )}
-
-      {/* Calendar list */}
-      {calendars.length > 0 && <LibraryClient calendars={calendars} />}
+      <LibraryTabs calendars={calendars} resourcePosts={resourcePosts} />
     </div>
   );
 }

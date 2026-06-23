@@ -191,15 +191,16 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-8",
         max_tokens: 300,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     if (!response.ok) {
-      console.error("Anthropic API error:", await response.text());
-      return { success: false, error: "AI service temporarily unavailable" };
+      const errorText = await response.text();
+      console.error("Anthropic API error:", errorText);
+      return { success: false, error: `AI service error (${response.status})` };
     }
 
     const data = await response.json();
