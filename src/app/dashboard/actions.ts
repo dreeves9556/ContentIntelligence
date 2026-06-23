@@ -5,11 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import webpush from "web-push";
 
-webpush.setVapidDetails(
-  process.env.NEXT_PUBLIC_VAPID_SUBJECT || "mailto:hello@contentintelligence.co",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.NEXT_PUBLIC_VAPID_SUBJECT || "mailto:hello@contentintelligence.co",
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 export interface PushPayload {
   title: string;

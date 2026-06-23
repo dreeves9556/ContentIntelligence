@@ -108,7 +108,8 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
       } else {
         setAiError(result.error || "Unable to generate insight");
       }
-    } catch {
+    } catch (e) {
+      console.error("AI Insight fetch error:", e);
       setAiError("Failed to load insight");
     } finally {
       setAiLoading(false);
