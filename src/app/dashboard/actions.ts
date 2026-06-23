@@ -105,6 +105,115 @@ export async function seedPostAnalytics() {
   return { success: true, message: "Seeded 7 dummy posts", count: 7 };
 }
 
+export interface AIInsightResult {
+  success: boolean;
+  insight?: string;
+  error?: string;
+}
+
+export async function generateAIInsight(posts: {
+  title: string;
+  format: string;
+  publishedAt: string;
+  views: number;
+  likes: number;
+  comments: number;
+}[]): Promise<AIInsightResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+
+  if (posts.length === 0) {
+    return { success: true, insight: "Connect your social accounts and sync analytics to get personalized AI insights about your content performance." };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { success: false, error: "AI service not configured" };
+  }
+
+  // Compute summary stats for the prompt
+  const totalViews = posts.reduce((s, p) => s + p.views, 0);
+  const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
+  const totalComments = posts.reduce((s, p) => s + p.comments, 0);
+  const avgEngagement = totalViews > 0 ? ((totalLikes + totalComments) / totalViews * 100).toFixed(1) : "0";
+
+  // Group by format
+  const byFormat: Record<string, { count: number; views: number; likes: number; comments: number }> = {};
+  for (const p of posts) {
+    if (!byFormat[p.format]) byFormat[p.format] = { count: 0, views: 0, likes: 0, comments: 0 };
+    byFormat[p.format].count++;
+    byFormat[p.format].views += p.views;
+    byFormat[p.format].likes += p.likes;
+    byFormat[p.format].comments += p.comments;
+  }
+
+  // Recent vs older comparison (split in half)
+  const sorted = [...posts].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  const mid = Math.ceil(sorted.length / 2);
+  const recent = sorted.slice(0, mid);
+  const older = sorted.slice(mid);
+  const recentAvgViews = recent.reduce((s, p) => s + p.views, 0) / (recent.length || 1);
+  const olderAvgViews = older.reduce((s, p) => s + p.views, 0) / (older.length || 1);
+  const viewsTrend = olderAvgViews > 0 ? (((recentAvgViews - olderAvgViews) / olderAvgViews) * 100).toFixed(0) : "0";
+
+  const formatSummary = Object.entries(byFormat)
+    .map(([fmt, d]) => `${fmt}: ${d.count} posts, ${d.views} views, ${((d.likes + d.comments) / (d.views || 1) * 100).toFixed(1)}% engagement`)
+    .join("\n");
+
+  const topPosts = sorted.slice(0, 5).map((p, i) =>
+    `${i + 1}. "${p.title}" (${p.format}) — ${p.views} views, ${p.likes} likes, ${p.comments} comments`
+  ).join("\n");
+
+  const prompt = `You are a social media content coach. Analyze this creator's recent performance data and provide ONE concise, actionable insight (2-3 sentences max). Be specific with numbers and give a clear recommendation.
+
+PERFORMANCE SUMMARY:
+- Total posts: ${posts.length}
+- Total views: ${totalViews}
+- Average engagement rate: ${avgEngagement}%
+- Views trend (recent vs older): ${viewsTrend}%
+
+BREAKDOWN BY FORMAT:
+${formatSummary}
+
+TOP PERFORMING POSTS:
+${topPosts}
+
+Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Anthropic API error:", await response.text());
+      return { success: false, error: "AI service temporarily unavailable" };
+    }
+
+    const data = await response.json();
+    const insight = data.content?.[0]?.text?.trim() || "";
+
+    if (!insight) {
+      return { success: false, error: "No insight generated" };
+    }
+
+    return { success: true, insight };
+  } catch (err) {
+    console.error("AI Insight generation failed:", err);
+    return { success: false, error: "Failed to generate insight" };
+  }
+}
+
 export async function subscribeUser(sub: PushSubscription) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   TrendingUp,
   Users,
@@ -29,7 +29,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { seedPostAnalytics } from "./actions";
+import { seedPostAnalytics, generateAIInsight } from "./actions";
 
 function ConditionalLink({ href, className, children }: { href: string | null; className?: string; children: React.ReactNode }) {
   if (!href) return <span className={className}>{children}</span>;
@@ -85,6 +85,39 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [seeding, setSeeding] = useState(false);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const fetchInsight = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await generateAIInsight(
+        posts.map((p) => ({
+          title: p.title,
+          format: p.format,
+          publishedAt: p.publishedAt,
+          views: p.views,
+          likes: p.likes,
+          comments: p.comments,
+        }))
+      );
+      if (result.success && result.insight) {
+        setAiInsight(result.insight);
+      } else {
+        setAiError(result.error || "Unable to generate insight");
+      }
+    } catch {
+      setAiError("Failed to load insight");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [posts]);
+
+  useEffect(() => {
+    fetchInsight();
+  }, [fetchInsight]);
   const trendData = buildTrendData(posts);
 
   const totalViews = posts.reduce((sum, p) => sum + p.views, 0);
@@ -214,19 +247,35 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
       <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
-            <Sparkles className="h-6 w-6 text-accent-primary" />
+            {aiLoading ? (
+              <Loader2 className="h-6 w-6 text-accent-primary animate-spin" />
+            ) : (
+              <Sparkles className="h-6 w-6 text-accent-primary" />
+            )}
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-accent-primary mb-2">
-              AI Insight
-            </h3>
-            <p className="text-text-primary leading-relaxed">
-              {"Your Reels are up "}
-              <span className="text-brand-expert font-semibold">20%</span>
-              {" this week. Keep leaning into local community content — posts featuring neighborhood businesses are performing "}
-              <span className="text-brand-expert font-semibold">35% better</span>
-              {" than average. Consider creating a weekly \"Local Spotlight\" series to capitalize on this trend."}
-            </p>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-accent-primary mb-2">
+                AI Insight
+              </h3>
+              {!aiLoading && aiInsight && (
+                <button
+                  onClick={fetchInsight}
+                  className="text-xs text-text-muted hover:text-accent-primary transition-colors"
+                >
+                  Refresh
+                </button>
+              )}
+            </div>
+            {aiLoading && (
+              <p className="text-text-muted leading-relaxed">Analyzing your content performance...</p>
+            )}
+            {aiError && (
+              <p className="text-text-muted leading-relaxed">{aiError}</p>
+            )}
+            {aiInsight && !aiLoading && (
+              <p className="text-text-primary leading-relaxed">{aiInsight}</p>
+            )}
           </div>
         </div>
       </div>
