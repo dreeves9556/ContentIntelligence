@@ -59,10 +59,11 @@ export async function syncAnalytics() {
 
       for (const post of analytics.posts ?? []) {
         const m = post.analytics;
+        const viewCount = Math.max(m.impressions ?? 0, m.views ?? 0);
         await prisma.postAnalytics.upsert({
           where: { externalId_userId: { externalId: post._id, userId: session.user.id } },
           update: {
-            views: m.impressions ?? m.views ?? 0,
+            views: viewCount,
             likes: m.likes ?? 0,
             comments: m.comments ?? 0,
             postUrl: post.platformPostUrl ?? null,
@@ -73,7 +74,7 @@ export async function syncAnalytics() {
             title: post.content.slice(0, 120),
             format: (post.platform ?? account.platform).toUpperCase(),
             publishedAt: new Date(post.publishedAt),
-            views: m.impressions ?? m.views ?? 0,
+            views: viewCount,
             likes: m.likes ?? 0,
             comments: m.comments ?? 0,
             postUrl: post.platformPostUrl ?? null,

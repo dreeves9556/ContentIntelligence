@@ -39,19 +39,22 @@ function ConditionalLink({ href, className, children }: { href: string | null; c
 
 function buildTrendData(posts: PostData[]) {
   const now = new Date();
-  const weeks: { week: string; views: number; engagement: number }[] = [];
+  const weeks: { week: string; dateRange: string; views: number; engagement: number }[] = [];
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   for (let i = 7; i >= 0; i--) {
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - i * 7 - 6);
     const weekEnd = new Date(now);
     weekEnd.setDate(now.getDate() - i * 7);
     const label = `Wk ${8 - i}`;
+    const dateRange = `${fmt(weekStart)} – ${fmt(weekEnd)}`;
     const weekPosts = posts.filter((p) => {
       const d = new Date(p.publishedAt);
       return d >= weekStart && d <= weekEnd;
     });
     weeks.push({
       week: label,
+      dateRange,
       views: weekPosts.reduce((s, p) => s + p.views, 0),
       engagement: weekPosts.reduce((s, p) => s + p.likes + p.comments, 0),
     });
@@ -376,7 +379,13 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
               <XAxis
                 dataKey="week"
                 stroke="#787878"
-                tick={{ fill: "#787878", fontSize: 12 }}
+                tick={({ x, y, payload, index }: { x: string | number; y: string | number; payload: { value: string }; index: number }) => (
+                  <g transform={`translate(${x},${y})`}>
+                    <text x={0} y={0} dy={14} textAnchor="middle" fill="#e8e8e8" fontSize={12} fontWeight={600}>{payload.value}</text>
+                    <text x={0} y={0} dy={28} textAnchor="middle" fill="#787878" fontSize={10}>{trendData[index]?.dateRange ?? ""}</text>
+                  </g>
+                )}
+                height={50}
                 tickLine={false}
               />
               <YAxis
@@ -402,6 +411,10 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
                   color: "#e8e8e8",
                 }}
                 formatter={(value) => [typeof value === "number" ? formatNumber(value) : value, ""]}
+                labelFormatter={(label, payload) => {
+                  const item = payload?.[0]?.payload as { week: string; dateRange: string } | undefined;
+                  return item ? `${item.week} · ${item.dateRange}` : label;
+                }}
               />
               <Legend
                 wrapperStyle={{ paddingTop: "20px" }}
