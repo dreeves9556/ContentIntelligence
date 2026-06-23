@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Plug, Share2, Music2, Facebook, PlayCircle, Zap } from "lucide-react";
+import { Plug, Share2, Music2, Users, PlayCircle, Zap } from "lucide-react";
 import ZernioCard from "./ZernioCard";
 import SyncButton from "./SyncButton";
 
@@ -25,7 +25,7 @@ const PLATFORMS = [
     label: "Facebook",
     description: "Sync page posts, reach & engagement",
     iconBg: "bg-blue-600",
-    icon: <Facebook className="h-6 w-6 text-white" />,
+    icon: <Users className="h-6 w-6 text-white" />,
   },
   {
     platform: "youtube",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   TrendingUp,
   Users,
@@ -18,6 +18,7 @@ import {
   MonitorPlay,
   Loader2,
   Database,
+  Layers,
 } from "lucide-react";
 import {
   LineChart,
@@ -76,6 +77,31 @@ interface AnalyticsClientProps {
 type SortKey = "date" | "views" | "engagement";
 type SortOrder = "asc" | "desc";
 
+const KNOWN_PLATFORMS = new Set(["INSTAGRAM", "TIKTOK", "LINKEDIN", "YOUTUBE", "FACEBOOK"]);
+
+function derivePlatform(format: string): string {
+  const f = format.toUpperCase();
+  return KNOWN_PLATFORMS.has(f) ? f : "OTHER";
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  INSTAGRAM: "Instagram",
+  TIKTOK: "TikTok",
+  LINKEDIN: "LinkedIn",
+  YOUTUBE: "YouTube",
+  FACEBOOK: "Facebook",
+  OTHER: "Other",
+};
+
+const PLATFORM_COLORS: Record<string, string> = {
+  INSTAGRAM: "from-blue-600 via-purple-600 to-pink-500",
+  TIKTOK: "from-neutral-700 to-neutral-900",
+  LINKEDIN: "from-blue-700 to-blue-900",
+  YOUTUBE: "from-red-600 to-red-800",
+  FACEBOOK: "from-blue-600 to-blue-800",
+  OTHER: "from-background-secondary to-background-card",
+};
+
 function computeEngagement(post: PostData) {
   if (post.views === 0) return 0;
   return +((post.likes + post.comments) / post.views * 100).toFixed(1);
@@ -88,6 +114,18 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [activePlatform, setActivePlatform] = useState<string>("ALL");
+
+  const platformTabs = useMemo(() => {
+    const present = new Set(posts.map((p) => derivePlatform(p.format)));
+    const order = ["INSTAGRAM", "TIKTOK", "LINKEDIN", "YOUTUBE", "FACEBOOK", "OTHER"];
+    return order.filter((pl) => present.has(pl));
+  }, [posts]);
+
+  const filteredPosts = useMemo(() => {
+    if (activePlatform === "ALL") return posts;
+    return posts.filter((p) => derivePlatform(p.format) === activePlatform);
+  }, [posts, activePlatform]);
 
   const fetchInsight = useCallback(async () => {
     setAiLoading(true);
@@ -110,20 +148,21 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
   useEffect(() => {
     fetchInsight();
   }, [fetchInsight]);
-  const trendData = buildTrendData(posts);
 
-  const totalViews = posts.reduce((sum, p) => sum + p.views, 0);
-  const totalLikes = posts.reduce((sum, p) => sum + p.likes, 0);
-  const totalComments = posts.reduce((sum, p) => sum + p.comments, 0);
+  const trendData = buildTrendData(filteredPosts);
+
+  const totalViews = filteredPosts.reduce((sum, p) => sum + p.views, 0);
+  const totalLikes = filteredPosts.reduce((sum, p) => sum + p.likes, 0);
+  const totalComments = filteredPosts.reduce((sum, p) => sum + p.comments, 0);
   const avgEngagement = totalViews > 0
     ? +((totalLikes + totalComments) / totalViews * 100).toFixed(1)
     : 0;
 
   const stats = [
-    { name: "Total Views", value: formatNumber(totalViews), change: posts.length > 0 ? "+12%" : "—", icon: Eye },
-    { name: "Engagement Rate", value: `${avgEngagement}%`, change: posts.length > 0 ? "+2.1%" : "—", icon: Heart },
-    { name: "Total Interactions", value: formatNumber(totalLikes + totalComments), change: posts.length > 0 ? "+5%" : "—", icon: Users },
-    { name: "Total Posts", value: String(posts.length), change: posts.length > 0 ? `+${posts.length}` : "—", icon: FileText },
+    { name: "Total Views", value: formatNumber(totalViews), change: filteredPosts.length > 0 ? "+12%" : "—", icon: Eye },
+    { name: "Engagement Rate", value: `${avgEngagement}%`, change: filteredPosts.length > 0 ? "+2.1%" : "—", icon: Heart },
+    { name: "Total Interactions", value: formatNumber(totalLikes + totalComments), change: filteredPosts.length > 0 ? "+5%" : "—", icon: Users },
+    { name: "Total Posts", value: String(filteredPosts.length), change: filteredPosts.length > 0 ? `+${filteredPosts.length}` : "—", icon: FileText },
   ];
 
   const handleSort = (key: SortKey) => {
@@ -135,7 +174,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
     }
   };
 
-  const sortedPosts = [...posts].sort((a, b) => {
+  const sortedPosts = [...filteredPosts].sort((a, b) => {
     let comparison = 0;
     if (sortKey === "date") {
       comparison = new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime();
@@ -234,6 +273,37 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
           </button>
         )}
       </div>
+
+      {/* Platform Tabs */}
+      {platformTabs.length > 0 && (
+        <div className="flex items-center gap-1 p-1 bg-background-card border border-background-secondary rounded-xl overflow-x-auto">
+          <button
+            onClick={() => setActivePlatform("ALL")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              activePlatform === "ALL"
+                ? "bg-accent-primary text-background-primary"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            All Platforms
+          </button>
+          {platformTabs.map((platform) => (
+            <button
+              key={platform}
+              onClick={() => setActivePlatform(platform)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                activePlatform === platform
+                  ? "bg-accent-primary text-background-primary"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <span className={`h-3 w-3 rounded-full bg-gradient-to-br ${PLATFORM_COLORS[platform]}`} />
+              {PLATFORM_LABELS[platform] ?? platform}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* AI Insights Box */}
       <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
@@ -367,13 +437,16 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
         <div className="p-6 border-b border-background-secondary">
           <h3 className="text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
             Recent Performance
+            {activePlatform !== "ALL" && (
+              <span className="ml-2 text-sm font-normal text-text-muted">— {PLATFORM_LABELS[activePlatform] ?? activePlatform}</span>
+            )}
           </h3>
           <p className="text-sm text-text-muted mt-1">
-            {posts.length > 0 ? "Posts pulled from your connected accounts" : "No post data yet — connect an account or seed demo data"}
+            {filteredPosts.length > 0 ? "Posts pulled from your connected accounts" : activePlatform !== "ALL" ? `No posts for ${PLATFORM_LABELS[activePlatform] ?? activePlatform}` : "No post data yet — connect an account or seed demo data"}
           </p>
         </div>
 
-        {posts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <div className="p-12 text-center">
             <Database className="h-10 w-10 text-text-muted mx-auto mb-3" />
             <p className="text-text-muted text-sm">No analytics data yet</p>
