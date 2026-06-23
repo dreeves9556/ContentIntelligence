@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --color-background-primary: #0a0a0a;
@@ -15,4 +16,89 @@
 body {
   background: var(--color-background-primary);
   color: var(--color-text-primary);
+}
+
+/* Rich text content — used in TiptapEditor and ResourcesTab article rendering */
+.tiptap-content h1,
+.tiptap-content h2,
+.tiptap-content h3,
+.tiptap-content h4 {
+  color: #e8e8e8;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+.tiptap-content h1 { font-size: 1.6rem; }
+.tiptap-content h2 { font-size: 1.3rem; }
+.tiptap-content h3 { font-size: 1.1rem; }
+
+.tiptap-content p {
+  color: #787878;
+  line-height: 1.75;
+  margin-bottom: 0.75em;
+}
+
+.tiptap-content strong { color: #e8e8e8; font-weight: 700; }
+.tiptap-content em { font-style: italic; }
+.tiptap-content s { text-decoration: line-through; }
+
+.tiptap-content ul,
+.tiptap-content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75em;
+  color: #787878;
+}
+.tiptap-content ul { list-style-type: disc; }
+.tiptap-content ol { list-style-type: decimal; }
+.tiptap-content li { margin-bottom: 0.25em; line-height: 1.7; }
+.tiptap-content li::marker { color: #c8952a; }
+
+.tiptap-content blockquote {
+  border-left: 3px solid #c8952a;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #787878;
+  font-style: italic;
+}
+
+.tiptap-content hr {
+  border: none;
+  border-top: 1px solid #1a1a1a;
+  margin: 1.5rem 0;
+}
+
+.tiptap-content a {
+  color: #c8952a;
+  text-decoration: underline;
+}
+
+.tiptap-content code {
+  background: #1a1a1a;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+  color: #e8e8e8;
+}
+
+.tiptap-content pre {
+  background: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+}
+.tiptap-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Tiptap placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #3a3a3a;
+  pointer-events: none;
+  float: left;
+  height: 0;
 }

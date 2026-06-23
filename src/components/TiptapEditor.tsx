@@ -33,13 +33,13 @@ interface TiptapEditorProps {
 }
 
 function ToolbarButton({
-  onClick,
+  onAction,
   active,
   disabled,
   title,
   children,
 }: {
-  onClick: () => void;
+  onAction: () => void;
   active?: boolean;
   disabled?: boolean;
   title: string;
@@ -48,9 +48,10 @@ function ToolbarButton({
   return (
     <button
       type="button"
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onClick();
+      tabIndex={-1}
+      onPointerDown={(e) => {
+        e.preventDefault(); // prevent editor blur
+        if (!disabled) onAction();
       }}
       disabled={disabled}
       title={title}
@@ -71,6 +72,7 @@ function Divider() {
 
 export default function TiptapEditor({ content, onChange, placeholder }: TiptapEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Underline,
@@ -84,8 +86,7 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
     },
     editorProps: {
       attributes: {
-        class:
-          "prose prose-invert prose-sm max-w-none min-h-[320px] focus:outline-none p-4 text-[#e8e8e8] leading-relaxed",
+        class: "tiptap-content min-h-[320px] focus:outline-none p-4",
       },
     },
   });
@@ -109,28 +110,28 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-[#2a2a2a] bg-[#111111]">
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onAction={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive("bold")}
           title="Bold"
         >
           <Bold className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onAction={() => editor.chain().focus().toggleItalic().run()}
           active={editor.isActive("italic")}
           title="Italic"
         >
           <Italic className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          onAction={() => editor.chain().focus().toggleUnderline().run()}
           active={editor.isActive("underline")}
           title="Underline"
         >
           <UnderlineIcon className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleStrike().run()}
+          onAction={() => editor.chain().focus().toggleStrike().run()}
           active={editor.isActive("strike")}
           title="Strikethrough"
         >
@@ -140,14 +141,14 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
         <Divider />
 
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          onAction={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           active={editor.isActive("heading", { level: 2 })}
           title="Heading 2"
         >
           <Heading2 className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          onAction={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           active={editor.isActive("heading", { level: 3 })}
           title="Heading 3"
         >
@@ -157,28 +158,28 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
         <Divider />
 
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          onAction={() => editor.chain().focus().toggleBulletList().run()}
           active={editor.isActive("bulletList")}
           title="Bullet list"
         >
           <List className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          onAction={() => editor.chain().focus().toggleOrderedList().run()}
           active={editor.isActive("orderedList")}
           title="Numbered list"
         >
           <ListOrdered className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          onAction={() => editor.chain().focus().toggleBlockquote().run()}
           active={editor.isActive("blockquote")}
           title="Blockquote"
         >
           <Quote className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          onAction={() => editor.chain().focus().setHorizontalRule().run()}
           title="Divider"
         >
           <Minus className="h-4 w-4" />
@@ -187,21 +188,21 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
         <Divider />
 
         <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          onAction={() => editor.chain().focus().setTextAlign("left").run()}
           active={editor.isActive({ textAlign: "left" })}
           title="Align left"
         >
           <AlignLeft className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          onAction={() => editor.chain().focus().setTextAlign("center").run()}
           active={editor.isActive({ textAlign: "center" })}
           title="Align center"
         >
           <AlignCenter className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          onAction={() => editor.chain().focus().setTextAlign("right").run()}
           active={editor.isActive({ textAlign: "right" })}
           title="Align right"
         >
@@ -210,21 +211,21 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
 
         <Divider />
 
-        <ToolbarButton onClick={setLink} active={editor.isActive("link")} title="Add link">
+        <ToolbarButton onAction={setLink} active={editor.isActive("link")} title="Add link">
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
 
         <Divider />
 
         <ToolbarButton
-          onClick={() => editor.chain().focus().undo().run()}
+          onAction={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
           title="Undo"
         >
           <Undo2 className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().redo().run()}
+          onAction={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
           title="Redo"
         >

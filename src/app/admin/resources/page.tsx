@@ -1,8 +1,9 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { BookOpen } from "lucide-react";
-import { getResourcePosts } from "./actions";
+import { getResourcePosts, getAdminAuthorProfile } from "./actions";
 import ResourcesAdminClient from "./ResourcesAdminClient";
+import AuthorProfileForm from "./AuthorProfileForm";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,10 @@ export default async function AdminResourcesPage() {
   const session = await auth();
   if (!session?.user || session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const posts = await getResourcePosts();
+  const [posts, authorProfile] = await Promise.all([
+    getResourcePosts(),
+    getAdminAuthorProfile(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -35,7 +39,18 @@ export default async function AdminResourcesPage() {
         </div>
       </div>
 
-      <ResourcesAdminClient initialPosts={posts} />
+      {/* Author profile */}
+      <AuthorProfileForm initial={authorProfile} />
+
+      {/* Article management */}
+      <div>
+        <h2
+          className="text-xs font-bold tracking-wider text-[#787878] uppercase mb-4"
+        >
+          Articles
+        </h2>
+        <ResourcesAdminClient initialPosts={posts} />
+      </div>
     </div>
   );
 }

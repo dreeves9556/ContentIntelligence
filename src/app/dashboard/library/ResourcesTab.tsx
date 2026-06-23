@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { BookOpen, Tag, Calendar, Search, ChevronDown, ChevronUp } from "lucide-react";
 import type { ResourcePostData } from "@/app/admin/resources/actions";
 
@@ -18,6 +19,31 @@ function CategoryBadge({ category }: { category: string }) {
       <Tag className="h-3 w-3" />
       {category}
     </span>
+  );
+}
+
+function AuthorByline({ post }: { post: ResourcePostData }) {
+  const name = post.authorDisplayName ?? post.authorName;
+  if (!name) return null;
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div className="flex items-center gap-2">
+      {post.authorImage ? (
+        <div className="relative h-7 w-7 rounded-full overflow-hidden shrink-0 border border-background-secondary">
+          <Image src={post.authorImage} alt={name} fill className="object-cover" unoptimized />
+        </div>
+      ) : (
+        <div className="h-7 w-7 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary text-[10px] font-bold shrink-0">
+          {initials}
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-text-primary leading-tight">{name}</p>
+        {post.authorOrganization && (
+          <p className="text-[10px] text-text-muted leading-tight">{post.authorOrganization}</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -40,11 +66,12 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
             </span>
           </div>
           <h3
-            className="text-lg font-bold text-text-primary leading-snug"
+            className="text-lg font-bold text-text-primary leading-snug mb-3"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             {post.title}
           </h3>
+          <AuthorByline post={post} />
         </div>
         <div className="shrink-0 text-text-muted mt-1">
           {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -53,18 +80,15 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
 
       {/* Expanded article content */}
       {expanded && (
-        <div className="border-t border-background-secondary px-5 py-5">
+        <div className="border-t border-background-secondary px-5 py-5 space-y-5">
           <div
-            className="prose prose-invert prose-sm max-w-none text-text-muted
-              prose-headings:text-text-primary prose-headings:font-bold
-              prose-h2:text-xl prose-h3:text-base
-              prose-strong:text-text-primary
-              prose-a:text-accent-primary prose-a:underline
-              prose-blockquote:border-accent-primary/40 prose-blockquote:text-text-muted
-              prose-hr:border-background-secondary
-              prose-li:marker:text-accent-primary"
+            className="tiptap-content"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
+          {/* Author footer */}
+          <div className="pt-4 border-t border-background-secondary">
+            <AuthorByline post={post} />
+          </div>
         </div>
       )}
     </div>

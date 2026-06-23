@@ -22,14 +22,41 @@ export interface ResourcePostData {
   createdAt: string;
   updatedAt: string;
   authorName: string | null;
+  authorDisplayName: string | null;
+  authorImage: string | null;
+  authorOrganization: string | null;
 }
 
-export async function getResourcePosts(): Promise<ResourcePostData[]> {
-  const posts = await prisma.resourcePost.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { author: { select: { name: true } } },
-  });
-  return posts.map((p) => ({
+export interface AdminAuthorProfile {
+  displayName: string;
+  image: string;
+  organization: string;
+}
+
+const AUTHOR_SELECT = {
+  name: true,
+  authorDisplayName: true,
+  authorImage: true,
+  authorOrganization: true,
+} as const;
+
+function mapPost(p: {
+  id: string;
+  title: string;
+  content: string;
+  category: string | null;
+  published: boolean;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  author: {
+    name: string | null;
+    authorDisplayName: string | null;
+    authorImage: string | null;
+    authorOrganization: string | null;
+  };
+}): ResourcePostData {
+  return {
     id: p.id,
     title: p.title,
     content: p.content,
@@ -39,26 +66,64 @@ export async function getResourcePosts(): Promise<ResourcePostData[]> {
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     authorName: p.author.name,
-  }));
+    authorDisplayName: p.author.authorDisplayName,
+    authorImage: p.author.authorImage,
+    authorOrganization: p.author.authorOrganization,
+  };
+}
+
+export async function getResourcePosts(): Promise<ResourcePostData[]> {
+  const posts = await prisma.resourcePost.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { author: { select: AUTHOR_SELECT } },
+  });
+  return posts.map(mapPost);
 }
 
 export async function getPublishedResourcePosts(): Promise<ResourcePostData[]> {
   const posts = await prisma.resourcePost.findMany({
     where: { published: true },
     orderBy: { publishedAt: "desc" },
-    include: { author: { select: { name: true } } },
+    include: { author: { select: AUTHOR_SELECT } },
   });
-  return posts.map((p) => ({
-    id: p.id,
-    title: p.title,
-    content: p.content,
-    category: p.category,
-    published: p.published,
-    publishedAt: p.publishedAt?.toISOString() ?? null,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-    authorName: p.author.name,
-  }));
+  return posts.map(mapPost);
+}
+
+export async function getAdminAuthorProfile(): Promise<AdminAuthorProfile> {
+  const id = await requireAdmin();
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { name: true, authorDisplayName: true, authorImage: true, authorOrganization: true },
+  });
+  return {
+    displayName: user?.authorDisplayName ?? user?.name ?? "",
+    image: user?.authorImage ?? "",
+    organization: user?.authorOrganization ?? "",
+  };
+}
+
+export async function updateAdminAuthorProfile(data: {
+  displayName: string;
+  image: string;
+  organization: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const id = await requireAdmin();
+    await prisma.user.update({
+      where: { id },
+      data: {
+        authorDisplayName: data.displayName.trim() || null,
+        authorImage: data.image.trim() || null,
+        authorOrganization: data.organization.trim() || null,
+      },
+    });
+    revalidatePath("/admin/resources");
+    revalidatePath("/dashboard/library");
+    return { success: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return { success: false, error: msg };
+  }
 }
 
 export async function createResourcePost(data: {
