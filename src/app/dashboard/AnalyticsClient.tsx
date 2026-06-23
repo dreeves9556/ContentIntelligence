@@ -119,6 +119,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string>("ALL");
   const [insightExpanded, setInsightExpanded] = useState(false);
+  const [chartWidth, setChartWidth] = useState(0);
 
   const platformTabs = useMemo(() => {
     const present = new Set(posts.map((p) => derivePlatform(p.format)));
@@ -402,7 +403,7 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
           </p>
         </div>
         <div className="h-80 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" onResize={(w) => setChartWidth(w)}>
             <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
               <XAxis
@@ -411,10 +412,12 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
                 tick={({ x, y, payload, index }: { x: string | number; y: string | number; payload: { value: string }; index: number }) => (
                   <g transform={`translate(${x},${y})`}>
                     <text x={0} y={0} dy={14} textAnchor="middle" fill="#e8e8e8" fontSize={12} fontWeight={600}>{payload.value}</text>
-                    <text x={0} y={0} dy={22} textAnchor="end" fill="#787878" fontSize={10} transform="rotate(-35)">{trendData[index]?.dateRange ?? ""}</text>
+                    {chartWidth >= 480 && (
+                      <text x={0} y={0} dy={28} textAnchor="middle" fill="#787878" fontSize={10}>{trendData[index]?.dateRange ?? ""}</text>
+                    )}
                   </g>
                 )}
-                height={65}
+                height={50}
                 tickLine={false}
               />
               <YAxis
