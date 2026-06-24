@@ -5,6 +5,7 @@ import Link from "next/link";
 import { InviteClientButton } from "./components/InviteClientButton";
 import PlanSwitcher from "./components/PlanSwitcher";
 import RoleSwitcher from "./components/RoleSwitcher";
+import ResetPasswordButton from "./components/ResetPasswordButton";
 import type { UserPlan } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
@@ -160,6 +161,7 @@ export default async function AdminPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <RoleSwitcher userId={user.id} currentRole={user.role} />
                 <PlanSwitcher userId={user.id} currentPlan={user.plan} />
+                <ResetPasswordButton userId={user.id} userEmail={user.email} />
                 <StatusPill status={user.status} />
                 <span className="text-xs text-[#787878]">{format(user.createdAt, "MMM d, yyyy")}</span>
               </div>
@@ -209,6 +211,9 @@ export default async function AdminPage() {
                   Status
                 </th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                  Actions
+                </th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
                   Activity
                 </th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
@@ -238,6 +243,9 @@ export default async function AdminPage() {
                   </td>
                   <td className="py-4 px-6">
                     <StatusPill status={user.status} />
+                  </td>
+                  <td className="py-4 px-6">
+                    <ResetPasswordButton userId={user.id} userEmail={user.email} />
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-4 text-sm">

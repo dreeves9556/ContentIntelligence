@@ -33,6 +33,7 @@ model User {
   profileSurveys   ProfileSurvey[]
   zernioAccounts   ZernioAccount[]
   resourcePosts    ResourcePost[]
+  bugReports      BugReport[]
   accounts      Account[]
   sessions      Session[]
 
@@ -151,6 +152,17 @@ model InviteToken {
   plan      UserPlan @default(CREATOR)
 
   @@map("invite_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, token])
+  @@map("password_reset_tokens")
 }
 
 enum UserRole {
@@ -294,4 +306,26 @@ model ResourcePost {
   updatedAt   DateTime  @updatedAt
 
   @@map("resource_posts")
+}
+
+enum BugReportStatus {
+  OPEN
+  INVESTIGATED
+  SOLVED
+}
+
+model BugReport {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  email       String
+  deviceInfo  String          // "mobile" or "browser" — user-reported
+  description String
+  status      BugReportStatus @default(OPEN)
+  adminNotes  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("bug_reports")
 }

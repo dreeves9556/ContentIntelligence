@@ -13,6 +13,7 @@ import {
   X,
   BookOpen,
   Mail,
+  Bug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -22,6 +23,7 @@ const adminNavItems = [
   { name: "Client Roster", href: "/admin", icon: Users },
   { name: "Bulk Invites", href: "/admin/invites", icon: Mail },
   { name: "Resources", href: "/admin/resources", icon: BookOpen },
+  { name: "Bug Reports", href: "/admin/bugs", icon: Bug },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

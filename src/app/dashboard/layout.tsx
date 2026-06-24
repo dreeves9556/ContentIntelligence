@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
+import BugReportButton from "./bug-report/BugReportButton";
 
 const ALL_NAV_ITEMS = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
@@ -145,6 +146,7 @@ export default function DashboardLayout({
               <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
             </div>
           </div>
+          <BugReportButton />
           <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
             <LogOut className="h-5 w-5 mr-2" />
             Sign Out
@@ -217,6 +219,7 @@ export default function DashboardLayout({
               <p className="text-xs text-text-muted">Plan</p>
               <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
             </div>
+            <BugReportButton />
             <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
               <LogOut className="h-5 w-5 mr-2" />
               Sign Out

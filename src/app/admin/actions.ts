@@ -279,3 +279,69 @@ export async function deleteInvite(
     return { success: false, error: "Failed to delete invite" };
   }
 }
+
+export async function adminResetPassword(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.email) {
+    return { success: false, error: "User not found or has no email." };
+  }
+
+  const email = user.email;
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.passwordResetToken.deleteMany({ where: { email } });
+  await prisma.passwordResetToken.create({
+    data: { email, token, expiresAt },
+  });
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+  const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const result = await resend.emails.send({
+      from: `Core OS <${fromAddress}>`,
+      to: email,
+      subject: "Reset your Core OS password",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#111111;color:#e8e8e8;border-radius:12px;overflow:hidden;">
+          <div style="background:#0a0a0a;padding:32px 32px 24px;border-bottom:1px solid #1a1a1a;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#e8e8e8;">Core OS</p>
+            <p style="margin:4px 0 0;font-size:11px;font-weight:600;color:#c8952a;letter-spacing:0.1em;text-transform:uppercase;">Password Reset</p>
+          </div>
+          <div style="padding:32px;">
+            <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#e8e8e8;">Reset Your Password</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#787878;line-height:1.6;">
+              An administrator has initiated a password reset for your account. Click the button below to choose a new password.
+            </p>
+            <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#c8952a;color:#0a0a0a;font-weight:600;font-size:14px;text-decoration:none;border-radius:8px;">
+              Reset Password
+            </a>
+            <p style="margin:24px 0 0;font-size:12px;color:#3a3a3a;line-height:1.6;">
+              This link expires in 1 hour.<br/>
+              If you didn&apos;t request a password reset, you can safely ignore this email.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    if (result.error) {
+      console.error("[ADMIN RESET] Resend error:", result.error);
+      return { success: false, error: "Failed to send reset email. Please try again." };
+    }
+  } catch (emailError) {
+    console.error("[ADMIN RESET] Failed to send email:", emailError);
+    return { success: false, error: "Failed to send reset email. Please try again." };
+  }
+
+  return { success: true };
+}
