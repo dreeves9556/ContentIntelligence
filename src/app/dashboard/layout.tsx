@@ -59,7 +59,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-background-primary overflow-x-hidden">
+    <div className="h-screen bg-background-primary overflow-hidden flex flex-col">
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div
@@ -156,9 +156,9 @@ export default function DashboardLayout({
       </div>
 
       {/* Desktop layout */}
-      <div className="flex min-h-screen">
+      <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-64 flex-col bg-background-secondary border-r border-background-primary">
+        <aside className="hidden lg:flex w-64 flex-col bg-background-secondary border-r border-background-primary shrink-0 overflow-y-auto">
           <div className="flex items-center gap-2 p-6 border-b border-background-primary">
             <Sparkles className="h-6 w-6 text-accent-primary" />
             <span className="font-bold text-lg" style={{ fontFamily: "var(--font-playfair)" }}>
@@ -229,7 +229,7 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden overflow-y-auto">
           {/* Mobile header */}
           <header className="lg:hidden flex items-center justify-between p-4 border-b border-background-secondary bg-background-primary/95 backdrop-blur">
             <div className="flex items-center gap-2">

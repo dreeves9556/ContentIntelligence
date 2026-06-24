@@ -41,7 +41,7 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="h-screen bg-[#0a0a0a] overflow-hidden flex flex-col">
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div
@@ -102,9 +102,9 @@ export default function AdminLayout({
       </div>
 
       {/* Desktop layout */}
-      <div className="flex min-h-screen">
+      <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-64 flex-col bg-[#111111] border-r border-[#0a0a0a]">
+        <aside className="hidden lg:flex w-64 flex-col bg-[#111111] border-r border-[#0a0a0a] shrink-0 overflow-y-auto">
           <div className="flex items-center gap-2 p-6 border-b border-[#0a0a0a]">
             <Crown className="h-6 w-6 text-[#c8952a]" />
             <div className="flex flex-col">
@@ -148,7 +148,7 @@ export default function AdminLayout({
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-y-auto">
           {/* Mobile header */}
           <header className="lg:hidden flex items-center justify-between p-4 border-b border-[#111111] bg-[#0a0a0a]/95 backdrop-blur">
             <div className="flex items-center gap-2">
