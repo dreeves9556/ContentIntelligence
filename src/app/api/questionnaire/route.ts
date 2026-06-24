@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { validateQuestionnaire } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -10,7 +11,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const data = await req.json();
+    const raw = await req.json();
+
+    const validation = validateQuestionnaire(raw);
+    if (!validation.success || !validation.data) {
+      return NextResponse.json({ success: false, error: validation.error ?? "Invalid data" }, { status: 400 });
+    }
+
+    const data = validation.data;
     const userId = session.user.id;
 
     const title = `Brand Questionnaire — ${data.businessName || data.name || "New Client"}`;

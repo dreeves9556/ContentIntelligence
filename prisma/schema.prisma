@@ -17,6 +17,7 @@ model User {
   image         String?
   role          UserRole       @default(USER)
   plan          UserPlan       @default(CREATOR)
+  tokenVersion  Int            @default(0)  // Incremented on password reset to invalidate existing JWTs
   authorDisplayName  String?  // Public byline name shown on articles
   authorImage        String?  // URL to headshot
   authorOrganization String?  // Optional org/title shown under name

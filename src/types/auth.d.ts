@@ -20,5 +20,7 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: "USER" | "ADMIN";
     plan?: "CALENDAR_ONLY" | "CREATOR" | "PRO";
+    sessionExpiry?: number;
+    tokenVersion?: number;
   }
 }

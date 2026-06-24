@@ -39,8 +39,6 @@ export default function LoginPage() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    console.log("[LOGIN] Submitting:", { email, passwordLength: password?.length });
-
     const result = await signIn("credentials", {
       email,
       password,
@@ -48,8 +46,6 @@ export default function LoginPage() {
       redirect: false,
       callbackUrl: "/dashboard",
     });
-
-    console.log("[LOGIN] Result:", result);
 
     if (result?.error) {
       setError("Invalid email or password");

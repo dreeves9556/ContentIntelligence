@@ -115,7 +115,7 @@ function ResetPasswordForm() {
                     disabled={!token}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
+                    placeholder="Min 8 chars, 1 letter & 1 number"
                     className="w-full pl-10 pr-10 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all disabled:opacity-50"
                     style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
                   />

@@ -13,7 +13,7 @@ export const authConfig = {
       const sessionExpiry = (auth?.user as { sessionExpiry?: number } | undefined)?.sessionExpiry;
       const isExpired = sessionExpiry ? Date.now() > sessionExpiry : false;
       const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
-      const isOnOnboardingAdmin = nextUrl.pathname.startsWith("/onboarding/admin");
+      const isOnOnboarding = nextUrl.pathname.startsWith("/onboarding");
       const isOnAdmin = nextUrl.pathname.startsWith("/admin");
 
       if (isOnAdmin) {
@@ -22,7 +22,7 @@ export const authConfig = {
         return true;
       }
 
-      if (isOnDashboard || isOnOnboardingAdmin) {
+      if (isOnDashboard || isOnOnboarding) {
         if (isLoggedIn && !isExpired) return true;
         return false;
       }
@@ -37,8 +37,18 @@ export const authConfig = {
     },
     session({ session, token }) {
       if (token) {
+        const sessionExpiry = token.sessionExpiry as number | undefined;
+        const isExpired = sessionExpiry ? Date.now() > sessionExpiry : false;
+
+        if (isExpired) {
+          return {
+            ...session,
+            user: { ...session.user, id: undefined as unknown as string },
+          } as typeof session;
+        }
+
         session.user.role = token.role as "USER" | "ADMIN";
-        (session.user as { sessionExpiry?: number }).sessionExpiry = token.sessionExpiry as number | undefined;
+        (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }
       return session;
     },

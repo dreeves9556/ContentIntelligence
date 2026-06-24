@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { PlatformConfig } from "@prisma/client";
+import { decryptIfEncrypted } from "@/lib/crypto";
 
 export type PlatformConfigData = Pick<
   PlatformConfig,
@@ -32,11 +33,11 @@ export async function getPlatformConfig(): Promise<PlatformConfigData> {
   if (!row) return DEFAULT_CONFIG;
 
   return {
-    zernioApiKey: row.zernioApiKey,
+    zernioApiKey: decryptIfEncrypted(row.zernioApiKey),
     zernioEnabledPlatforms: row.zernioEnabledPlatforms,
     analyticsSyncFrequencyMinutes: row.analyticsSyncFrequencyMinutes,
     anthropicModel: row.anthropicModel,
-    anthropicApiKey: row.anthropicApiKey,
+    anthropicApiKey: decryptIfEncrypted(row.anthropicApiKey),
     insightPromptTemplate: row.insightPromptTemplate,
     calendarPromptTemplate: row.calendarPromptTemplate,
     calendarStrategyPromptTemplate: row.calendarStrategyPromptTemplate,

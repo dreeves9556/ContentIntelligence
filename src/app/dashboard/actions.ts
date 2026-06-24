@@ -142,6 +142,11 @@ export async function getCachedInsight(): Promise<AIInsightResult> {
 }
 
 export async function generateAIInsight(userId: string): Promise<AIInsightResult> {
+  const session = await auth();
+  if (!session?.user?.id || session.user.id !== userId) {
+    return { success: false, error: "Not authenticated" };
+  }
+
   const posts = await prisma.postAnalytics.findMany({
     where: { userId },
     orderBy: { publishedAt: "desc" },

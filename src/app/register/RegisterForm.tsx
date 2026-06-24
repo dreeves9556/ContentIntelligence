@@ -63,7 +63,7 @@ export function RegisterForm({ email, token }: RegisterFormProps) {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Minimum 8 characters"
+            placeholder="Min 8 chars, 1 letter & 1 number"
             className="w-full pl-10 pr-10 py-2.5 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-[#e8e8e8] placeholder-[#3a3a3a] focus:outline-none focus:border-[#c8952a]/50 transition-colors text-sm"
           />
           <button

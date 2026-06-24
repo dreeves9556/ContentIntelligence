@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
+import { validateQuestionnaire } from "@/lib/validation";
 
 export type UpdateQuestionnaireResult =
   | { success: true }
@@ -32,11 +33,18 @@ export async function updateQuestionnaire(
     return { success: false, error: "Not authorised to edit this questionnaire." };
   }
 
+  const validation = validateQuestionnaire(data);
+  if (!validation.success || !validation.data) {
+    return { success: false, error: validation.error ?? "Invalid questionnaire data." };
+  }
+
+  const validatedData = validation.data;
+
   await prisma.questionnaire.update({
     where: { id: questionnaireId },
     data: {
-      content: data as object,
-      title: `Brand Questionnaire — ${data.name || "Unnamed"}`,
+      content: validatedData as object,
+      title: `Brand Questionnaire — ${validatedData.name || "Unnamed"}`,
     },
   });
 

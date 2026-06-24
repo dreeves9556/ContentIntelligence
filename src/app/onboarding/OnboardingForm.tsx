@@ -757,6 +757,13 @@ export default function OnboardingForm() {
         >
           {renderSection()}
 
+          {/* PII disclosure on final step */}
+          {isLastStep && (
+            <p className="mt-6 text-xs text-text-muted leading-relaxed">
+              By submitting, you acknowledge that your answers will be processed by our AI provider (Anthropic) to generate personalized content recommendations. Your data is handled in accordance with our privacy policy.
+            </p>
+          )}
+
           {/* Nav buttons */}
           <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/5">
             <button

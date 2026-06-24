@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import DOMPurify from "isomorphic-dompurify";
 
 async function requireAdmin() {
   const session = await auth();
@@ -73,6 +74,7 @@ function mapPost(p: {
 }
 
 export async function getResourcePosts(): Promise<ResourcePostData[]> {
+  await requireAdmin();
   const posts = await prisma.resourcePost.findMany({
     orderBy: { createdAt: "desc" },
     include: { author: { select: AUTHOR_SELECT } },
@@ -86,7 +88,11 @@ export async function getPublishedResourcePosts(): Promise<ResourcePostData[]> {
     orderBy: { publishedAt: "desc" },
     include: { author: { select: AUTHOR_SELECT } },
   });
-  return posts.map(mapPost);
+  return posts.map((p) => {
+    const mapped = mapPost(p);
+    mapped.content = DOMPurify.sanitize(mapped.content);
+    return mapped;
+  });
 }
 
 export async function getAdminAuthorProfile(): Promise<AdminAuthorProfile> {
@@ -137,7 +143,7 @@ export async function createResourcePost(data: {
     const post = await prisma.resourcePost.create({
       data: {
         title: data.title.trim(),
-        content: data.content,
+        content: DOMPurify.sanitize(data.content),
         category: data.category?.trim() || null,
         published: data.published,
         publishedAt: data.published ? new Date() : null,
@@ -167,7 +173,7 @@ export async function updateResourcePost(
       where: { id },
       data: {
         title: data.title.trim(),
-        content: data.content,
+        content: DOMPurify.sanitize(data.content),
         category: data.category?.trim() || null,
         published: data.published,
         publishedAt: data.published && wasUnpublished ? new Date() : existing.publishedAt,

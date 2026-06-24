@@ -4,6 +4,10 @@ import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, recordFailedAttempt } from "@/lib/rate-limiter";
+
+const RESET_MAX_ATTEMPTS = 3;
+const RESET_LOCKOUT_MS = 60 * 60 * 1000; // 1 hour
 
 export async function requestPasswordReset(
   email: string
@@ -13,6 +17,15 @@ export async function requestPasswordReset(
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const rateLimitKey = `reset:${normalizedEmail}`;
+
+  const rateCheck = checkRateLimit(rateLimitKey, RESET_MAX_ATTEMPTS, RESET_LOCKOUT_MS);
+  if (!rateCheck.allowed) {
+    return {
+      success: false,
+      error: `Too many reset requests. Please try again in ${Math.ceil(rateCheck.retryAfterMs! / (60 * 1000))} minutes.`,
+    };
+  }
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
@@ -20,6 +33,7 @@ export async function requestPasswordReset(
 
   // Don't reveal whether the email exists — always return success
   if (!user || !user.password) {
+    recordFailedAttempt(rateLimitKey, RESET_MAX_ATTEMPTS, RESET_LOCKOUT_MS);
     return { success: true };
   }
 
@@ -91,6 +105,10 @@ export async function resetPassword(
     return { success: false, error: "Password must be at least 8 characters." };
   }
 
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return { success: false, error: "Password must include at least one letter and one number." };
+  }
+
   const resetToken = await prisma.passwordResetToken.findUnique({
     where: { token },
   });
@@ -116,7 +134,10 @@ export async function resetPassword(
 
   await prisma.user.update({
     where: { email: resetToken.email },
-    data: { password: hashedPassword },
+    data: {
+      password: hashedPassword,
+      tokenVersion: { increment: 1 },
+    },
   });
 
   // Delete the token so it can't be reused

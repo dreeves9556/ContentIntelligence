@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { PlatformConfigData } from "@/lib/platform-config";
+import { encryptIfPlaintext, decryptIfEncrypted } from "@/lib/crypto";
 
 export async function updatePlatformConfig(
   data: Partial<PlatformConfigData>
@@ -28,6 +29,14 @@ export async function updatePlatformConfig(
     if (key in data) {
       update[key] = data[key];
     }
+  }
+
+  // Encrypt API keys before storing
+  if (update.zernioApiKey !== undefined) {
+    update.zernioApiKey = update.zernioApiKey ? encryptIfPlaintext(update.zernioApiKey as string) : null;
+  }
+  if (update.anthropicApiKey !== undefined) {
+    update.anthropicApiKey = update.anthropicApiKey ? encryptIfPlaintext(update.anthropicApiKey as string) : null;
   }
 
   if (
@@ -92,11 +101,11 @@ export async function getPlatformConfigForAdmin(): Promise<PlatformConfigData & 
 
   const count = await prisma.zernioAccount.count();
   return {
-    zernioApiKey: row.zernioApiKey,
+    zernioApiKey: decryptIfEncrypted(row.zernioApiKey),
     zernioEnabledPlatforms: row.zernioEnabledPlatforms,
     analyticsSyncFrequencyMinutes: row.analyticsSyncFrequencyMinutes,
     anthropicModel: row.anthropicModel,
-    anthropicApiKey: row.anthropicApiKey,
+    anthropicApiKey: decryptIfEncrypted(row.anthropicApiKey),
     insightPromptTemplate: row.insightPromptTemplate,
     calendarPromptTemplate: row.calendarPromptTemplate,
     calendarStrategyPromptTemplate: row.calendarStrategyPromptTemplate,

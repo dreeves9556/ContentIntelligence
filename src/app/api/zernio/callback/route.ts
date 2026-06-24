@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -11,6 +12,13 @@ export async function GET(req: NextRequest) {
   if (!platform || !userId || !profileId) {
     return NextResponse.redirect(
       new URL("/dashboard/integrations?error=missing_params", req.nextUrl.origin)
+    );
+  }
+
+  const session = await auth();
+  if (!session?.user?.id || session.user.id !== userId) {
+    return NextResponse.redirect(
+      new URL("/login", req.nextUrl.origin)
     );
   }
 

@@ -7,6 +7,11 @@ import { auth } from "@/auth";
 import type { UserPlan } from "@/lib/tiers";
 
 export async function createInviteLink(email: string, plan?: UserPlan): Promise<{ url: string; error?: string } | { error: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { error: "Unauthorized" };
+  }
+
   if (!email || !email.includes("@")) {
     return { error: "A valid email address is required." };
   }
