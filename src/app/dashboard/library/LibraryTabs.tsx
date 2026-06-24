@@ -36,7 +36,7 @@ export default function LibraryTabs({
   return (
     <div className="space-y-6">
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-background-secondary overflow-x-auto scrollbar-none">
+      <div className="sticky top-0 z-20 flex items-center gap-1 border-b border-background-secondary bg-background-primary overflow-x-auto scrollbar-none">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
