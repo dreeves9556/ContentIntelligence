@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 const ALL_NAV_ITEMS = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
-  { name: "Analytics", href: "/dashboard", icon: BarChart3, alwaysUnlocked: false },
+  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, alwaysUnlocked: false },
   { name: "Content Library", href: "/dashboard/library", icon: Library, alwaysUnlocked: true },
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug, alwaysUnlocked: false },
   { name: "Profile", href: "/dashboard/profile", icon: User, alwaysUnlocked: true },
@@ -32,7 +32,7 @@ const ALL_NAV_ITEMS = [
 function getNavItems(plan: UserPlan) {
   return ALL_NAV_ITEMS.map((item) => {
     if (item.alwaysUnlocked) return { ...item, locked: false };
-    if (item.href === "/dashboard" && !canAccessAnalytics(plan)) return { ...item, locked: true };
+    if (item.href === "/dashboard/analytics" && !canAccessAnalytics(plan)) return { ...item, locked: true };
     if (item.href === "/dashboard/integrations" && !canAccessIntegrations(plan)) return { ...item, locked: true };
     return { ...item, locked: false };
   });
