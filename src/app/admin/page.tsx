@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Users, UserPlus, Crown, Shield, FileText, CalendarDays } from "lucide-react";
+import { Users, UserPlus, Crown, Shield, FileText, CalendarDays, Mail, Share2 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { InviteClientButton } from "./components/InviteClientButton";
@@ -20,6 +20,7 @@ interface UserWithStats {
   _count?: {
     questionnaires: number;
     calendars: number;
+    zernioAccounts: number;
   };
 }
 
@@ -33,6 +34,7 @@ async function getUsers(): Promise<UserWithStats[]> {
         select: {
           questionnaires: true,
           calendars: true,
+          zernioAccounts: true,
         },
       },
     },
@@ -83,7 +85,16 @@ export default async function AdminPage() {
             Manage your clients and their platform access
           </p>
         </div>
-        <InviteClientButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/invites"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-[#e8e8e8] font-medium rounded-lg transition-colors"
+          >
+            <Mail className="h-4 w-4" />
+            Bulk Invite
+          </Link>
+          <InviteClientButton />
+        </div>
       </div>
 
       {/* Stats */}
@@ -171,6 +182,10 @@ export default async function AdminPage() {
                   <CalendarDays className="h-3 w-3" />
                   {user._count?.calendars || 0} calendar{user._count?.calendars !== 1 ? "s" : ""}
                 </span>
+                <span className="flex items-center gap-1 text-[#787878]">
+                  <Share2 className="h-3 w-3" />
+                  {user._count?.zernioAccounts || 0} social{user._count?.zernioAccounts !== 1 ? "s" : ""}
+                </span>
               </div>
             </div>
           ))}
@@ -244,6 +259,11 @@ export default async function AdminPage() {
                       <span className="text-[#787878] flex items-center gap-1.5">
                         <CalendarDays className="h-3.5 w-3.5" />
                         {user._count?.calendars || 0} calendar{user._count?.calendars !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-[#2a2a2a]">|</span>
+                      <span className="text-[#787878] flex items-center gap-1.5">
+                        <Share2 className="h-3.5 w-3.5" />
+                        {user._count?.zernioAccounts || 0} social{user._count?.zernioAccounts !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </td>

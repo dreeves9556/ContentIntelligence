@@ -38,6 +38,7 @@ export async function registerWithToken(
       email: invite.email,
       password: hashedPassword,
       role: "USER",
+      plan: invite.plan ?? "CREATOR",
     },
   });
 

@@ -6,19 +6,20 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { UserPlan } from "@/lib/tiers";
 
-export async function createInviteLink(email: string): Promise<{ url: string; error?: string } | { error: string }> {
+export async function createInviteLink(email: string, plan?: UserPlan): Promise<{ url: string; error?: string } | { error: string }> {
   if (!email || !email.includes("@")) {
     return { error: "A valid email address is required." };
   }
 
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const invitePlan = plan ?? "CREATOR";
 
   try {
     await prisma.inviteToken.upsert({
       where: { email },
-      update: { token, expiresAt },
-      create: { email, token, expiresAt },
+      update: { token, expiresAt, plan: invitePlan },
+      create: { email, token, expiresAt, plan: invitePlan },
     });
   } catch {
     return { error: "Failed to create invite token. Please try again." };
@@ -111,5 +112,170 @@ export async function updateUserRole(
     return { success: true };
   } catch {
     return { success: false, error: "Failed to update role" };
+  }
+}
+
+export interface PendingInvite {
+  id: string;
+  email: string;
+  plan: UserPlan;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export async function getPendingInvites(): Promise<PendingInvite[]> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return [];
+  }
+
+  const invites = await prisma.inviteToken.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+
+  return invites.map((i) => ({
+    id: i.id,
+    email: i.email,
+    plan: (i.plan ?? "CREATOR") as UserPlan,
+    expiresAt: i.expiresAt.toISOString(),
+    createdAt: i.createdAt.toISOString(),
+  }));
+}
+
+export interface BulkInviteResult {
+  email: string;
+  success: boolean;
+  error?: string;
+  url?: string;
+}
+
+export async function bulkCreateInvites(
+  rawEmails: string,
+  plan: UserPlan
+): Promise<{ results: BulkInviteResult[]; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { results: [], error: "Unauthorized" };
+  }
+
+  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+  if (!validPlans.includes(plan)) {
+    return { results: [], error: "Invalid plan" };
+  }
+
+  const emails = rawEmails
+    .split(/[,\n\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+
+  if (emails.length === 0) {
+    return { results: [], error: "No email addresses provided." };
+  }
+
+  const results: BulkInviteResult[] = [];
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  for (const email of emails) {
+    if (!email.includes("@") || !email.includes(".")) {
+      results.push({ email, success: false, error: "Invalid email format" });
+      continue;
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const url = `${baseUrl}/register?token=${token}`;
+
+    try {
+      await prisma.inviteToken.upsert({
+        where: { email },
+        update: { token, expiresAt, plan },
+        create: { email, token, expiresAt, plan },
+      });
+    } catch {
+      results.push({ email, success: false, error: "Failed to create invite token" });
+      continue;
+    }
+
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const sendResult = await resend.emails.send({
+        from: `Core OS <${fromAddress}>`,
+        to: email,
+        subject: "You've been invited to Core OS",
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#111111;color:#e8e8e8;border-radius:12px;overflow:hidden;">
+            <div style="background:#0a0a0a;padding:32px 32px 24px;border-bottom:1px solid #1a1a1a;">
+              <p style="margin:0;font-size:22px;font-weight:700;color:#e8e8e8;">Core OS</p>
+              <p style="margin:4px 0 0;font-size:11px;font-weight:600;color:#c8952a;letter-spacing:0.1em;text-transform:uppercase;">Client Invitation</p>
+            </div>
+            <div style="padding:32px;">
+              <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#e8e8e8;">You&apos;re Invited</h1>
+              <p style="margin:0 0 24px;font-size:14px;color:#787878;line-height:1.6;">
+                You&apos;ve been invited to join Core OS. Click the button below to create your account and get started.
+              </p>
+              <a href="${url}" style="display:inline-block;padding:12px 28px;background:#c8952a;color:#0a0a0a;font-weight:600;font-size:14px;text-decoration:none;border-radius:8px;">
+                Create Your Account
+              </a>
+              <p style="margin:24px 0 0;font-size:12px;color:#3a3a3a;line-height:1.6;">
+                This link expires in 7 days and can only be used once.<br/>
+                If you weren&apos;t expecting this invite, you can safely ignore this email.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+      if (sendResult.error) {
+        results.push({ email, success: true, url, error: `Email failed: ${sendResult.error.message}` });
+      } else {
+        results.push({ email, success: true, url });
+      }
+    } catch (emailError) {
+      console.error("[BULK INVITE] Failed to send email:", emailError);
+      results.push({ email, success: true, url, error: "Email failed to send — copy link manually" });
+    }
+  }
+
+  return { results };
+}
+
+export async function updateInvitePlan(
+  inviteId: string,
+  plan: UserPlan
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+  if (!validPlans.includes(plan)) {
+    return { success: false, error: "Invalid plan" };
+  }
+
+  try {
+    await prisma.inviteToken.update({
+      where: { id: inviteId },
+      data: { plan },
+    });
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to update invite plan" };
+  }
+}
+
+export async function deleteInvite(
+  inviteId: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    await prisma.inviteToken.delete({ where: { id: inviteId } });
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to delete invite" };
   }
 }

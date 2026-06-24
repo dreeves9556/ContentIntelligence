@@ -148,6 +148,7 @@ model InviteToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+  plan      UserPlan @default(CREATOR)
 
   @@map("invite_tokens")
 }

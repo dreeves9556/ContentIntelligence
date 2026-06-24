@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   BookOpen,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -19,6 +20,7 @@ import { useState } from "react";
 const adminNavItems = [
   { name: "Exit Admin Mode", href: "/dashboard", icon: LogOut },
   { name: "Client Roster", href: "/admin", icon: Users },
+  { name: "Bulk Invites", href: "/admin/invites", icon: Mail },
   { name: "Resources", href: "/admin/resources", icon: BookOpen },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
