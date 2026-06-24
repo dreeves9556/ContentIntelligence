@@ -1,8 +1,10 @@
+import { getZernioApiKey } from "@/lib/platform-config";
+
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 
-function apiKey() {
-  const key = process.env.ZERNIO_API_KEY;
-  if (!key) throw new Error("ZERNIO_API_KEY is not set");
+async function apiKey() {
+  const key = await getZernioApiKey();
+  if (!key) throw new Error("Zernio API key is not configured");
   return key;
 }
 
@@ -13,7 +15,7 @@ async function zernioFetch<T>(
   const res = await fetch(`${ZERNIO_BASE}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${apiKey()}`,
+      Authorization: `Bearer ${await apiKey()}`,
       "Content-Type": "application/json",
       ...(options.headers ?? {}),
     },

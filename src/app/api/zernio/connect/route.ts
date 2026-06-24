@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
+import { getEnabledPlatforms } from "@/lib/platform-config";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -12,6 +13,14 @@ export async function GET(req: NextRequest) {
   const platform = req.nextUrl.searchParams.get("platform");
   if (!platform) {
     return NextResponse.json({ error: "Missing platform" }, { status: 400 });
+  }
+
+  const enabled = await getEnabledPlatforms();
+  if (!enabled.includes(platform)) {
+    return NextResponse.json(
+      { error: `Platform "${platform}" is not enabled` },
+      { status: 403 }
+    );
   }
 
   try {

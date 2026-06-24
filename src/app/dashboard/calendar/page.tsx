@@ -1,6 +1,7 @@
 import { getWeeklyCalendar } from "./actions";
 import { GenerateButton } from "./GenerateButton";
 import CalendarClient from "./CalendarClient";
+import CalendarStrategyNote from "./CalendarStrategyNote";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import {
@@ -61,25 +62,8 @@ export default async function CalendarPage() {
         </div>
       </div>
 
-      {/* AI Insight Box */}
-      <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
-            <Sparkles className="h-6 w-6 text-accent-primary" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-accent-primary mb-2">
-              AI Strategy Note
-            </h3>
-            <p className="text-text-primary leading-relaxed">
-              This week's calendar balances <span className="text-brand-local font-semibold">local community content</span>,{" "}
-              <span className="text-brand-expert font-semibold">expert authority</span>, and{" "}
-              <span className="text-brand-personal font-semibold">personal storytelling</span>.
-              Your audience responds best to educational carousels mid-week and behind-the-scenes content on weekends.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* AI Strategy Note */}
+      <CalendarStrategyNote />
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 items-center">

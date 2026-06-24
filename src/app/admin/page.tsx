@@ -3,6 +3,9 @@ import { Users, UserPlus, Crown, Shield, FileText, CalendarDays } from "lucide-r
 import { format } from "date-fns";
 import Link from "next/link";
 import { InviteClientButton } from "./components/InviteClientButton";
+import PlanSwitcher from "./components/PlanSwitcher";
+import RoleSwitcher from "./components/RoleSwitcher";
+import type { UserPlan } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,7 @@ interface UserWithStats {
   email: string | null;
   name: string | null;
   role: "USER" | "ADMIN";
+  plan: UserPlan;
   createdAt: Date;
   status: "ACTIVE" | "PENDING";
   _count?: {
@@ -36,7 +40,13 @@ async function getUsers(): Promise<UserWithStats[]> {
 
   return users.map((user) => ({
     ...user,
-    status: user.role === "ADMIN" ? "ACTIVE" : "PENDING",
+    plan: (user.plan ?? "CREATOR") as UserPlan,
+    status:
+      user.role === "ADMIN" ||
+      (user._count?.questionnaires ?? 0) > 0 ||
+      (user._count?.calendars ?? 0) > 0
+        ? "ACTIVE"
+        : "PENDING",
   }));
 }
 
@@ -52,23 +62,6 @@ function StatusPill({ status }: { status: "ACTIVE" | "PENDING" }) {
     >
       <span className={`w-1.5 h-1.5 rounded-full ${status === "ACTIVE" ? "bg-emerald-400" : "bg-amber-400"}`} />
       {status}
-    </span>
-  );
-}
-
-function RoleBadge({ role }: { role: "USER" | "ADMIN" }) {
-  if (role === "ADMIN") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[#c8952a]/10 text-[#c8952a] border border-[#c8952a]/20">
-        <Shield className="w-3 h-3" />
-        Admin
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[#1a1a1a] text-[#787878] border border-[#2a2a2a]">
-      <Users className="w-3 h-3" />
-      Client
     </span>
   );
 }
@@ -154,7 +147,8 @@ export default async function AdminPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <RoleBadge role={user.role} />
+                <RoleSwitcher userId={user.id} currentRole={user.role} />
+                <PlanSwitcher userId={user.id} currentPlan={user.plan} />
                 <StatusPill status={user.status} />
                 <span className="text-xs text-[#787878]">{format(user.createdAt, "MMM d, yyyy")}</span>
               </div>
@@ -194,6 +188,9 @@ export default async function AdminPage() {
                   Role
                 </th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                  Plan
+                </th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
                   Status
                 </th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
@@ -219,7 +216,10 @@ export default async function AdminPage() {
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <RoleBadge role={user.role} />
+                    <RoleSwitcher userId={user.id} currentRole={user.role} />
+                  </td>
+                  <td className="py-4 px-6">
+                    <PlanSwitcher userId={user.id} currentPlan={user.plan} />
                   </td>
                   <td className="py-4 px-6">
                     <StatusPill status={user.status} />

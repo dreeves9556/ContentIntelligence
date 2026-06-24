@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { zernio } from "@/lib/zernio";
 import { generateAIInsight } from "../actions";
+import { getSyncFrequencyMinutes } from "@/lib/platform-config";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -41,7 +42,27 @@ export async function syncAnalytics() {
     return { success: false, message: "No connected accounts" };
   }
 
+  const syncFreqMinutes = await getSyncFrequencyMinutes();
   const now = new Date();
+  const minSyncTime = new Date(now.getTime() - syncFreqMinutes * 60 * 1000);
+
+  const recentSync = zernioAccounts.some(
+    (a) => a.lastSyncAt && a.lastSyncAt > minSyncTime
+  );
+
+  if (recentSync) {
+    const oldestSync = zernioAccounts
+      .filter((a) => a.lastSyncAt)
+      .sort((a, b) => (a.lastSyncAt!.getTime() - b.lastSyncAt!.getTime()))[0];
+    const nextAvailable = new Date(
+      (oldestSync?.lastSyncAt ?? now).getTime() + syncFreqMinutes * 60 * 1000
+    );
+    return {
+      success: false,
+      message: `Sync throttled. Try again after ${nextAvailable.toLocaleTimeString()}.`,
+    };
+  }
+
   const startDate = new Date(now);
   startDate.setDate(now.getDate() - 90);
   const startStr = startDate.toISOString().split("T")[0];
@@ -89,6 +110,12 @@ export async function syncAnalytics() {
 
   // Regenerate AI insight with fresh data (cheap Haiku call)
   if (synced > 0) {
+    // Update lastSyncAt for all user's accounts
+    await prisma.zernioAccount.updateMany({
+      where: { userId: session.user.id },
+      data: { lastSyncAt: now },
+    });
+
     generateAIInsight(session.user.id).catch((err) =>
       console.error("Background AI insight generation failed:", err)
     );

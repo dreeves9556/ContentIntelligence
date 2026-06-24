@@ -16,16 +16,27 @@ import {
   X,
   LogOut,
   Shield,
+  Lock,
 } from "lucide-react";
+import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { name: "Analytics", href: "/dashboard", icon: BarChart3 },
-  { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar },
-  { name: "Content Library", href: "/dashboard/library", icon: Library },
-  { name: "Integrations", href: "/dashboard/integrations", icon: Plug },
-  { name: "Profile", href: "/dashboard/profile", icon: User },
+const ALL_NAV_ITEMS = [
+  { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
+  { name: "Analytics", href: "/dashboard", icon: BarChart3, alwaysUnlocked: false },
+  { name: "Content Library", href: "/dashboard/library", icon: Library, alwaysUnlocked: true },
+  { name: "Integrations", href: "/dashboard/integrations", icon: Plug, alwaysUnlocked: false },
+  { name: "Profile", href: "/dashboard/profile", icon: User, alwaysUnlocked: true },
 ];
+
+function getNavItems(plan: UserPlan) {
+  return ALL_NAV_ITEMS.map((item) => {
+    if (item.alwaysUnlocked) return { ...item, locked: false };
+    if (item.href === "/dashboard" && !canAccessAnalytics(plan)) return { ...item, locked: true };
+    if (item.href === "/dashboard/integrations" && !canAccessIntegrations(plan)) return { ...item, locked: true };
+    return { ...item, locked: false };
+  });
+}
 
 const adminNavItem = { name: "Admin", href: "/admin", icon: Shield };
 
@@ -37,6 +48,9 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession();
+
+  const plan = (session?.user?.plan ?? "CREATOR") as UserPlan;
+  const navItems = getNavItems(plan);
 
   const handleLogout = () => {
     signOut({ callbackUrl: "/login" });
@@ -77,6 +91,20 @@ export default function DashboardLayout({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
+            if (item.locked) {
+              return (
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-text-muted/50 cursor-not-allowed select-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-5 w-5" />
+                    {item.name}
+                  </div>
+                  <Lock className="h-3.5 w-3.5 shrink-0" />
+                </div>
+              );
+            }
             return (
               <Link
                 key={item.name}
@@ -111,9 +139,11 @@ export default function DashboardLayout({
           )}
         </nav>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-2">
-          <div className="px-3 py-2">
-            <p className="text-xs text-text-muted">Role</p>
-            <p className="text-sm font-medium text-accent-primary">{session?.user?.role || "Unknown"}</p>
+          <div className="px-3 py-2 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-text-muted">Plan</p>
+              <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
+            </div>
           </div>
           <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
             <LogOut className="h-5 w-5 mr-2" />
@@ -136,6 +166,21 @@ export default function DashboardLayout({
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
+              if (item.locked) {
+                return (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-text-muted/50 cursor-not-allowed select-none"
+                    title="Upgrade your plan to unlock"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="h-5 w-5" />
+                      {item.name}
+                    </div>
+                    <Lock className="h-3.5 w-3.5 shrink-0" />
+                  </div>
+                );
+              }
               return (
                 <Link
                   key={item.name}
@@ -169,8 +214,8 @@ export default function DashboardLayout({
           </nav>
           <div className="p-4 border-t border-background-primary space-y-2">
             <div className="px-3 py-2">
-              <p className="text-xs text-text-muted">Role</p>
-              <p className="text-sm font-medium text-accent-primary">{session?.user?.role || "Unknown"}</p>
+              <p className="text-xs text-text-muted">Plan</p>
+              <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
             </div>
             <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
               <LogOut className="h-5 w-5 mr-2" />

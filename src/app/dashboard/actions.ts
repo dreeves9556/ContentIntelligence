@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import webpush from "web-push";
+import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -165,10 +166,12 @@ export async function generateAIInsight(userId: string): Promise<AIInsightResult
     return { success: true, insight: fallback };
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await getAnthropicApiKey();
   if (!apiKey) {
     return { success: false, error: "AI service not configured" };
   }
+
+  const model = await getAnthropicModel();
 
   // Compute summary stats
   const totalViews = posts.reduce((s, p) => s + p.views, 0);
@@ -202,7 +205,8 @@ export async function generateAIInsight(userId: string): Promise<AIInsightResult
     `${i + 1}. "${p.title}" (${p.format}) — ${p.views} views, ${p.likes} likes, ${p.comments} comments`
   ).join("\n");
 
-  const prompt = `You are a social media content coach. Analyze this creator's recent performance data and provide ONE concise, actionable insight (2-3 sentences max). Be specific with numbers and give a clear recommendation.
+  const config = await getPlatformConfig();
+  const defaultPrompt = `You are a social media content coach. Analyze this creator's recent performance data and provide ONE concise, actionable insight (2-3 sentences max). Be specific with numbers and give a clear recommendation.
 
 PERFORMANCE SUMMARY:
 - Total posts: ${posts.length}
@@ -218,6 +222,14 @@ ${topPosts}
 
 Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step.`;
 
+  const prompt = (config.insightPromptTemplate ?? defaultPrompt)
+    .replace(/\{\{totalPosts\}\}/g, String(posts.length))
+    .replace(/\{\{totalViews\}\}/g, String(totalViews))
+    .replace(/\{\{avgEngagement\}\}/g, String(avgEngagement))
+    .replace(/\{\{viewsTrend\}\}/g, String(viewsTrend))
+    .replace(/\{\{formatSummary\}\}/g, formatSummary)
+    .replace(/\{\{topPosts\}\}/g, topPosts);
+
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -227,7 +239,7 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-8",
+        model,
         max_tokens: 250,
         messages: [{ role: "user", content: prompt }],
       }),

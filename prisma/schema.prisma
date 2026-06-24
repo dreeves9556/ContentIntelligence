@@ -16,6 +16,7 @@ model User {
   password      String?        // For credentials auth, nullable for OAuth
   image         String?
   role          UserRole       @default(USER)
+  plan          UserPlan       @default(CREATOR)
   authorDisplayName  String?  // Public byline name shown on articles
   authorImage        String?  // URL to headshot
   authorOrganization String?  // Optional org/title shown under name
@@ -156,6 +157,12 @@ enum UserRole {
   ADMIN
 }
 
+enum UserPlan {
+  CALENDAR_ONLY
+  CREATOR
+  PRO
+}
+
 model SocialProfile {
   id           String   @id @default(cuid())
   userId       String
@@ -243,17 +250,34 @@ model ProfileSurvey {
 }
 
 model ZernioAccount {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   zernioProfileId String
   zernioAccountId String
-  platform        String   // e.g. "instagram", "tiktok", "linkedin"
+  platform        String    // e.g. "instagram", "tiktok", "linkedin"
   handle          String?
-  connectedAt     DateTime @default(now())
+  connectedAt     DateTime  @default(now())
+  lastSyncAt      DateTime?
 
   @@unique([userId, platform])
   @@map("zernio_accounts")
+}
+
+model PlatformConfig {
+  id                          String   @id @default("default")
+  zernioApiKey                String?
+  zernioEnabledPlatforms      String[] @default(["instagram", "tiktok", "facebook", "youtube"])
+  analyticsSyncFrequencyMinutes Int    @default(60)
+  anthropicModel              String   @default("claude-opus-4-8")
+  anthropicApiKey             String?
+  insightPromptTemplate       String?
+  calendarPromptTemplate      String?
+  calendarStrategyPromptTemplate String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  @@map("platform_config")
 }
 
 model ResourcePost {

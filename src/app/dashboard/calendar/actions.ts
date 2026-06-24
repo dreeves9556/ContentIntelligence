@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { generateAIInsight } from "../actions";
+import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -28,6 +29,13 @@ export interface WeeklyCalendar {
   days: CalendarDay[];
 }
 
+export interface CalendarStrategyResult {
+  success: boolean;
+  insight?: string;
+  generatedAt?: string;
+  error?: string;
+}
+
 export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
   const session = await auth();
 
@@ -46,6 +54,147 @@ export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
 
   const content = calendar.contentJson as unknown as WeeklyCalendar;
   return content;
+}
+
+export async function generateCalendarStrategy(userId: string): Promise<CalendarStrategyResult> {
+  const calendarRow = await prisma.calendar.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!calendarRow) {
+    return { success: false, error: "No calendar found" };
+  }
+
+  const calendar = calendarRow.contentJson as unknown as WeeklyCalendar;
+  const questionnaire = await prisma.questionnaire.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const answersJson = questionnaire?.content ?? {};
+  const answers = answersJson as Record<string, unknown>;
+  const primaryGoal = typeof answers.primaryGoal === "string" && answers.primaryGoal ? answers.primaryGoal : null;
+  const antiBrandWords = typeof answers.antiBrandWords === "string" && answers.antiBrandWords ? answers.antiBrandWords : null;
+
+  const apiKey = await getAnthropicApiKey();
+  if (!apiKey) {
+    return { success: false, error: "AI service not configured" };
+  }
+
+  const model = await getAnthropicModel();
+
+  const formatCounts = calendar.days.reduce((acc, day) => {
+    acc[day.format] = (acc[day.format] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const bucketCounts = calendar.days.reduce((acc, day) => {
+    acc[day.bucket] = (acc[day.bucket] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const daySummary = calendar.days.map((day) =>
+    `${day.day}: ${day.format} — ${day.bucket} — "${day.title}"`
+  ).join("\n");
+
+  const goalBlock = primaryGoal
+    ? `\n\nThe user's PRIMARY MARKETING GOAL is: "${primaryGoal}".`
+    : "";
+
+  const guardrailBlock = antiBrandWords
+    ? `\n\nVOCABULARY GUARDRAILS — never use these words/phrases in the note: ${antiBrandWords}`
+    : "";
+
+  const config = await getPlatformConfig();
+  const defaultPrompt = `You are an elite personal brand content strategist. Write ONE concise "AI Strategy Note" (2-3 sentences max) for this creator's upcoming content calendar. It should read like a weekly strategy brief.
+
+The note should explain the balance of content "buckets" for the week: local community content (builds belonging around their city), expert authority (showcases professional expertise), and personal storytelling (human/off-duty moments). Naturally weave in the buckets, format mix, and timing insight.
+
+Calendar starts ${calendar.weekStarting}.
+
+FORMAT MIX:
+${Object.entries(formatCounts).map(([fmt, count]) => `- ${fmt}: ${count}`).join("\n")}
+
+BUCKET MIX:
+${Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n")}
+
+UPCOMING DAYS:
+${daySummary}${goalBlock}${guardrailBlock}
+
+Respond with ONLY the strategy note text — no headers, no bullet points, no markdown. Keep it under 180 words. Make it feel like a confident strategist wrote it for the creator. Reference the buckets using the exact phrases "local community content", "expert authority", and "personal storytelling" when possible so they can be visually highlighted.`;
+
+  const prompt = (config.calendarStrategyPromptTemplate ?? defaultPrompt)
+    .replace(/\{\{weekStarting\}\}/g, calendar.weekStarting)
+    .replace(/\{\{formatMix\}\}/g, Object.entries(formatCounts).map(([fmt, count]) => `- ${fmt}: ${count}`).join("\n"))
+    .replace(/\{\{bucketMix\}\}/g, Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n"))
+    .replace(/\{\{daySummary\}\}/g, daySummary)
+    .replace(/\{\{primaryGoal\}\}/g, primaryGoal ?? "")
+    .replace(/\{\{antiBrandWords\}\}/g, antiBrandWords ?? "");
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 250,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Anthropic API error (calendar strategy):", errorText);
+      return { success: false, error: `AI service error (${response.status})` };
+    }
+
+    const data = await response.json();
+    const insight = data.content?.[0]?.text?.trim() || "";
+
+    if (!insight) {
+      return { success: false, error: "No strategy note generated" };
+    }
+
+    await prisma.analyticsCache.upsert({
+      where: { key: `calendar_strategy_${userId}` },
+      update: { data: { insight, weekStarting: calendar.weekStarting }, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      create: { key: `calendar_strategy_${userId}`, data: { insight, weekStarting: calendar.weekStarting }, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+    });
+
+    return { success: true, insight, generatedAt: new Date().toISOString() };
+  } catch (err) {
+    console.error("Calendar strategy generation failed:", err);
+    return { success: false, error: "Failed to generate strategy note" };
+  }
+}
+
+export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+
+  const calendar = await getWeeklyCalendar();
+  if (!calendar) {
+    return { success: true, insight: "Generate your first content calendar to get a personalized AI strategy note for the week." };
+  }
+
+  const cached = await prisma.analyticsCache.findUnique({
+    where: { key: `calendar_strategy_${session.user.id}` },
+  });
+
+  const cachedData = cached?.data as { insight?: string; weekStarting?: string } | undefined;
+  const isFresh = cached && cached.expiresAt && cached.expiresAt > new Date();
+  const matchesWeek = cachedData?.weekStarting === calendar.weekStarting;
+
+  if (cachedData?.insight && isFresh && matchesWeek) {
+    return { success: true, insight: cachedData.insight, generatedAt: cached.updatedAt.toISOString() };
+  }
+
+  return generateCalendarStrategy(session.user.id);
 }
 
 export async function generateWeeklyCalendar(): Promise<{ success: boolean; error?: string }> {
@@ -78,11 +227,13 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     select: { title: true },
   });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await getAnthropicApiKey();
   if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
+    console.error("Anthropic API key is not configured");
     return { success: false, error: "API key not configured" };
   }
+
+  const model = await getAnthropicModel();
 
   const usedTitlesBlock = recentArchived.length > 0
     ? `\n\nPreviously used post titles — do NOT repeat or closely paraphrase any of these:\n${recentArchived.map((p: { title: string }, i: number) => `${i + 1}. ${p.title}`).join("\n")}\n`
@@ -116,7 +267,8 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     ? `\n\nVOCABULARY GUARDRAILS — the user has explicitly banned these words and phrases from ALL content. Do NOT use them anywhere (hook, body, cta, caption, directions): ${antiBrandWords}`
     : "";
 
-  const prompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}
+  const config = await getPlatformConfig();
+  const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
 The days must be, in order: ${targetDays.join(", ")}.
@@ -165,6 +317,20 @@ Days must be one of: ${targetDays.join(", ")}.
 Formats must be: Reel, Carousel, Static.
 Buckets must be: Personal, Expert, Local.`;
 
+  const prompt = (config.calendarPromptTemplate ?? defaultPrompt)
+    .replace(/\{\{questionnaireAnswers\}\}/g, JSON.stringify(answersJson))
+    .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesBlock)
+    .replace(/\{\{deepDiveBlock\}\}/g, deepDiveBlock)
+    .replace(/\{\{goalBlock\}\}/g, goalBlock)
+    .replace(/\{\{guardrailBlock\}\}/g, guardrailBlock)
+    .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
+    .replace(/\{\{currentDay\}\}/g, currentDay)
+    .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))
+    .replace(/\{\{formatMix\}\}/g, daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`)
+    .replace(/\{\{bucketDistribution\}\}/g, `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`)
+    .replace(/\{\{weekStarting\}\}/g, weekStarting)
+    .replace(/\{\{firstDay\}\}/g, targetDays[0]);
+
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -174,7 +340,7 @@ Buckets must be: Personal, Expert, Local.`;
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-8",
+        model,
         max_tokens: 4000,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -228,9 +394,14 @@ Buckets must be: Personal, Expert, Local.`;
       });
     }
 
-    // Generate AI insight in the background (uses cheap Haiku model)
+    // Generate AI insight in the background
     generateAIInsight(session.user.id).catch((err) =>
       console.error("Background AI insight generation failed:", err)
+    );
+
+    // Generate AI strategy note for the new calendar in the background
+    generateCalendarStrategy(session.user.id).catch((err) =>
+      console.error("Background calendar strategy generation failed:", err)
     );
 
     revalidatePath("/dashboard/calendar");

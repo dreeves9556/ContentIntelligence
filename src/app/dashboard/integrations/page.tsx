@@ -4,8 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { Plug, Share2, Music2, Users, PlayCircle, Zap } from "lucide-react";
 import ZernioCard from "./ZernioCard";
 import SyncButton from "./SyncButton";
+import { getEnabledPlatforms } from "@/lib/platform-config";
+import LockedTabOverlay from "@/components/LockedTabOverlay";
+import { canAccessIntegrations, CREATOR_ACCOUNT_LIMIT } from "@/lib/tiers";
+import type { UserPlan } from "@/lib/tiers";
 
-const PLATFORMS = [
+const ALL_PLATFORMS = [
   {
     platform: "instagram",
     label: "Instagram",
@@ -43,15 +47,24 @@ export default async function IntegrationsPage() {
     redirect("/login");
   }
 
+  const plan = (session.user.plan ?? "CREATOR") as UserPlan;
+
   const zernioAccounts = await prisma.zernioAccount.findMany({
     where: { userId: session.user.id },
   });
+
+  const enabledPlatforms = await getEnabledPlatforms();
+  const PLATFORMS = ALL_PLATFORMS.filter((p) =>
+    enabledPlatforms.includes(p.platform)
+  );
 
   const connectedMap: Record<string, { handle: string | null }> = Object.fromEntries(
     zernioAccounts.map((a: { platform: string; handle: string | null }) => [a.platform, a])
   );
 
-  return (
+  const connectedCount = zernioAccounts.length;
+
+  const mainContent = (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -106,6 +119,8 @@ export default async function IntegrationsPage() {
               icon={p.icon}
               connected={!!connectedMap[p.platform]}
               handle={connectedMap[p.platform]?.handle}
+              plan={plan}
+              connectedCount={connectedCount}
             />
           ))}
           <div className="bg-background-card rounded-xl border border-dashed border-background-secondary p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
@@ -119,4 +134,19 @@ export default async function IntegrationsPage() {
       </div>
     </div>
   );
+
+  if (!canAccessIntegrations(plan)) {
+    return (
+      <LockedTabOverlay
+        requiredPlan="CREATOR"
+        currentPlan={plan}
+        featureName="Integrations"
+        featureDescription="Upgrade to the Creator plan to connect your social media accounts and automatically sync performance data to your analytics dashboard."
+      >
+        {mainContent}
+      </LockedTabOverlay>
+    );
+  }
+
+  return mainContent;
 }

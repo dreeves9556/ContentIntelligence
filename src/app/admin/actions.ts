@@ -3,8 +3,8 @@
 import { randomBytes } from "crypto";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { auth } from "@/auth";
+import type { UserPlan } from "@/lib/tiers";
 
 export async function createInviteLink(email: string): Promise<{ url: string; error?: string } | { error: string }> {
   if (!email || !email.includes("@")) {
@@ -30,6 +30,7 @@ export async function createInviteLink(email: string): Promise<{ url: string; er
   const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
 
   try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const result = await resend.emails.send({
       from: `Core OS <${fromAddress}>`,
       to: email,
@@ -66,4 +67,49 @@ export async function createInviteLink(email: string): Promise<{ url: string; er
   }
 
   return { url };
+}
+
+export async function updateUserPlan(
+  userId: string,
+  plan: UserPlan
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+  if (!validPlans.includes(plan)) {
+    return { success: false, error: "Invalid plan" };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { plan },
+    });
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to update plan" };
+  }
+}
+
+export async function updateUserRole(
+  userId: string,
+  role: "USER" | "ADMIN"
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role },
+    });
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to update role" };
+  }
 }

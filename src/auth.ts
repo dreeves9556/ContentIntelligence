@@ -48,6 +48,7 @@ export const {
           name: user.name,
           image: user.image,
           role: user.role,
+          plan: user.plan,
           sessionExpiry,
         };
       },
@@ -59,6 +60,7 @@ export const {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+        token.plan = (user as { plan?: string }).plan as "CALENDAR_ONLY" | "CREATOR" | "PRO" | undefined;
         token.sessionExpiry = (user as { sessionExpiry?: number }).sessionExpiry;
       }
 
@@ -66,14 +68,17 @@ export const {
         token[`${account.provider}_access_token`] = account.access_token;
       }
 
-      // Refresh role from DB on every token creation (not on every request)
+      // Refresh role/plan from DB on every token creation (not on every request)
       if (token.id && !token.role) {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true },
+            select: { role: true, plan: true },
           });
-          if (dbUser) token.role = dbUser.role;
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.plan = dbUser.plan;
+          }
         } catch {
           // silently fail
         }
@@ -85,6 +90,7 @@ export const {
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as "USER" | "ADMIN";
+        session.user.plan = (token.plan ?? "CREATOR") as "CALENDAR_ONLY" | "CREATOR" | "PRO";
       }
       return session;
     },
