@@ -232,21 +232,31 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
         </div>
       )}
 
-      {/* On-Camera Script */}
+      {/* Script / Post Content */}
       <div className="p-5 sm:p-6 border-t border-white/10 space-y-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-accent-primary">
-            <Video className="h-4 w-4 shrink-0" />
-            <span className="text-sm font-bold tracking-wider uppercase">On-Camera Script</span>
+            {day.format === "Reel" ? (
+              <Video className="h-4 w-4 shrink-0" />
+            ) : day.format === "Carousel" ? (
+              <Images className="h-4 w-4 shrink-0" />
+            ) : (
+              <FileText className="h-4 w-4 shrink-0" />
+            )}
+            <span className="text-sm font-bold tracking-wider uppercase">
+              {day.format === "Reel" ? "On-Camera Script" : "Post Content"}
+            </span>
           </div>
-          <CopyButton text={fullScript} label="Copy script" />
+          <CopyButton text={fullScript} label={day.format === "Reel" ? "Copy script" : "Copy content"} />
         </div>
         <div className="space-y-4">
-          {/* Hook */}
+          {/* Hook / Headline */}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold tracking-wider text-accent-primary uppercase">Hook</span>
-              <CopyButton text={day.hook} label="Copy hook" />
+              <span className="text-xs font-bold tracking-wider text-accent-primary uppercase">
+                {day.format === "Reel" ? "Hook" : "Headline"}
+              </span>
+              <CopyButton text={day.hook} label={day.format === "Reel" ? "Copy hook" : "Copy headline"} />
             </div>
             <p className="text-base text-text-primary leading-relaxed font-medium">
               {day.hook}

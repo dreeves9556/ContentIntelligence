@@ -19,7 +19,6 @@ export interface QuestionnaireFormData {
   preferredCTA: string;
   speakingStyle: string;
   humorStyle: string;
-  profanityComfort: string;
   sentenceLength: string;
   audienceLabel: string;
   clientWords: string;

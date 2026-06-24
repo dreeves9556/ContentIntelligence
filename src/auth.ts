@@ -18,6 +18,7 @@ export const {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   secret: process.env.AUTH_SECRET,
+  trustHost: true,
   ...authConfig,
   providers: [
     ...authConfig.providers,

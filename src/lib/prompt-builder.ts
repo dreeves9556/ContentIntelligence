@@ -103,9 +103,7 @@ function buildVoiceBlock(answers: QuestionnaireFormData): string {
   if (hasText(answers.humorStyle)) {
     parts.push(`- HUMOR STYLE: ${answers.humorStyle}`);
   }
-  if (hasText(answers.profanityComfort)) {
-    parts.push(`- PROFANITY COMFORT: ${answers.profanityComfort}`);
-  }
+  parts.push(`- PROFANITY RULE: Curse words and profanity must NEVER be used in any generated content — regardless of user preferences. This is a hard rule that applies to all posts, captions, hooks, bodies, CTAs, and directions.`);
   if (hasText(answers.sentenceLength)) {
     parts.push(`- SENTENCE LENGTH PREFERENCE: ${answers.sentenceLength}`);
   }

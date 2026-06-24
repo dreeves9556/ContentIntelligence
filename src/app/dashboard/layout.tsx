@@ -17,6 +17,7 @@ import {
   LogOut,
   Shield,
   Lock,
+  Settings,
 } from "lucide-react";
 import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const ALL_NAV_ITEMS = [
   { name: "Content Library", href: "/dashboard/library", icon: Library, alwaysUnlocked: true },
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug, alwaysUnlocked: false },
   { name: "Profile", href: "/dashboard/profile", icon: User, alwaysUnlocked: true },
+  { name: "Brand Settings", href: "/dashboard/settings", icon: Settings, alwaysUnlocked: true },
 ];
 
 function getNavItems(plan: UserPlan) {

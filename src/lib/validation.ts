@@ -21,7 +21,6 @@ export const questionnaireSchema = z.object({
   preferredCTA: z.string().max(200).optional().default(""),
   speakingStyle: z.string().max(500).optional().default(""),
   humorStyle: z.string().max(500).optional().default(""),
-  profanityComfort: z.string().max(100).optional().default(""),
   sentenceLength: z.string().max(100).optional().default(""),
   audienceLabel: z.string().max(200).optional().default(""),
   clientWords: z.string().max(1000).optional().default(""),

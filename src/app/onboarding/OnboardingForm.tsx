@@ -52,8 +52,6 @@ const HUMOR_OPTIONS = [
   "Witty wordplay",
 ];
 
-const PROFANITY_OPTIONS = ["None", "Occasional", "Comfortable"];
-
 const SENTENCE_LENGTH_OPTIONS = ["Short & punchy", "Mixed", "Long & flowing"];
 
 const EMOJI_OPTIONS = ["Heavy", "Occasional", "Minimal", "Never"];
@@ -255,7 +253,6 @@ export default function OnboardingForm() {
     preferredCTA: "",
     speakingStyle: "",
     humorStyle: "",
-    profanityComfort: "",
     sentenceLength: "",
     audienceLabel: "",
     clientWords: "",
@@ -577,14 +574,6 @@ export default function OnboardingForm() {
                   options={HUMOR_OPTIONS}
                   value={formData.humorStyle}
                   onChange={(v) => set("humorStyle", v)}
-                />
-              </div>
-              <div>
-                <FieldLabel>Profanity comfort level</FieldLabel>
-                <RadioGroup
-                  options={PROFANITY_OPTIONS}
-                  value={formData.profanityComfort}
-                  onChange={(v) => set("profanityComfort", v)}
                 />
               </div>
               <div>
