@@ -3,7 +3,28 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
+
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [
+    "p", "br", "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li", "blockquote", "pre", "code", "hr",
+    "a", "u", "em", "strong", "s", "del", "span", "sub", "sup",
+  ],
+  allowedAttributes: {
+    a: ["href", "class", "target", "rel"],
+    span: ["style", "class"],
+    p: ["style", "class"],
+    h1: ["style"], h2: ["style"], h3: ["style"],
+    h4: ["style"], h5: ["style"], h6: ["style"],
+  },
+  allowedStyles: {
+    "*": {
+      "text-align": [/^(left|center|right|justify)$/],
+    },
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+};
 
 async function requireAdmin() {
   const session = await auth();
@@ -90,7 +111,7 @@ export async function getPublishedResourcePosts(): Promise<ResourcePostData[]> {
   });
   return posts.map((p) => {
     const mapped = mapPost(p);
-    mapped.content = DOMPurify.sanitize(mapped.content);
+    mapped.content = sanitizeHtml(mapped.content, SANITIZE_OPTIONS);
     return mapped;
   });
 }
@@ -143,7 +164,7 @@ export async function createResourcePost(data: {
     const post = await prisma.resourcePost.create({
       data: {
         title: data.title.trim(),
-        content: DOMPurify.sanitize(data.content),
+        content: sanitizeHtml(data.content, SANITIZE_OPTIONS),
         category: data.category?.trim() || null,
         published: data.published,
         publishedAt: data.published ? new Date() : null,
@@ -173,7 +194,7 @@ export async function updateResourcePost(
       where: { id },
       data: {
         title: data.title.trim(),
-        content: DOMPurify.sanitize(data.content),
+        content: sanitizeHtml(data.content, SANITIZE_OPTIONS),
         category: data.category?.trim() || null,
         published: data.published,
         publishedAt: data.published && wasUnpublished ? new Date() : existing.publishedAt,
