@@ -17,9 +17,9 @@ interface SavedCalendar {
 }
 
 const TABS = [
-  { id: "archive", label: "My Posts", icon: Archive },
   { id: "resources", label: "Resources", icon: BookOpen },
   { id: "social101", label: "Social 101", icon: GraduationCap },
+  { id: "archive", label: "My Posts", icon: Archive },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -31,7 +31,7 @@ export default function LibraryTabs({
   calendars: SavedCalendar[];
   resourcePosts: ResourcePostData[];
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>("archive");
+  const [activeTab, setActiveTab] = useState<TabId>("resources");
 
   return (
     <div className="space-y-6">
@@ -58,29 +58,27 @@ export default function LibraryTabs({
       </div>
 
       {/* Tab content */}
-      {activeTab === "archive" ? (
-        calendars.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
-            <div className="p-4 bg-accent-primary/10 rounded-full mb-4">
-              <Archive className="h-8 w-8 text-accent-primary" />
-            </div>
-            <h2
-              className="text-xl font-bold text-text-primary mb-2"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
-              Your archive is empty
-            </h2>
-            <p className="text-text-muted max-w-sm text-sm">
-              Posts you mark as scheduled or posted from your calendar will appear here.
-            </p>
-          </div>
-        ) : (
-          <LibraryClient calendars={calendars} />
-        )
-      ) : activeTab === "resources" ? (
+      {activeTab === "resources" ? (
         <ResourcesTab posts={resourcePosts} />
-      ) : (
+      ) : activeTab === "social101" ? (
         <Social101Tab />
+      ) : calendars.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
+          <div className="p-4 bg-accent-primary/10 rounded-full mb-4">
+            <Archive className="h-8 w-8 text-accent-primary" />
+          </div>
+          <h2
+            className="text-xl font-bold text-text-primary mb-2"
+            style={{ fontFamily: "var(--font-playfair)" }}
+          >
+            Your archive is empty
+          </h2>
+          <p className="text-text-muted max-w-sm text-sm">
+            Posts you mark as scheduled or posted from your calendar will appear here.
+          </p>
+        </div>
+      ) : (
+        <LibraryClient calendars={calendars} />
       )}
     </div>
   );

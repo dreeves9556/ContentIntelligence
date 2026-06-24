@@ -570,10 +570,10 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
             key={i}
             className="bg-background-card rounded-xl border border-background-secondary p-4 text-center hover:border-accent-primary/30 transition-colors"
           >
-            <p className={`text-2xl font-bold bg-gradient-to-r ${platform.gradient} bg-clip-text text-transparent`}>
+            <p className="text-xl sm:text-2xl font-bold text-text-primary">
               {stat.value}
             </p>
-            <p className="text-[10px] font-medium text-text-muted mt-1 leading-tight">{stat.label}</p>
+            <p className="text-[11px] font-medium text-text-muted mt-1 leading-tight">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -581,20 +581,20 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
       {/* Cadence + Content Mix */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-background-card rounded-xl border border-background-secondary p-4 flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${platform.gradient} flex items-center justify-center shrink-0`}>
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="white" strokeWidth="2">
+          <div className="w-10 h-10 rounded-lg bg-background-secondary flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2" style={{ color: platform.color }}>
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Cadence</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-text-muted">Cadence</p>
             <p className="text-sm text-text-primary font-semibold">{platform.cadence}</p>
           </div>
         </div>
         <div className="bg-background-card rounded-xl border border-background-secondary p-4 flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${platform.gradient} flex items-center justify-center shrink-0`}>
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="white" strokeWidth="2">
+          <div className="w-10 h-10 rounded-lg bg-background-secondary flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2" style={{ color: platform.color }}>
               <rect x="3" y="3" width="7" height="7" rx="1" />
               <rect x="14" y="3" width="7" height="7" rx="1" />
               <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -602,7 +602,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
             </svg>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Content Mix</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-text-muted">Content Mix</p>
             <p className="text-sm text-text-primary font-semibold">{platform.contentMix}</p>
           </div>
         </div>
@@ -617,18 +617,17 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
             return (
               <div
                 key={i}
-                className="bg-background-card rounded-xl border border-background-secondary p-4 hover:border-accent-primary/30 transition-all duration-200 relative overflow-hidden"
+                className="bg-background-card rounded-xl border border-background-secondary p-4 hover:border-accent-primary/30 transition-all duration-200"
               >
-                <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${platform.gradient}`} />
-                <div className="flex items-start gap-3 pl-1">
-                  <span className="text-2xl font-bold text-text-muted/20 shrink-0 leading-none">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl font-bold text-text-muted/30 shrink-0 leading-none">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border mb-1.5 ${color}`}>
+                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border mb-2 ${color}`}>
                       {tag}
                     </span>
-                    <p className="text-sm text-text-muted leading-relaxed">{practice}</p>
+                    <p className="text-[15px] text-text-primary/90 leading-relaxed">{practice}</p>
                   </div>
                 </div>
               </div>
@@ -638,13 +637,12 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
       </div>
 
       {/* Pro tip callout */}
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${platform.gradient} px-6 py-5`}>
-        <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-        <div className="relative flex items-start gap-3">
+      <div className="bg-background-card rounded-2xl border border-background-secondary px-6 py-5">
+        <div className="flex items-start gap-3">
           <span className="text-2xl shrink-0">💡</span>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Pro Tip</p>
-            <p className="text-sm text-white font-medium leading-relaxed">{platform.tip}</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-text-muted mb-1">Pro Tip</p>
+            <p className="text-[15px] text-text-primary/90 font-medium leading-relaxed">{platform.tip}</p>
           </div>
         </div>
       </div>
@@ -912,11 +910,12 @@ export default function Social101Tab() {
                   onClick={() => setActivePlatform(p.id)}
                   className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
                     isActive
-                      ? `bg-gradient-to-r ${p.gradient} text-white shadow-lg`
+                      ? "bg-background-card text-text-primary border-2"
                       : "bg-background-card text-text-muted hover:text-text-primary border border-background-secondary"
                   }`}
+                  style={isActive ? { borderColor: p.color } : undefined}
                 >
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-md ${isActive ? "bg-white/20" : "bg-background-secondary"}`}>
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-md ${isActive ? "bg-background-secondary" : "bg-background-secondary"}`}>
                     {p.logo}
                   </div>
                   {p.name}
