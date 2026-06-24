@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
 import { auth } from "@/auth";
+import { revalidatePath } from "next/cache";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -52,6 +53,8 @@ export async function GET(req: NextRequest) {
         handle: connected.handle ?? null,
       },
     });
+
+    revalidatePath("/dashboard/calendar");
 
     return NextResponse.redirect(
       new URL("/dashboard/integrations?connected=" + platform, req.nextUrl.origin)

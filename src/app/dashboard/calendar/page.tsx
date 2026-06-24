@@ -4,6 +4,7 @@ import CalendarClient from "./CalendarClient";
 import CalendarStrategyNote from "./CalendarStrategyNote";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import {
   Sparkles,
   Video,
@@ -20,6 +21,12 @@ export default async function CalendarPage() {
   }
 
   const calendar = await getWeeklyCalendar();
+
+  const zernioAccounts = await prisma.zernioAccount.findMany({
+    where: { userId: session.user.id },
+    select: { platform: true },
+  });
+  const connectedPlatforms = zernioAccounts.map((a) => a.platform);
 
   // Empty state - no calendar generated yet
   if (!calendar) {
@@ -103,7 +110,7 @@ export default async function CalendarPage() {
       </div>
 
       {/* Focus Mode Calendar */}
-      <CalendarClient days={calendar.days} weekStarting={calendar.weekStarting} />
+      <CalendarClient days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} />
     </div>
   );
 }

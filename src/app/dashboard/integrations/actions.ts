@@ -27,6 +27,7 @@ export async function disconnectZernioAccount(platform: string) {
   }
 
   revalidatePath("/dashboard/integrations");
+  revalidatePath("/dashboard/calendar");
   return { success: true };
 }
 

@@ -15,7 +15,24 @@ import {
   Clock,
   MessageCircle,
   Lightbulb,
+  ExternalLink,
 } from "lucide-react";
+
+type Platform = "instagram" | "tiktok" | "youtube" | "facebook" | "linkedin";
+
+const PLATFORM_INFO: Record<Platform, { label: string; url: string; color: string }> = {
+  instagram: { label: "Instagram", url: "https://www.instagram.com/", color: "from-blue-600 via-purple-600 to-pink-500" },
+  tiktok: { label: "TikTok", url: "https://www.tiktok.com/upload", color: "from-black to-neutral-800" },
+  youtube: { label: "YouTube", url: "https://www.youtube.com/upload", color: "from-red-600 to-red-700" },
+  facebook: { label: "Facebook", url: "https://www.facebook.com/", color: "from-blue-600 to-blue-700" },
+  linkedin: { label: "LinkedIn", url: "https://www.linkedin.com/feed/?doFeedActivity=true", color: "from-blue-700 to-blue-800" },
+};
+
+const FORMAT_PLATFORMS: Record<ContentFormat, Platform[]> = {
+  Reel: ["instagram", "tiktok", "youtube", "facebook"],
+  Carousel: ["instagram", "linkedin", "facebook"],
+  Static: ["instagram", "linkedin", "facebook"],
+};
 
 function FormatBadge({ format }: { format: ContentFormat }) {
   const icons = {
@@ -177,7 +194,7 @@ function BucketBadge({ bucket }: { bucket: ContentBucket }) {
   );
 }
 
-function DayCard({ day, isPosted, onTogglePosted, isPending }: { day: CalendarDay; isPosted: boolean; onTogglePosted: () => void; isPending: boolean }) {
+function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms }: { day: CalendarDay; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[] }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
 
@@ -315,6 +332,39 @@ function DayCard({ day, isPosted, onTogglePosted, isPending }: { day: CalendarDa
         </div>
       </div>
 
+      {/* Post To Platform Links */}
+      {(() => {
+        const eligiblePlatforms = FORMAT_PLATFORMS[day.format].filter((p) =>
+          connectedPlatforms.includes(p)
+        );
+        if (eligiblePlatforms.length === 0) return null;
+        return (
+          <div className="p-4 bg-background-secondary/30 border-t border-background-secondary">
+            <div className="flex items-center gap-2 text-accent-primary mb-3">
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold tracking-wider uppercase">Post To</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {eligiblePlatforms.map((platform) => {
+                const info = PLATFORM_INFO[platform];
+                return (
+                  <a
+                    key={platform}
+                    href={info.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-br ${info.color} hover:opacity-90 transition-opacity`}
+                  >
+                    {info.label}
+                    <ExternalLink className="h-3 w-3 opacity-70" />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Posted checkbox */}
       <div className="p-4 bg-background-secondary/30 border-t border-background-secondary">
         <label className={`flex items-center gap-3 cursor-pointer group/check ${isPending ? "opacity-60 pointer-events-none" : ""}`}>
@@ -336,7 +386,7 @@ function DayCard({ day, isPosted, onTogglePosted, isPending }: { day: CalendarDa
   );
 }
 
-export default function CalendarClient({ days, weekStarting }: { days: CalendarDay[]; weekStarting: string }) {
+export default function CalendarClient({ days, weekStarting, connectedPlatforms }: { days: CalendarDay[]; weekStarting: string; connectedPlatforms: string[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
   const [isPending, startTransition] = useTransition();
@@ -417,7 +467,7 @@ export default function CalendarClient({ days, weekStarting }: { days: CalendarD
 
       {/* Focused Day Card */}
       <div className="transition-all duration-300 ease-in-out">
-        <DayCard day={activeDay} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} />
+        <DayCard day={activeDay} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} />
       </div>
     </div>
   );
