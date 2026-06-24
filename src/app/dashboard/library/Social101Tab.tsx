@@ -36,6 +36,11 @@ const PLATFORMS = [
       "Carousel completion rate matters: the algorithm tracks whether viewers swipe through all slides. Put your best slide mid-carousel, not first",
     ],
     tip: "Sends > Saves > Comments > Likes. A DM share is worth 5 likes to the algorithm.",
+    keyStats: [
+      { value: "5x", label: "DM share weight vs likes" },
+      { value: "32%", label: "fewer views with hashtags" },
+      { value: "203%", label: "more comments with Q-CTAs" },
+    ],
   },
   {
     id: "facebook",
@@ -58,6 +63,11 @@ const PLATFORMS = [
       "Go Live regularly — Facebook pushes Live content to notifications and gives it priority feed placement",
     ],
     tip: "Comments in the first hour matter more than any post-day engagement. Reply to every comment quickly.",
+    keyStats: [
+      { value: "60min", label: "golden window for engagement" },
+      { value: "3:1", label: "native video vs shared links" },
+      { value: "Priority", label: "Live feed placement boost" },
+    ],
   },
   {
     id: "tiktok",
@@ -96,6 +106,11 @@ const PLATFORMS = [
       "Use TikTok's Creator Search Insights to find what your audience is searching for, then make content matching those queries",
     ],
     tip: "TikTok auto-generates captions from spoken words. Say your keywords out loud — they become searchable text.",
+    keyStats: [
+      { value: "3s", label: "say keywords in first 3 sec" },
+      { value: "60-180s", label: "sweet spot video length" },
+      { value: "48-72h", label: "trend participation window" },
+    ],
   },
   {
     id: "linkedin",
@@ -119,6 +134,11 @@ const PLATFORMS = [
       "Write 1,300+ character text posts with a strong hook (first 1–3 lines), short paragraphs, and an open-ended question. Avoid 'Thoughts?' — the algorithm penalizes it",
     ],
     tip: "Comments on other people's posts drive more profile views than your own posts. Engage first, post second.",
+    keyStats: [
+      { value: "6.6%", label: "document carousel engagement" },
+      { value: "60%", label: "reach loss from external links" },
+      { value: "1,300+", label: "characters for text posts" },
+    ],
   },
   {
     id: "youtube",
@@ -142,6 +162,11 @@ const PLATFORMS = [
       "Configure the Related Video field on every Short and add a verbal CTA in the final 3 seconds to bridge Shorts viewers to long-form",
     ],
     tip: "Two deeply-researched long-form videos per month beats daily uploads of weak content.",
+    keyStats: [
+      { value: "25-40%", label: "Shorts upload sweet spot" },
+      { value: "30s", label: "first seconds matter most" },
+      { value: "3-5", label: "Shorts per long-form video" },
+    ],
   },
 ];
 
@@ -506,6 +531,127 @@ function PlatformCard({ platform }: { platform: (typeof PLATFORMS)[number] }) {
   );
 }
 
+function getPracticeTag(text: string): { tag: string; color: string } {
+  const l = text.toLowerCase();
+  if (l.includes("search") || l.includes("keyword") || l.includes("seo")) return { tag: "SEO", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" };
+  if (l.includes("reel") || l.includes("carousel") || l.includes("video") || l.includes("short") || l.includes("thumbnail") || l.includes("document")) return { tag: "Format", color: "bg-blue-500/15 text-blue-400 border-blue-500/20" };
+  if (l.includes("comment") || l.includes("engage") || l.includes("question") || l.includes("cta")) return { tag: "Engagement", color: "bg-green-500/15 text-green-400 border-green-500/20" };
+  if (l.includes("signal") || l.includes("algorithm") || l.includes("penalty") || l.includes("suppress") || l.includes("original") || l.includes("aggregator")) return { tag: "Signal", color: "bg-purple-500/15 text-purple-400 border-purple-500/20" };
+  if (l.includes("trend") || l.includes("hub") || l.includes("group") || l.includes("live") || l.includes("pillar") || l.includes("entry point")) return { tag: "Strategy", color: "bg-amber-500/15 text-amber-400 border-amber-500/20" };
+  if (l.includes("loop") || l.includes("rewatch") || l.includes("retention") || l.includes("watch") || l.includes("swipe") || l.includes("completion") || l.includes("first 30")) return { tag: "Retention", color: "bg-red-500/15 text-red-400 border-red-500/20" };
+  return { tag: "Tip", color: "bg-gray-500/15 text-gray-400 border-gray-500/20" };
+}
+
+function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) {
+  return (
+    <div className="space-y-6">
+      {/* Hero banner with platform gradient */}
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${platform.gradient} px-6 py-8`}>
+        <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-4">
+          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm shrink-0">
+            {platform.logo}
+          </div>
+          <div className="text-white">
+            <h3 className="text-2xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+              {platform.name}
+            </h3>
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm mt-1">
+              ⚡ {platform.algorithmFocus}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Key stat callouts */}
+      <div className="grid grid-cols-3 gap-3">
+        {platform.keyStats.map((stat, i) => (
+          <div
+            key={i}
+            className="bg-background-card rounded-xl border border-background-secondary p-4 text-center hover:border-accent-primary/30 transition-colors"
+          >
+            <p className={`text-2xl font-bold bg-gradient-to-r ${platform.gradient} bg-clip-text text-transparent`}>
+              {stat.value}
+            </p>
+            <p className="text-[10px] font-medium text-text-muted mt-1 leading-tight">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Cadence + Content Mix */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="bg-background-card rounded-xl border border-background-secondary p-4 flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${platform.gradient} flex items-center justify-center shrink-0`}>
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="white" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Cadence</p>
+            <p className="text-sm text-text-primary font-semibold">{platform.cadence}</p>
+          </div>
+        </div>
+        <div className="bg-background-card rounded-xl border border-background-secondary p-4 flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${platform.gradient} flex items-center justify-center shrink-0`}>
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="white" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Content Mix</p>
+            <p className="text-sm text-text-primary font-semibold">{platform.contentMix}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Best Practices — card grid with category tags */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-text-muted mb-3">Best Practices</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {platform.practices.map((practice, i) => {
+            const { tag, color } = getPracticeTag(practice);
+            return (
+              <div
+                key={i}
+                className="bg-background-card rounded-xl border border-background-secondary p-4 hover:border-accent-primary/30 transition-all duration-200 relative overflow-hidden"
+              >
+                <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${platform.gradient}`} />
+                <div className="flex items-start gap-3 pl-1">
+                  <span className="text-2xl font-bold text-text-muted/20 shrink-0 leading-none">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border mb-1.5 ${color}`}>
+                      {tag}
+                    </span>
+                    <p className="text-sm text-text-muted leading-relaxed">{practice}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pro tip callout */}
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${platform.gradient} px-6 py-5`}>
+        <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-start gap-3">
+          <span className="text-2xl shrink-0">💡</span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Pro Tip</p>
+            <p className="text-sm text-white font-medium leading-relaxed">{platform.tip}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FormatCard({ format }: { format: (typeof FORMATS)[number] }) {
   return (
     <div className="bg-background-card rounded-2xl border border-background-secondary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 flex flex-col">
@@ -610,6 +756,7 @@ type Section = "fundamentals" | "playbooks" | "formats" | "automations";
 
 export default function Social101Tab() {
   const [section, setSection] = useState<Section>("playbooks");
+  const [activePlatform, setActivePlatform] = useState<string>("instagram");
 
   return (
     <div className="space-y-8">
@@ -754,23 +901,36 @@ export default function Social101Tab() {
 
       {/* Platform Playbooks */}
       {section === "playbooks" && (
-        <div className="space-y-4">
-          <div>
-            <h3
-              className="text-xl font-bold text-text-primary"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
-              Platform Playbooks
-            </h3>
-            <p className="text-sm text-text-muted mt-0.5">
-              How each algorithm actually works — and how to play it to win.
-            </p>
+        <div className="space-y-5">
+          {/* Platform tab bar */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
+            {PLATFORMS.map((p) => {
+              const isActive = activePlatform === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setActivePlatform(p.id)}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
+                    isActive
+                      ? `bg-gradient-to-r ${p.gradient} text-white shadow-lg`
+                      : "bg-background-card text-text-muted hover:text-text-primary border border-background-secondary"
+                  }`}
+                >
+                  <div className={`flex items-center justify-center w-6 h-6 rounded-md ${isActive ? "bg-white/20" : "bg-background-secondary"}`}>
+                    {p.logo}
+                  </div>
+                  {p.name}
+                </button>
+              );
+            })}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {PLATFORMS.map((platform) => (
-              <PlatformCard key={platform.id} platform={platform} />
-            ))}
-          </div>
+
+          {/* Active platform detail */}
+          {PLATFORMS.map((platform) =>
+            platform.id === activePlatform ? (
+              <PlatformDetail key={platform.id} platform={platform} />
+            ) : null
+          )}
         </div>
       )}
 
