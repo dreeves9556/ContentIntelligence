@@ -82,20 +82,22 @@ export default async function CalendarPage() {
             <span className="text-xs text-text-muted">Static</span>
           </div>
         </div>
-        <div className="w-px h-4 bg-background-secondary hidden sm:block" />
-        <span className="text-sm text-text-muted font-medium">Buckets:</span>
-        <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded bg-brand-personal/20 border border-brand-personal" />
-            <span className="text-xs text-text-muted">Personal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded bg-brand-expert/20 border border-brand-expert" />
-            <span className="text-xs text-text-muted">Expert</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded bg-brand-local/20 border border-brand-local" />
-            <span className="text-xs text-text-muted">Local</span>
+        <div className="w-full sm:w-auto flex flex-wrap gap-4 items-center">
+          <div className="w-px h-4 bg-background-secondary hidden sm:block" />
+          <span className="text-sm text-text-muted font-medium">Buckets:</span>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded bg-brand-personal/20 border border-brand-personal" />
+              <span className="text-xs text-text-muted">Personal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded bg-brand-expert/20 border border-brand-expert" />
+              <span className="text-xs text-text-muted">Expert</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded bg-brand-local/20 border border-brand-local" />
+              <span className="text-xs text-text-muted">Local</span>
+            </div>
           </div>
         </div>
       </div>
