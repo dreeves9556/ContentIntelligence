@@ -17,4 +17,17 @@ export interface QuestionnaireFormData {
   brandWords: string;
   currentOffer: string;
   preferredCTA: string;
+  speakingStyle: string;
+  humorStyle: string;
+  profanityComfort: string;
+  sentenceLength: string;
+  audienceLabel: string;
+  clientWords: string;
+  contentBoundaries: string;
+  familyContext: string;
+  morningRoutine: string;
+  hotTakes: string;
+  emojiUsage: string;
+  formattingStyle: string;
+  storytellingStyle: string;
 }

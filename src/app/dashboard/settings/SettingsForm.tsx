@@ -43,6 +43,34 @@ const CTA_OPTIONS = [
   "No CTA / just value",
 ];
 
+const HUMOR_OPTIONS = [
+  "Dry / Sarcastic",
+  "Self-deprecating",
+  "Goofy",
+  "No humor",
+  "Witty wordplay",
+];
+
+const PROFANITY_OPTIONS = ["None", "Occasional", "Comfortable"];
+
+const SENTENCE_LENGTH_OPTIONS = ["Short & punchy", "Mixed", "Long & flowing"];
+
+const EMOJI_OPTIONS = ["Heavy", "Occasional", "Minimal", "Never"];
+
+const FORMATTING_OPTIONS = [
+  "Short paragraphs",
+  "Bullet points",
+  "One-liners",
+  "Long-form",
+];
+
+const STORYTELLING_OPTIONS = [
+  "Anecdote-driven",
+  "Tip / listicle-driven",
+  "Myth-busting",
+  "Question-driven",
+];
+
 const INDUSTRY_QUESTIONS: Record<string, { key: string; label: string; placeholder?: string }[]> = {
   "Real Estate": [
     { key: "yearsLicensed", label: "How long have you been licensed?", placeholder: "e.g. 7 years" },
@@ -519,6 +547,131 @@ export default function SettingsForm({
             value={formData.contentSample}
             onChange={(e) => set("contentSample", e.target.value)}
             className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>How would friends describe the way you talk?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Verbal texture — pace, rhythm, style</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "fast-paced and punchy", "slow and thoughtful", "lots of analogies"`}
+            value={formData.speakingStyle}
+            onChange={(e) => set("speakingStyle", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Humor style</FieldLabel>
+          <RadioGroup
+            options={HUMOR_OPTIONS}
+            value={formData.humorStyle}
+            onChange={(v) => set("humorStyle", v)}
+          />
+        </div>
+        <div>
+          <FieldLabel>Profanity comfort level</FieldLabel>
+          <RadioGroup
+            options={PROFANITY_OPTIONS}
+            value={formData.profanityComfort}
+            onChange={(v) => set("profanityComfort", v)}
+          />
+        </div>
+        <div>
+          <FieldLabel>Sentence length preference</FieldLabel>
+          <RadioGroup
+            options={SENTENCE_LENGTH_OPTIONS}
+            value={formData.sentenceLength}
+            onChange={(v) => set("sentenceLength", v)}
+          />
+        </div>
+        <div>
+          <FieldLabel>What do you call your followers/audience?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">How you refer to your community — this shapes how the AI addresses them</p>
+          <input
+            type="text"
+            placeholder={`e.g. "fam", "team", "y'all", or leave blank for none`}
+            value={formData.audienceLabel}
+            onChange={(e) => set("audienceLabel", e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>What exact words do your clients use when describing their problem?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Mirror their language in hooks for instant resonance</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "I'm stuck", "I feel behind", "I don't know where to start"`}
+            value={formData.clientWords}
+            onChange={(e) => set("clientWords", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Anything you DON'T want to show or talk about?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Content boundaries — prevents unusable suggestions</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "don't show my kids' faces", "no political topics", "don't feature clients by name"`}
+            value={formData.contentBoundaries}
+            onChange={(e) => set("contentBoundaries", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Anything about your life outside work you're comfortable sharing?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Fuels authentic Personal bucket content</p>
+          <textarea
+            rows={2}
+            placeholder={`Kids, pets, partner, where you live, hobbies...`}
+            value={formData.familyContext}
+            onChange={(e) => set("familyContext", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>What does your typical morning look like?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Perfect for day-in-the-life content</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "5am gym, coffee, journal, inbox by 8"`}
+            value={formData.morningRoutine}
+            onChange={(e) => set("morningRoutine", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>What's a controversial opinion in your industry you're willing to stake your name on?</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Hot takes drive engagement</p>
+          <textarea
+            rows={2}
+            placeholder={`The thing other professionals won't say out loud...`}
+            value={formData.hotTakes}
+            onChange={(e) => set("hotTakes", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Emoji usage</FieldLabel>
+          <RadioGroup
+            options={EMOJI_OPTIONS}
+            value={formData.emojiUsage}
+            onChange={(v) => set("emojiUsage", v)}
+          />
+        </div>
+        <div>
+          <FieldLabel>Formatting style</FieldLabel>
+          <RadioGroup
+            options={FORMATTING_OPTIONS}
+            value={formData.formattingStyle}
+            onChange={(v) => set("formattingStyle", v)}
+          />
+        </div>
+        <div>
+          <FieldLabel>Storytelling style</FieldLabel>
+          <RadioGroup
+            options={STORYTELLING_OPTIONS}
+            value={formData.storytellingStyle}
+            onChange={(v) => set("storytellingStyle", v)}
           />
         </div>
       </SectionCard>

@@ -28,7 +28,7 @@ TOP PERFORMING POSTS:
 
 Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step.`;
 
-const DEFAULT_CALENDAR_PROMPT = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: {{questionnaireAnswers}}. {{usedTitlesBlock}}{{deepDiveBlock}}{{goalBlock}}{{guardrailBlock}}{{voiceBlock}}{{offerBlock}}
+const DEFAULT_CALENDAR_PROMPT = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: {{questionnaireAnswers}}. {{usedTitlesBlock}}{{deepDiveBlock}}{{goalBlock}}{{guardrailBlock}}{{voiceBlock}}{{offerBlock}}{{audienceBlock}}{{boundariesBlock}}{{personalContextBlock}}{{formattingBlock}}
 Generate a {{daysToPost}}-day content calendar starting today, which is {{currentDay}}, and running for the next {{daysToPost}} consecutive days.
 
 The days must be, in order: {{targetDays}}.
@@ -414,6 +414,10 @@ export default function ConfigForm({
             <code className="text-[#c8952a]">{"{{guardrailBlock}}"}</code>,
             <code className="text-[#c8952a]">{"{{voiceBlock}}"}</code>,
             <code className="text-[#c8952a]">{"{{offerBlock}}"}</code>,
+            <code className="text-[#c8952a]">{"{{audienceBlock}}"}</code>,
+            <code className="text-[#c8952a]">{"{{boundariesBlock}}"}</code>,
+            <code className="text-[#c8952a]">{"{{personalContextBlock}}"}</code>,
+            <code className="text-[#c8952a]">{"{{formattingBlock}}"}</code>,
             <code className="text-[#c8952a]">{"{{daysToPost}}"}</code>,
             <code className="text-[#c8952a]">{"{{currentDay}}"}</code>,
             <code className="text-[#c8952a]">{"{{targetDays}}"}</code>,

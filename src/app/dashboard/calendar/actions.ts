@@ -57,6 +57,11 @@ export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
 }
 
 export async function generateCalendarStrategy(userId: string): Promise<CalendarStrategyResult> {
+  const session = await auth();
+  if (!session?.user?.id || session.user.id !== userId) {
+    return { success: false, error: "Not authenticated" };
+  }
+
   const calendarRow = await prisma.calendar.findFirst({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -251,6 +256,19 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   const brandWords = typeof answers.brandWords === "string" && answers.brandWords.trim() ? answers.brandWords.trim() : null;
   const currentOffer = typeof answers.currentOffer === "string" && answers.currentOffer.trim() ? answers.currentOffer.trim() : null;
   const preferredCTA = typeof answers.preferredCTA === "string" && answers.preferredCTA ? answers.preferredCTA : null;
+  const speakingStyle = typeof answers.speakingStyle === "string" && answers.speakingStyle.trim() ? answers.speakingStyle.trim() : null;
+  const humorStyle = typeof answers.humorStyle === "string" && answers.humorStyle ? answers.humorStyle : null;
+  const profanityComfort = typeof answers.profanityComfort === "string" && answers.profanityComfort ? answers.profanityComfort : null;
+  const sentenceLength = typeof answers.sentenceLength === "string" && answers.sentenceLength ? answers.sentenceLength : null;
+  const audienceLabel = typeof answers.audienceLabel === "string" && answers.audienceLabel.trim() ? answers.audienceLabel.trim() : null;
+  const clientWords = typeof answers.clientWords === "string" && answers.clientWords.trim() ? answers.clientWords.trim() : null;
+  const contentBoundaries = typeof answers.contentBoundaries === "string" && answers.contentBoundaries.trim() ? answers.contentBoundaries.trim() : null;
+  const familyContext = typeof answers.familyContext === "string" && answers.familyContext.trim() ? answers.familyContext.trim() : null;
+  const morningRoutine = typeof answers.morningRoutine === "string" && answers.morningRoutine.trim() ? answers.morningRoutine.trim() : null;
+  const hotTakes = typeof answers.hotTakes === "string" && answers.hotTakes.trim() ? answers.hotTakes.trim() : null;
+  const emojiUsage = typeof answers.emojiUsage === "string" && answers.emojiUsage ? answers.emojiUsage : null;
+  const formattingStyle = typeof answers.formattingStyle === "string" && answers.formattingStyle ? answers.formattingStyle : null;
+  const storytellingStyle = typeof answers.storytellingStyle === "string" && answers.storytellingStyle ? answers.storytellingStyle : null;
 
   const parsedDaysToPost = Number(answers.daysToPost);
   const daysToPost =
@@ -282,6 +300,18 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   if (contentSample) {
     voiceParts.push(`VOICE REFERENCE — the user has provided sample posts/captions they wrote and love. Study the tone, sentence structure, vocabulary, and rhythm. Match this voice as closely as possible in all generated content:\n${contentSample}`);
   }
+  if (speakingStyle) {
+    voiceParts.push(`SPEAKING STYLE — how this person actually talks: ${speakingStyle}`);
+  }
+  if (humorStyle) {
+    voiceParts.push(`HUMOR STYLE: ${humorStyle}`);
+  }
+  if (profanityComfort) {
+    voiceParts.push(`PROFANITY COMFORT: ${profanityComfort}`);
+  }
+  if (sentenceLength) {
+    voiceParts.push(`SENTENCE LENGTH PREFERENCE: ${sentenceLength}`);
+  }
   const voiceBlock = voiceParts.length > 0
     ? `\n\nBRAND VOICE CALIBRATION — use these signals to make the content sound like THIS person, not a generic AI:\n${voiceParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
     : "";
@@ -297,8 +327,51 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     ? `\n\nCTA CALIBRATION — make every call-to-action specific to what the user is actually promoting, not generic:\n${offerParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
     : "";
 
+  const audienceParts: string[] = [];
+  if (audienceLabel) {
+    audienceParts.push(`AUDIENCE LABEL — the user calls their followers/audience: "${audienceLabel}". Use this term when addressing them in captions and CTAs.`);
+  }
+  if (clientWords) {
+    audienceParts.push(`CLIENT LANGUAGE — these are the exact words the user's clients use to describe their problems. Mirror this language in hooks for instant resonance: ${clientWords}`);
+  }
+  const audienceBlock = audienceParts.length > 0
+    ? `\n\nAUDIENCE CALIBRATION — use the audience's own language to make content feel like it's speaking directly to them:\n${audienceParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
+  const boundariesBlock = contentBoundaries
+    ? `\n\nCONTENT BOUNDARIES — the user has specified these hard limits. Do NOT suggest content that crosses these lines: ${contentBoundaries}`
+    : "";
+
+  const personalParts: string[] = [];
+  if (familyContext) {
+    personalParts.push(`LIFE CONTEXT — details about the user's life outside work they're comfortable sharing: ${familyContext}`);
+  }
+  if (morningRoutine) {
+    personalParts.push(`MORNING ROUTINE: ${morningRoutine}`);
+  }
+  if (hotTakes) {
+    personalParts.push(`HOT TAKES — controversial opinions the user is willing to stake their name on (great for engagement content): ${hotTakes}`);
+  }
+  const personalContextBlock = personalParts.length > 0
+    ? `\n\nPERSONAL CONTEXT — use these details for Personal bucket content and to add authentic human texture across all buckets:\n${personalParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
+  const formattingParts: string[] = [];
+  if (emojiUsage) {
+    formattingParts.push(`EMOJI USAGE: ${emojiUsage}`);
+  }
+  if (formattingStyle) {
+    formattingParts.push(`FORMATTING STYLE: ${formattingStyle}`);
+  }
+  if (storytellingStyle) {
+    formattingParts.push(`STORYTELLING STYLE: ${storytellingStyle}`);
+  }
+  const formattingBlock = formattingParts.length > 0
+    ? `\n\nFORMATTING PREFERENCES — match these output style preferences in all generated content:\n${formattingParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
   const config = await getPlatformConfig();
-  const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}${voiceBlock}${offerBlock}
+  const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}${voiceBlock}${offerBlock}${audienceBlock}${boundariesBlock}${personalContextBlock}${formattingBlock}
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
 The days must be, in order: ${targetDays.join(", ")}.
@@ -355,6 +428,10 @@ Buckets must be: Personal, Expert, Local.`;
     .replace(/\{\{guardrailBlock\}\}/g, guardrailBlock)
     .replace(/\{\{voiceBlock\}\}/g, voiceBlock)
     .replace(/\{\{offerBlock\}\}/g, offerBlock)
+    .replace(/\{\{audienceBlock\}\}/g, audienceBlock)
+    .replace(/\{\{boundariesBlock\}\}/g, boundariesBlock)
+    .replace(/\{\{personalContextBlock\}\}/g, personalContextBlock)
+    .replace(/\{\{formattingBlock\}\}/g, formattingBlock)
     .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
     .replace(/\{\{currentDay\}\}/g, currentDay)
     .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))

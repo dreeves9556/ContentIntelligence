@@ -25,6 +25,19 @@ const DEFAULT_FORM_DATA: QuestionnaireFormData = {
   brandWords: "",
   currentOffer: "",
   preferredCTA: "",
+  speakingStyle: "",
+  humorStyle: "",
+  profanityComfort: "",
+  sentenceLength: "",
+  audienceLabel: "",
+  clientWords: "",
+  contentBoundaries: "",
+  familyContext: "",
+  morningRoutine: "",
+  hotTakes: "",
+  emojiUsage: "",
+  formattingStyle: "",
+  storytellingStyle: "",
 };
 
 function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
@@ -58,6 +71,19 @@ function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
     brandWords: typeof r.brandWords === "string" ? r.brandWords : DEFAULT_FORM_DATA.brandWords,
     currentOffer: typeof r.currentOffer === "string" ? r.currentOffer : DEFAULT_FORM_DATA.currentOffer,
     preferredCTA: typeof r.preferredCTA === "string" ? r.preferredCTA : DEFAULT_FORM_DATA.preferredCTA,
+    speakingStyle: typeof r.speakingStyle === "string" ? r.speakingStyle : DEFAULT_FORM_DATA.speakingStyle,
+    humorStyle: typeof r.humorStyle === "string" ? r.humorStyle : DEFAULT_FORM_DATA.humorStyle,
+    profanityComfort: typeof r.profanityComfort === "string" ? r.profanityComfort : DEFAULT_FORM_DATA.profanityComfort,
+    sentenceLength: typeof r.sentenceLength === "string" ? r.sentenceLength : DEFAULT_FORM_DATA.sentenceLength,
+    audienceLabel: typeof r.audienceLabel === "string" ? r.audienceLabel : DEFAULT_FORM_DATA.audienceLabel,
+    clientWords: typeof r.clientWords === "string" ? r.clientWords : DEFAULT_FORM_DATA.clientWords,
+    contentBoundaries: typeof r.contentBoundaries === "string" ? r.contentBoundaries : DEFAULT_FORM_DATA.contentBoundaries,
+    familyContext: typeof r.familyContext === "string" ? r.familyContext : DEFAULT_FORM_DATA.familyContext,
+    morningRoutine: typeof r.morningRoutine === "string" ? r.morningRoutine : DEFAULT_FORM_DATA.morningRoutine,
+    hotTakes: typeof r.hotTakes === "string" ? r.hotTakes : DEFAULT_FORM_DATA.hotTakes,
+    emojiUsage: typeof r.emojiUsage === "string" ? r.emojiUsage : DEFAULT_FORM_DATA.emojiUsage,
+    formattingStyle: typeof r.formattingStyle === "string" ? r.formattingStyle : DEFAULT_FORM_DATA.formattingStyle,
+    storytellingStyle: typeof r.storytellingStyle === "string" ? r.storytellingStyle : DEFAULT_FORM_DATA.storytellingStyle,
   };
 }
 
