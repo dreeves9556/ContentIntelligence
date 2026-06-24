@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { generateAIInsight } from "../actions";
-import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
+import { getPlatformConfig, type PlatformConfigData } from "@/lib/platform-config";
 import {
   buildUserProfileXml,
   buildUsedTitlesBlock,
@@ -63,7 +63,10 @@ export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
   return content;
 }
 
-export async function generateCalendarStrategy(userId: string): Promise<CalendarStrategyResult> {
+export async function generateCalendarStrategy(
+  userId: string,
+  existingConfig?: PlatformConfigData,
+): Promise<CalendarStrategyResult> {
   const session = await auth();
   if (!session?.user?.id || session.user.id !== userId) {
     return { success: false, error: "Not authenticated" };
@@ -86,12 +89,13 @@ export async function generateCalendarStrategy(userId: string): Promise<Calendar
 
   const answers = (questionnaire?.content ?? {}) as unknown as QuestionnaireFormData;
 
-  const apiKey = await getAnthropicApiKey();
+  const config = existingConfig ?? await getPlatformConfig();
+  const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
   if (!apiKey) {
     return { success: false, error: "AI service not configured" };
   }
 
-  const model = await getAnthropicModel();
+  const model = config.anthropicModel || "claude-opus-4-8";
 
   const formatCounts = calendar.days.reduce((acc, day) => {
     acc[day.format] = (acc[day.format] ?? 0) + 1;
@@ -112,7 +116,6 @@ export async function generateCalendarStrategy(userId: string): Promise<Calendar
     profileSurveys: [],
   });
 
-  const config = await getPlatformConfig();
   const defaultUserPrompt = `<calendar_data>
 Calendar starts ${calendar.weekStarting}.
 
@@ -240,13 +243,14 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     select: { title: true },
   });
 
-  const apiKey = await getAnthropicApiKey();
+  const config = await getPlatformConfig();
+  const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
   if (!apiKey) {
     console.error("Anthropic API key is not configured");
     return { success: false, error: "API key not configured" };
   }
 
-  const model = await getAnthropicModel();
+  const model = config.anthropicModel || "claude-opus-4-8";
 
   const usedTitlesXml = buildUsedTitlesBlock(recentArchived.map((p: { title: string }) => p.title));
 
@@ -270,7 +274,6 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
   const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
-  const config = await getPlatformConfig();
   const defaultUserPrompt = `${userProfileXml}
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
 
@@ -371,8 +374,9 @@ Days must be one of: ${targetDays.join(", ")}.
       console.error("Background AI insight generation failed:", err)
     );
 
-    // Generate AI strategy note for the new calendar (awaited so cache is updated before revalidatePath)
-    await generateCalendarStrategy(session.user.id).catch((err) =>
+    // Generate AI strategy note in the background — CalendarStrategyNote component
+    // loads it async via getCachedCalendarStrategy(), so no need to block the response
+    generateCalendarStrategy(session.user.id, config).catch((err) =>
       console.error("Calendar strategy generation failed:", err)
     );
 
