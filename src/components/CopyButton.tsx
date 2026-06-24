@@ -28,7 +28,7 @@ export function CopyButton({ text, label }: CopyButtonProps) {
     <button
       onClick={handleCopy}
       className={`
-        flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold tracking-wider uppercase
+        flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold tracking-wider uppercase
         transition-all duration-200 ease-out
         ${
           copied
@@ -40,12 +40,12 @@ export function CopyButton({ text, label }: CopyButtonProps) {
     >
       {copied ? (
         <>
-          <Check className="h-3 w-3" />
+          <Check className="h-3.5 w-3.5" />
           {copiedLabel}
         </>
       ) : (
         <>
-          <Copy className="h-3 w-3" />
+          <Copy className="h-3.5 w-3.5" />
           {displayLabel}
         </>
       )}

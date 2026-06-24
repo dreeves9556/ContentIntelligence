@@ -16,6 +16,8 @@ import {
   MessageCircle,
   Lightbulb,
   ExternalLink,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 
 type Platform = "instagram" | "tiktok" | "youtube" | "facebook" | "linkedin";
@@ -199,11 +201,11 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
   const hasDirections = !!day.directions;
 
   return (
-    <div className={`group bg-background-card rounded-xl border border-background-secondary overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/5 ${isPosted ? "opacity-60 hover:border-accent-primary/30" : "hover:border-accent-primary/30"}`}>
+    <div className={`group bg-background-card rounded-xl border border-white/10 overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/5 ${isPosted ? "opacity-60 hover:border-accent-primary/30" : "hover:border-accent-primary/30"}`}>
       {/* Header */}
-      <div className="p-4 border-b border-background-secondary bg-gradient-to-r from-background-secondary/50 to-transparent">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <span className="text-xs font-bold tracking-wider text-text-muted uppercase shrink-0">
+      <div className="p-5 sm:p-6 border-b border-white/10 bg-gradient-to-r from-background-secondary/50 to-transparent">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <span className="text-sm font-bold tracking-wider text-text-muted uppercase shrink-0">
             {day.day}
           </span>
           <div className="flex flex-wrap items-center gap-2 justify-end">
@@ -211,100 +213,103 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
             <BucketBadge bucket={day.bucket} />
           </div>
         </div>
-        <h3 className="text-lg font-bold text-text-primary leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h2 className="text-xl sm:text-2xl font-bold text-text-primary leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
           {day.title}
-        </h3>
+        </h2>
       </div>
 
       {/* Directions — how to film / perform */}
       {hasDirections && (
-        <div className="p-4 border-t border-background-secondary bg-brand-expert/5">
-          <div className="flex items-center gap-2 text-brand-expert mb-3">
-            <Lightbulb className="h-3.5 w-3.5" />
-            <span className="text-[10px] font-bold tracking-wider uppercase">How to Make This</span>
-            <span className="text-[10px] text-text-muted/60 normal-case tracking-normal">(directions, not copy-paste)</span>
+        <div className="p-5 sm:p-6 border-t border-white/10 bg-brand-expert/5">
+          <div className="flex items-center gap-2 text-brand-expert mb-4">
+            <Lightbulb className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-bold tracking-wider uppercase">How to Make This</span>
+            <span className="text-xs text-text-muted/60 normal-case tracking-normal hidden sm:inline">(directions, not copy-paste)</span>
           </div>
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-line">
+          <p className="text-base text-text-primary leading-relaxed whitespace-pre-line">
             {day.directions}
           </p>
         </div>
       )}
 
       {/* On-Camera Script */}
-      <div className="p-4 border-t border-background-secondary space-y-4">
+      <div className="p-5 sm:p-6 border-t border-white/10 space-y-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-accent-primary">
-            <Video className="h-3.5 w-3.5" />
-            <span className="text-[10px] font-bold tracking-wider uppercase">On-Camera Script</span>
+            <Video className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-bold tracking-wider uppercase">On-Camera Script</span>
           </div>
           <CopyButton text={fullScript} label="Copy script" />
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Hook */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold tracking-wider text-accent-primary uppercase">Hook</span>
+              <span className="text-xs font-bold tracking-wider text-accent-primary uppercase">Hook</span>
               <CopyButton text={day.hook} label="Copy hook" />
             </div>
-            <p className="text-sm text-text-primary leading-relaxed font-medium">
+            <p className="text-base text-text-primary leading-relaxed font-medium">
               {day.hook}
             </p>
           </div>
 
           {/* Body */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold tracking-wider text-text-muted uppercase">Body</span>
+              <span className="text-xs font-bold tracking-wider text-text-muted uppercase">Body</span>
               <CopyButton text={day.body} label="Copy body" />
             </div>
-            <p className="text-sm text-text-muted leading-relaxed whitespace-pre-line">
+            <p className="text-base text-text-secondary leading-relaxed whitespace-pre-line">
               {day.body}
             </p>
           </div>
 
           {/* CTA */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold tracking-wider text-brand-expert uppercase">Call to Action</span>
+              <span className="text-xs font-bold tracking-wider text-brand-expert uppercase">Call to Action</span>
               <CopyButton text={day.cta} label="Copy CTA" />
             </div>
-            <p className="text-sm text-brand-expert leading-relaxed font-medium">
+            <p className="text-base text-brand-expert leading-relaxed font-medium">
               {day.cta}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Caption */}
-      <div className="p-4 bg-background-secondary/30 border-t border-background-secondary space-y-3">
-        <div className="flex items-center justify-between gap-2 text-text-muted">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-3.5 w-3.5" />
-            <span className="text-[10px] font-bold tracking-wider uppercase">Caption to Paste</span>
-          </div>
-          <CopyButton text={day.caption} label="Copy caption" />
+      {/* Caption — distinct copy-paste card */}
+      <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10">
+        <div className="flex items-center gap-2 text-text-muted mb-4">
+          <MessageCircle className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-bold tracking-wider uppercase">Caption to Paste</span>
         </div>
-        <p className="text-xs text-text-muted leading-relaxed line-clamp-3">
-          {day.caption}
-        </p>
+        <div className="rounded-lg border-2 border-dashed border-accent-primary/30 bg-background-card/50 overflow-hidden">
+          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-accent-primary/10 border-b border-accent-primary/20">
+            <span className="text-xs font-semibold text-accent-primary tracking-wide">📋 Copy-paste caption below</span>
+            <CopyButton text={day.caption} label="Copy caption" />
+          </div>
+          <p className="px-4 py-4 text-sm text-text-primary leading-relaxed whitespace-pre-wrap font-mono selection:bg-accent-primary/20">
+            {day.caption}
+          </p>
+        </div>
       </div>
 
       {/* Production Notes */}
-      <div className="p-4 bg-background-secondary/30 border-t border-background-secondary space-y-3">
+      <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10 space-y-4">
         <div className="flex items-center gap-2 text-accent-primary">
-          <Clock className="h-3.5 w-3.5" />
-          <span className="text-[10px] font-bold tracking-wider uppercase">Production Notes</span>
+          <Clock className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-bold tracking-wider uppercase">Production Notes</span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {day.musicSuggestion && (
-            <div className="flex items-start gap-1.5 text-xs text-text-muted">
-              <Music className="h-3.5 w-3.5 text-accent-primary shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 text-sm text-text-secondary">
+              <Music className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
               <span>{day.musicSuggestion}</span>
             </div>
           )}
           {day.duration && (
-            <div className="flex items-center gap-1.5 text-xs text-text-muted">
-              <Clock className="h-3.5 w-3.5 text-accent-primary shrink-0" />
+            <div className="flex items-center gap-2 text-sm text-text-secondary">
+              <Clock className="h-4 w-4 text-accent-primary shrink-0" />
               <span>{day.duration}</span>
             </div>
           )}
@@ -312,19 +317,19 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
       </div>
 
       {/* Best Time to Post */}
-      <div className="p-4 bg-background-secondary/30 border-t border-background-secondary space-y-3">
+      <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10 space-y-4">
         <div className="flex items-center gap-2 text-accent-primary">
-          <Clock className="h-3.5 w-3.5" />
-          <span className="text-[10px] font-bold tracking-wider uppercase">Best Time to Post</span>
+          <Clock className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-bold tracking-wider uppercase">Best Time to Post</span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {bestTimesByFormatAndDay[day.format][day.day as DayOfWeek].map((item: TimeSlot) => (
-            <div key={item.platform} className="flex items-start justify-between gap-2 text-xs">
+            <div key={item.platform} className="flex items-start justify-between gap-3 text-sm">
               <span className="text-text-primary font-medium">{item.platform}</span>
               <div className="text-right">
-                <span className="text-text-muted">{item.time}</span>
+                <span className="text-text-secondary">{item.time}</span>
                 {item.note && (
-                  <span className="block text-[10px] text-text-muted/60">{item.note}</span>
+                  <span className="block text-xs text-text-muted/70 mt-0.5">{item.note}</span>
                 )}
               </div>
             </div>
@@ -339,10 +344,10 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
         );
         if (eligiblePlatforms.length === 0) return null;
         return (
-          <div className="p-4 bg-background-secondary/30 border-t border-background-secondary">
-            <div className="flex items-center gap-2 text-accent-primary mb-3">
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold tracking-wider uppercase">Post To</span>
+          <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10">
+            <div className="flex items-center gap-2 text-accent-primary mb-4">
+              <ExternalLink className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-bold tracking-wider uppercase">Post To</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {eligiblePlatforms.map((platform) => {
@@ -353,10 +358,10 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
                     href={info.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-br ${info.color} hover:opacity-90 transition-opacity`}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-br ${info.color} hover:opacity-90 transition-opacity`}
                   >
                     {info.label}
-                    <ExternalLink className="h-3 w-3 opacity-70" />
+                    <ExternalLink className="h-3.5 w-3.5 opacity-70" />
                   </a>
                 );
               })}
@@ -365,22 +370,30 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
         );
       })()}
 
-      {/* Posted checkbox */}
-      <div className="p-4 bg-background-secondary/30 border-t border-background-secondary">
-        <label className={`flex items-center gap-3 cursor-pointer group/check ${isPending ? "opacity-60 pointer-events-none" : ""}`}>
-          <div className="relative flex items-center">
-            <input
-              type="checkbox"
-              checked={isPosted}
-              onChange={onTogglePosted}
-              disabled={isPending}
-              className="peer h-5 w-5 rounded border border-background-secondary bg-background-card text-accent-primary focus:ring-accent-primary focus:ring-offset-0 focus:ring-offset-background-card transition-colors"
-            />
-          </div>
-          <span className={`text-sm font-medium transition-colors ${isPosted ? "text-accent-primary" : "text-text-muted group-hover/check:text-text-primary"}`}>
-            {isPending ? "Saving..." : isPosted ? "Posted / scheduled ✓" : "Mark as posted / scheduled"}
+      {/* Posted toggle */}
+      <div className="p-5 sm:p-6 border-t border-white/10">
+        <button
+          onClick={onTogglePosted}
+          disabled={isPending}
+          className={`
+            w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-lg
+            text-sm font-bold tracking-wide transition-all duration-200
+            ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+            ${isPosted
+              ? "bg-accent-primary/15 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20"
+              : "bg-background-secondary/50 text-text-muted border border-white/10 hover:text-text-primary hover:border-accent-primary/20 hover:bg-background-secondary/80"
+            }
+          `}
+        >
+          {isPosted ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <Circle className="h-4 w-4 shrink-0" />
+          )}
+          <span>
+            {isPending ? "Saving..." : isPosted ? "Posted / scheduled" : "Mark as posted / scheduled"}
           </span>
-        </label>
+        </button>
       </div>
     </div>
   );
