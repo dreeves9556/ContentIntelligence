@@ -12,4 +12,9 @@ export interface QuestionnaireFormData {
   daysToPost: number;
   primaryGoal: string;
   antiBrandWords: string;
+  contentSample: string;
+  signaturePhrases: string;
+  brandWords: string;
+  currentOffer: string;
+  preferredCTA: string;
 }

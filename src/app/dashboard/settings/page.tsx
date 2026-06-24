@@ -20,6 +20,11 @@ const DEFAULT_FORM_DATA: QuestionnaireFormData = {
   daysToPost: 3,
   primaryGoal: "",
   antiBrandWords: "",
+  contentSample: "",
+  signaturePhrases: "",
+  brandWords: "",
+  currentOffer: "",
+  preferredCTA: "",
 };
 
 function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
@@ -48,6 +53,11 @@ function mergeWithDefaults(raw: unknown): QuestionnaireFormData {
     daysToPost: typeof r.daysToPost === "number" ? r.daysToPost : DEFAULT_FORM_DATA.daysToPost,
     primaryGoal: typeof r.primaryGoal === "string" ? r.primaryGoal : DEFAULT_FORM_DATA.primaryGoal,
     antiBrandWords: typeof r.antiBrandWords === "string" ? r.antiBrandWords : DEFAULT_FORM_DATA.antiBrandWords,
+    contentSample: typeof r.contentSample === "string" ? r.contentSample : DEFAULT_FORM_DATA.contentSample,
+    signaturePhrases: typeof r.signaturePhrases === "string" ? r.signaturePhrases : DEFAULT_FORM_DATA.signaturePhrases,
+    brandWords: typeof r.brandWords === "string" ? r.brandWords : DEFAULT_FORM_DATA.brandWords,
+    currentOffer: typeof r.currentOffer === "string" ? r.currentOffer : DEFAULT_FORM_DATA.currentOffer,
+    preferredCTA: typeof r.preferredCTA === "string" ? r.preferredCTA : DEFAULT_FORM_DATA.preferredCTA,
   };
 }
 

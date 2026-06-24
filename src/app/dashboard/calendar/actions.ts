@@ -246,6 +246,11 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   const answers = answersJson as Record<string, unknown>;
   const primaryGoal = typeof answers.primaryGoal === "string" && answers.primaryGoal ? answers.primaryGoal : null;
   const antiBrandWords = typeof answers.antiBrandWords === "string" && answers.antiBrandWords ? answers.antiBrandWords : null;
+  const contentSample = typeof answers.contentSample === "string" && answers.contentSample.trim() ? answers.contentSample.trim() : null;
+  const signaturePhrases = typeof answers.signaturePhrases === "string" && answers.signaturePhrases.trim() ? answers.signaturePhrases.trim() : null;
+  const brandWords = typeof answers.brandWords === "string" && answers.brandWords.trim() ? answers.brandWords.trim() : null;
+  const currentOffer = typeof answers.currentOffer === "string" && answers.currentOffer.trim() ? answers.currentOffer.trim() : null;
+  const preferredCTA = typeof answers.preferredCTA === "string" && answers.preferredCTA ? answers.preferredCTA : null;
 
   const parsedDaysToPost = Number(answers.daysToPost);
   const daysToPost =
@@ -267,8 +272,33 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     ? `\n\nVOCABULARY GUARDRAILS — the user has explicitly banned these words and phrases from ALL content. Do NOT use them anywhere (hook, body, cta, caption, directions): ${antiBrandWords}`
     : "";
 
+  const voiceParts: string[] = [];
+  if (signaturePhrases) {
+    voiceParts.push(`SIGNATURE PHRASES — naturally weave these into content where appropriate (do not force them): ${signaturePhrases}`);
+  }
+  if (brandWords) {
+    voiceParts.push(`BRAND VOCABULARY — lean into these words and this tone: ${brandWords}`);
+  }
+  if (contentSample) {
+    voiceParts.push(`VOICE REFERENCE — the user has provided sample posts/captions they wrote and love. Study the tone, sentence structure, vocabulary, and rhythm. Match this voice as closely as possible in all generated content:\n${contentSample}`);
+  }
+  const voiceBlock = voiceParts.length > 0
+    ? `\n\nBRAND VOICE CALIBRATION — use these signals to make the content sound like THIS person, not a generic AI:\n${voiceParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
+  const offerParts: string[] = [];
+  if (currentOffer) {
+    offerParts.push(`CURRENT OFFER: ${currentOffer}`);
+  }
+  if (preferredCTA) {
+    offerParts.push(`PREFERRED CTA STYLE: ${preferredCTA}`);
+  }
+  const offerBlock = offerParts.length > 0
+    ? `\n\nCTA CALIBRATION — make every call-to-action specific to what the user is actually promoting, not generic:\n${offerParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
   const config = await getPlatformConfig();
-  const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}
+  const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}${voiceBlock}${offerBlock}
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
 The days must be, in order: ${targetDays.join(", ")}.
@@ -323,6 +353,8 @@ Buckets must be: Personal, Expert, Local.`;
     .replace(/\{\{deepDiveBlock\}\}/g, deepDiveBlock)
     .replace(/\{\{goalBlock\}\}/g, goalBlock)
     .replace(/\{\{guardrailBlock\}\}/g, guardrailBlock)
+    .replace(/\{\{voiceBlock\}\}/g, voiceBlock)
+    .replace(/\{\{offerBlock\}\}/g, offerBlock)
     .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
     .replace(/\{\{currentDay\}\}/g, currentDay)
     .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))

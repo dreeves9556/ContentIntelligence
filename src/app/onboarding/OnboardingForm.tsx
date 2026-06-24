@@ -36,6 +36,14 @@ const CONTENT_ENJOYED = [
   "Lifestyle / day-in-the-life",
 ];
 
+const CTA_OPTIONS = [
+  "DM me",
+  "Comment a word",
+  "Link in bio",
+  "Book a call",
+  "No CTA / just value",
+];
+
 const INDUSTRY_QUESTIONS: Record<string, { key: string; label: string; placeholder?: string }[]> = {
   "Real Estate": [
     { key: "yearsLicensed", label: "How long have you been licensed?", placeholder: "e.g. 7 years" },
@@ -212,6 +220,11 @@ export default function OnboardingForm() {
     daysToPost: 3,
     primaryGoal: "",
     antiBrandWords: "",
+    contentSample: "",
+    signaturePhrases: "",
+    brandWords: "",
+    currentOffer: "",
+    preferredCTA: "",
   });
 
   const set = (key: keyof QuestionnaireFormData, value: unknown) =>
@@ -451,6 +464,58 @@ export default function OnboardingForm() {
                   placeholder={`e.g. "hustle", "dream home", "boss babe" — anything that feels off-brand or cliché to you`}
                   value={formData.antiBrandWords}
                   onChange={(e) => set("antiBrandWords", e.target.value)}
+                  className={textareaClass}
+                />
+              </div>
+              <div>
+                <FieldLabel>Words or catchphrases you use a lot</FieldLabel>
+                <p className="text-xs text-text-muted mb-3">Things you say all the time and want to be known for</p>
+                <textarea
+                  rows={2}
+                  placeholder={`e.g. "here's the thing", "let's get into it", "straight talk"`}
+                  value={formData.signaturePhrases}
+                  onChange={(e) => set("signaturePhrases", e.target.value)}
+                  className={textareaClass}
+                />
+              </div>
+              <div>
+                <FieldLabel>Words that feel on-brand for you</FieldLabel>
+                <p className="text-xs text-text-muted mb-3">The vocabulary of your brand — words the AI should lean into</p>
+                <textarea
+                  rows={2}
+                  placeholder={`e.g. "no fluff", "real talk", "done right", "unapologetic"`}
+                  value={formData.brandWords}
+                  onChange={(e) => set("brandWords", e.target.value)}
+                  className={textareaClass}
+                />
+              </div>
+              <div>
+                <FieldLabel>What are you currently promoting or selling?</FieldLabel>
+                <p className="text-xs text-text-muted mb-3">This makes your CTAs specific instead of generic</p>
+                <textarea
+                  rows={2}
+                  placeholder={`e.g. "Free buyer consultation", "12-week coaching program", "Download my free guide"`}
+                  value={formData.currentOffer}
+                  onChange={(e) => set("currentOffer", e.target.value)}
+                  className={textareaClass}
+                />
+              </div>
+              <div>
+                <FieldLabel>Preferred call-to-action style</FieldLabel>
+                <RadioGroup
+                  options={CTA_OPTIONS}
+                  value={formData.preferredCTA}
+                  onChange={(v) => set("preferredCTA", v)}
+                />
+              </div>
+              <div>
+                <FieldLabel>Paste 1-3 posts or captions you've written that feel most "you"</FieldLabel>
+                <p className="text-xs text-text-muted mb-3">The single most powerful way to calibrate your voice — paste real examples</p>
+                <textarea
+                  rows={6}
+                  placeholder={`Paste posts, captions, or even emails you've written that capture your tone perfectly...`}
+                  value={formData.contentSample}
+                  onChange={(e) => set("contentSample", e.target.value)}
                   className={textareaClass}
                 />
               </div>

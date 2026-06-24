@@ -21,6 +21,7 @@ import {
 import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
 import BugReportButton from "./bug-report/BugReportButton";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 const ALL_NAV_ITEMS = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
@@ -252,6 +253,8 @@ export default function DashboardLayout({
           <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">{children}</main>
         </div>
       </div>
+
+      <InstallPrompt />
     </div>
   );
 }
