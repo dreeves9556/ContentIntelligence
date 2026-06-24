@@ -251,8 +251,44 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     ? `\n\nPreviously used post titles — do NOT repeat or closely paraphrase any of these:\n${recentArchived.map((p: { title: string }, i: number) => `${i + 1}. ${p.title}`).join("\n")}\n`
     : "";
 
-  const deepDiveBlock = profileSurveys.length > 0
-    ? `\n\nThe user has also provided optional deep-dive profile surveys to give you hyper-specific local and personal context. Use these details to make the content highly authentic: ${JSON.stringify(profileSurveys)}`
+  const localMayorSurvey = profileSurveys.find((s: { surveyType: string; answersJson: unknown }) => s.surveyType === "LOCAL_MAYOR");
+  const localMayorAnswers = (localMayorSurvey?.answersJson ?? {}) as Record<string, string>;
+
+  const localMayorParts: string[] = [];
+  if (localMayorAnswers.hiddenGems) {
+    localMayorParts.push(`HIDDEN GEMS: ${localMayorAnswers.hiddenGems}`);
+  }
+  if (localMayorAnswers.fierceDebate) {
+    localMayorParts.push(`FIERCE LOCAL DEBATE: ${localMayorAnswers.fierceDebate}`);
+  }
+  if (localMayorAnswers.idealSunday) {
+    localMayorParts.push(`IDEAL SUNDAY: ${localMayorAnswers.idealSunday}`);
+  }
+  if (localMayorAnswers.underratedNeighborhood) {
+    localMayorParts.push(`UNDERRATED NEIGHBORHOOD: ${localMayorAnswers.underratedNeighborhood}`);
+  }
+  if (localMayorAnswers.topRestaurants) {
+    localMayorParts.push(`TOP 5 RESTAURANTS (with what's good): ${localMayorAnswers.topRestaurants}`);
+  }
+  if (localMayorAnswers.topCoffeeShops) {
+    localMayorParts.push(`TOP 5 COFFEE SHOPS (with what's special): ${localMayorAnswers.topCoffeeShops}`);
+  }
+  if (localMayorAnswers.topShops) {
+    localMayorParts.push(`TOP 5 LOCAL SHOPS/BOUTIQUES (with what makes them great): ${localMayorAnswers.topShops}`);
+  }
+  if (localMayorAnswers.topParks) {
+    localMayorParts.push(`TOP 5 PARKS/OUTDOOR SPOTS (with what's special): ${localMayorAnswers.topParks}`);
+  }
+  if (localMayorAnswers.topGyms) {
+    localMayorParts.push(`TOP 5 GYMS/FITNESS SPOTS (with what stands out): ${localMayorAnswers.topGyms}`);
+  }
+  const localMayorBlock = localMayorParts.length > 0
+    ? `\n\nLOCAL MAYOR INTEL — this is the user's hyper-local knowledge. Use these specific spots, opinions, and neighbourhood insights to make "Local" bucket content feel authentic and specific — not generic. Reference real business names and details from these lists:\n${localMayorParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+    : "";
+
+  const otherSurveys = profileSurveys.filter((s: { surveyType: string }) => s.surveyType !== "LOCAL_MAYOR");
+  const deepDiveBlock = otherSurveys.length > 0
+    ? `\n\nThe user has also provided optional deep-dive profile surveys to give you hyper-specific personal and professional context. Use these details to make the content highly authentic: ${JSON.stringify(otherSurveys)}`
     : "";
 
   const answers = answersJson as Record<string, unknown>;
@@ -379,6 +415,7 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
 
   const config = await getPlatformConfig();
   const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}${voiceBlock}${offerBlock}${audienceBlock}${boundariesBlock}${personalContextBlock}${formattingBlock}
+${localMayorBlock}
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
 The days must be, in order: ${targetDays.join(", ")}.
@@ -431,6 +468,7 @@ Buckets must be: Personal, Expert, Local.`;
     .replace(/\{\{questionnaireAnswers\}\}/g, JSON.stringify(answersJson))
     .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesBlock)
     .replace(/\{\{deepDiveBlock\}\}/g, deepDiveBlock)
+    .replace(/\{\{localMayorBlock\}\}/g, localMayorBlock)
     .replace(/\{\{goalBlock\}\}/g, goalBlock)
     .replace(/\{\{guardrailBlock\}\}/g, guardrailBlock)
     .replace(/\{\{voiceBlock\}\}/g, voiceBlock)

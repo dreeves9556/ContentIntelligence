@@ -106,6 +106,11 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
       { key: "fierceDebate", label: "The most fiercely debated local topic right now?", placeholder: "The new development going up downtown, the school rezoning..." },
       { key: "idealSunday", label: "Your ideal unplugged Sunday in your city?", placeholder: "Farmer's market, hike at Runyon, brunch at..." },
       { key: "underratedNeighborhood", label: "The most underrated neighborhood that will boom in 5 years?", placeholder: "And why you believe that..." },
+      { key: "topRestaurants", label: "Your 5 favorite restaurants and what's good there?", placeholder: "1. Maria's Tacqueria — the al pastor is unreal\n2. The Loft — best burger in town\n3. ..." },
+      { key: "topCoffeeShops", label: "Your 5 favorite coffee shops and what's special about them?", placeholder: "1. Blue Bottle — the pour-over bar is a ritual\n2. Daydream — they roast their own beans\n3. ..." },
+      { key: "topShops", label: "Your 5 favorite local shops or boutiques and what makes them great?", placeholder: "1. Foundry — curated vintage and local makers\n2. Olive & Birch — the best home goods\n3. ..." },
+      { key: "topParks", label: "Your 5 favorite parks or outdoor spots and what's special about them?", placeholder: "1. Riverside Trail — 3 miles along the water\n2. Elm Park — best sunset view in the city\n3. ..." },
+      { key: "topGyms", label: "Your 5 favorite gyms, studios, or fitness spots and what stands out?", placeholder: "1. Iron Yard — 24/7 access, old-school vibe\n2. Flow Yoga — the heated classes are unmatched\n3. ..." },
     ],
   },
   {
