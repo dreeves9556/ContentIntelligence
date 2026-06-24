@@ -182,10 +182,16 @@ export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResul
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
-  const calendar = await getWeeklyCalendar();
-  if (!calendar) {
+  const calendarRow = await prisma.calendar.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!calendarRow) {
     return { success: true, insight: "Generate your first content calendar to get a personalized AI strategy note for the week." };
   }
+
+  const calendar = calendarRow.contentJson as unknown as WeeklyCalendar;
 
   const cached = await prisma.analyticsCache.findUnique({
     where: { key: `calendar_strategy_${session.user.id}` },
@@ -194,8 +200,9 @@ export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResul
   const cachedData = cached?.data as { insight?: string; weekStarting?: string } | undefined;
   const isFresh = cached && cached.expiresAt && cached.expiresAt > new Date();
   const matchesWeek = cachedData?.weekStarting === calendar.weekStarting;
+  const cacheIsNewerThanCalendar = cached && cached.updatedAt > calendarRow.updatedAt;
 
-  if (cachedData?.insight && isFresh && matchesWeek) {
+  if (cachedData?.insight && isFresh && matchesWeek && cacheIsNewerThanCalendar) {
     return { success: true, insight: cachedData.insight, generatedAt: cached.updatedAt.toISOString() };
   }
 
@@ -508,9 +515,9 @@ Buckets must be: Personal, Expert, Local.`;
       console.error("Background AI insight generation failed:", err)
     );
 
-    // Generate AI strategy note for the new calendar in the background
-    generateCalendarStrategy(session.user.id).catch((err) =>
-      console.error("Background calendar strategy generation failed:", err)
+    // Generate AI strategy note for the new calendar (awaited so cache is updated before revalidatePath)
+    await generateCalendarStrategy(session.user.id).catch((err) =>
+      console.error("Calendar strategy generation failed:", err)
     );
 
     revalidatePath("/dashboard/calendar");
