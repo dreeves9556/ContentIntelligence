@@ -6,6 +6,13 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { generateAIInsight } from "../actions";
 import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
+import {
+  buildUserProfileXml,
+  buildUsedTitlesBlock,
+  CALENDAR_SYSTEM_PROMPT,
+  CALENDAR_STRATEGY_SYSTEM_PROMPT,
+} from "@/lib/prompt-builder";
+import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -77,10 +84,7 @@ export async function generateCalendarStrategy(userId: string): Promise<Calendar
     orderBy: { createdAt: "desc" },
   });
 
-  const answersJson = questionnaire?.content ?? {};
-  const answers = answersJson as Record<string, unknown>;
-  const primaryGoal = typeof answers.primaryGoal === "string" && answers.primaryGoal ? answers.primaryGoal : null;
-  const antiBrandWords = typeof answers.antiBrandWords === "string" && answers.antiBrandWords ? answers.antiBrandWords : null;
+  const answers = (questionnaire?.content ?? {}) as unknown as QuestionnaireFormData;
 
   const apiKey = await getAnthropicApiKey();
   if (!apiKey) {
@@ -103,19 +107,13 @@ export async function generateCalendarStrategy(userId: string): Promise<Calendar
     `${day.day}: ${day.format} — ${day.bucket} — "${day.title}"`
   ).join("\n");
 
-  const goalBlock = primaryGoal
-    ? `\n\nThe user's PRIMARY MARKETING GOAL is: "${primaryGoal}".`
-    : "";
-
-  const guardrailBlock = antiBrandWords
-    ? `\n\nVOCABULARY GUARDRAILS — never use these words/phrases in the note: ${antiBrandWords}`
-    : "";
+  const userProfileXml = buildUserProfileXml({
+    answers,
+    profileSurveys: [],
+  });
 
   const config = await getPlatformConfig();
-  const defaultPrompt = `You are an elite personal brand content strategist. Write ONE concise "AI Strategy Note" (2-3 sentences max) for this creator's upcoming content calendar. It should read like a weekly strategy brief.
-
-The note should explain the balance of content "buckets" for the week: local community content (builds belonging around their city), expert authority (showcases professional expertise), and personal storytelling (human/off-duty moments). Naturally weave in the buckets, format mix, and timing insight.
-
+  const defaultUserPrompt = `<calendar_data>
 Calendar starts ${calendar.weekStarting}.
 
 FORMAT MIX:
@@ -125,17 +123,19 @@ BUCKET MIX:
 ${Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n")}
 
 UPCOMING DAYS:
-${daySummary}${goalBlock}${guardrailBlock}
+${daySummary}
+</calendar_data>
 
-Respond with ONLY the strategy note text — no headers, no bullet points, no markdown. Keep it under 180 words. Make it feel like a confident strategist wrote it for the creator. Reference the buckets using the exact phrases "local community content", "expert authority", and "personal storytelling" when possible so they can be visually highlighted.`;
+${userProfileXml}
 
-  const prompt = (config.calendarStrategyPromptTemplate ?? defaultPrompt)
+Write the strategy note now.`;
+
+  const systemPrompt = config.calendarStrategyPromptTemplate ?? CALENDAR_STRATEGY_SYSTEM_PROMPT;
+  const userPrompt = (config.calendarStrategyPromptTemplate ?? defaultUserPrompt)
     .replace(/\{\{weekStarting\}\}/g, calendar.weekStarting)
     .replace(/\{\{formatMix\}\}/g, Object.entries(formatCounts).map(([fmt, count]) => `- ${fmt}: ${count}`).join("\n"))
     .replace(/\{\{bucketMix\}\}/g, Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n"))
-    .replace(/\{\{daySummary\}\}/g, daySummary)
-    .replace(/\{\{primaryGoal\}\}/g, primaryGoal ?? "")
-    .replace(/\{\{antiBrandWords\}\}/g, antiBrandWords ?? "");
+    .replace(/\{\{daySummary\}\}/g, daySummary);
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -148,7 +148,8 @@ Respond with ONLY the strategy note text — no headers, no bullet points, no ma
       body: JSON.stringify({
         model,
         max_tokens: 250,
-        messages: [{ role: "user", content: prompt }],
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
       }),
     });
 
@@ -225,7 +226,7 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
     return { success: false, error: "No questionnaire found. Please complete your onboarding first." };
   }
 
-  const answersJson = questionnaire.content;
+  const answers = questionnaire.content as unknown as QuestionnaireFormData;
 
   const profileSurveys = await prisma.profileSurvey.findMany({
     where: { userId: session.user.id },
@@ -247,71 +248,12 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
 
   const model = await getAnthropicModel();
 
-  const usedTitlesBlock = recentArchived.length > 0
-    ? `\n\nPreviously used post titles — do NOT repeat or closely paraphrase any of these:\n${recentArchived.map((p: { title: string }, i: number) => `${i + 1}. ${p.title}`).join("\n")}\n`
-    : "";
+  const usedTitlesXml = buildUsedTitlesBlock(recentArchived.map((p: { title: string }) => p.title));
 
-  const localMayorSurvey = profileSurveys.find((s: { surveyType: string; answersJson: unknown }) => s.surveyType === "LOCAL_MAYOR");
-  const localMayorAnswers = (localMayorSurvey?.answersJson ?? {}) as Record<string, string>;
-
-  const localMayorParts: string[] = [];
-  if (localMayorAnswers.hiddenGems) {
-    localMayorParts.push(`HIDDEN GEMS: ${localMayorAnswers.hiddenGems}`);
-  }
-  if (localMayorAnswers.fierceDebate) {
-    localMayorParts.push(`FIERCE LOCAL DEBATE: ${localMayorAnswers.fierceDebate}`);
-  }
-  if (localMayorAnswers.idealSunday) {
-    localMayorParts.push(`IDEAL SUNDAY: ${localMayorAnswers.idealSunday}`);
-  }
-  if (localMayorAnswers.underratedNeighborhood) {
-    localMayorParts.push(`UNDERRATED NEIGHBORHOOD: ${localMayorAnswers.underratedNeighborhood}`);
-  }
-  if (localMayorAnswers.topRestaurants) {
-    localMayorParts.push(`TOP 5 RESTAURANTS (with what's good): ${localMayorAnswers.topRestaurants}`);
-  }
-  if (localMayorAnswers.topCoffeeShops) {
-    localMayorParts.push(`TOP 5 COFFEE SHOPS (with what's special): ${localMayorAnswers.topCoffeeShops}`);
-  }
-  if (localMayorAnswers.topShops) {
-    localMayorParts.push(`TOP 5 LOCAL SHOPS/BOUTIQUES (with what makes them great): ${localMayorAnswers.topShops}`);
-  }
-  if (localMayorAnswers.topParks) {
-    localMayorParts.push(`TOP 5 PARKS/OUTDOOR SPOTS (with what's special): ${localMayorAnswers.topParks}`);
-  }
-  if (localMayorAnswers.topGyms) {
-    localMayorParts.push(`TOP 5 GYMS/FITNESS SPOTS (with what stands out): ${localMayorAnswers.topGyms}`);
-  }
-  const localMayorBlock = localMayorParts.length > 0
-    ? `\n\nLOCAL MAYOR INTEL — this is the user's hyper-local knowledge. Use these specific spots, opinions, and neighbourhood insights to make "Local" bucket content feel authentic and specific — not generic. Reference real business names and details from these lists:\n${localMayorParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-    : "";
-
-  const otherSurveys = profileSurveys.filter((s: { surveyType: string }) => s.surveyType !== "LOCAL_MAYOR");
-  const deepDiveBlock = otherSurveys.length > 0
-    ? `\n\nThe user has also provided optional deep-dive profile surveys to give you hyper-specific personal and professional context. Use these details to make the content highly authentic: ${JSON.stringify(otherSurveys)}`
-    : "";
-
-  const answers = answersJson as Record<string, unknown>;
-  const primaryGoal = typeof answers.primaryGoal === "string" && answers.primaryGoal ? answers.primaryGoal : null;
-  const antiBrandWords = typeof answers.antiBrandWords === "string" && answers.antiBrandWords ? answers.antiBrandWords : null;
-  const contentSample = typeof answers.contentSample === "string" && answers.contentSample.trim() ? answers.contentSample.trim() : null;
-  const signaturePhrases = typeof answers.signaturePhrases === "string" && answers.signaturePhrases.trim() ? answers.signaturePhrases.trim() : null;
-  const brandWords = typeof answers.brandWords === "string" && answers.brandWords.trim() ? answers.brandWords.trim() : null;
-  const currentOffer = typeof answers.currentOffer === "string" && answers.currentOffer.trim() ? answers.currentOffer.trim() : null;
-  const preferredCTA = typeof answers.preferredCTA === "string" && answers.preferredCTA ? answers.preferredCTA : null;
-  const speakingStyle = typeof answers.speakingStyle === "string" && answers.speakingStyle.trim() ? answers.speakingStyle.trim() : null;
-  const humorStyle = typeof answers.humorStyle === "string" && answers.humorStyle ? answers.humorStyle : null;
-  const profanityComfort = typeof answers.profanityComfort === "string" && answers.profanityComfort ? answers.profanityComfort : null;
-  const sentenceLength = typeof answers.sentenceLength === "string" && answers.sentenceLength ? answers.sentenceLength : null;
-  const audienceLabel = typeof answers.audienceLabel === "string" && answers.audienceLabel.trim() ? answers.audienceLabel.trim() : null;
-  const clientWords = typeof answers.clientWords === "string" && answers.clientWords.trim() ? answers.clientWords.trim() : null;
-  const contentBoundaries = typeof answers.contentBoundaries === "string" && answers.contentBoundaries.trim() ? answers.contentBoundaries.trim() : null;
-  const familyContext = typeof answers.familyContext === "string" && answers.familyContext.trim() ? answers.familyContext.trim() : null;
-  const morningRoutine = typeof answers.morningRoutine === "string" && answers.morningRoutine.trim() ? answers.morningRoutine.trim() : null;
-  const hotTakes = typeof answers.hotTakes === "string" && answers.hotTakes.trim() ? answers.hotTakes.trim() : null;
-  const emojiUsage = typeof answers.emojiUsage === "string" && answers.emojiUsage ? answers.emojiUsage : null;
-  const formattingStyle = typeof answers.formattingStyle === "string" && answers.formattingStyle ? answers.formattingStyle : null;
-  const storytellingStyle = typeof answers.storytellingStyle === "string" && answers.storytellingStyle ? answers.storytellingStyle : null;
+  const userProfileXml = buildUserProfileXml({
+    answers,
+    profileSurveys: profileSurveys as unknown as { surveyType: string; answersJson: unknown }[],
+  });
 
   const parsedDaysToPost = Number(answers.daysToPost);
   const daysToPost =
@@ -325,163 +267,38 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   const targetDays = Array.from({ length: daysToPost }, (_, i) => DAY_NAMES[(today.getDay() + i) % 7]);
   const weekStarting = today.toISOString().split('T')[0];
 
-  const goalBlock = primaryGoal
-    ? `\n\nThe user's PRIMARY MARKETING GOAL this month is: "${primaryGoal}". Every piece of content — especially the CTA — should ladder up to this goal.`
-    : "";
-
-  const guardrailBlock = antiBrandWords
-    ? `\n\nVOCABULARY GUARDRAILS — the user has explicitly banned these words and phrases from ALL content. Do NOT use them anywhere (hook, body, cta, caption, directions): ${antiBrandWords}`
-    : "";
-
-  const voiceParts: string[] = [];
-  if (signaturePhrases) {
-    voiceParts.push(`SIGNATURE PHRASES — naturally weave these into content where appropriate (do not force them): ${signaturePhrases}`);
-  }
-  if (brandWords) {
-    voiceParts.push(`BRAND VOCABULARY — lean into these words and this tone: ${brandWords}`);
-  }
-  if (contentSample) {
-    voiceParts.push(`VOICE REFERENCE — the user has provided sample posts/captions they wrote and love. Study the tone, sentence structure, vocabulary, and rhythm. Match this voice as closely as possible in all generated content:\n${contentSample}`);
-  }
-  if (speakingStyle) {
-    voiceParts.push(`SPEAKING STYLE — how this person actually talks: ${speakingStyle}`);
-  }
-  if (humorStyle) {
-    voiceParts.push(`HUMOR STYLE: ${humorStyle}`);
-  }
-  if (profanityComfort) {
-    voiceParts.push(`PROFANITY COMFORT: ${profanityComfort}`);
-  }
-  if (sentenceLength) {
-    voiceParts.push(`SENTENCE LENGTH PREFERENCE: ${sentenceLength}`);
-  }
-  const voiceBlock = voiceParts.length > 0
-    ? `\n\nBRAND VOICE CALIBRATION — use these signals to make the content sound like THIS person, not a generic AI:\n${voiceParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-    : "";
-
-  const offerParts: string[] = [];
-  if (currentOffer) {
-    offerParts.push(`CURRENT OFFER: ${currentOffer}`);
-  }
-  if (preferredCTA) {
-    offerParts.push(`PREFERRED CTA STYLE: ${preferredCTA}`);
-  }
-  const offerBlock = offerParts.length > 0
-    ? `\n\nCTA CALIBRATION — make every call-to-action specific to what the user is actually promoting, not generic:\n${offerParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-    : "";
-
-  const audienceParts: string[] = [];
-  if (audienceLabel) {
-    audienceParts.push(`AUDIENCE LABEL — the user calls their followers/audience: "${audienceLabel}". Use this term when addressing them in captions and CTAs.`);
-  }
-  if (clientWords) {
-    audienceParts.push(`CLIENT LANGUAGE — these are the exact words the user's clients use to describe their problems. Mirror this language in hooks for instant resonance: ${clientWords}`);
-  }
-  const audienceBlock = audienceParts.length > 0
-    ? `\n\nAUDIENCE CALIBRATION — use the audience's own language to make content feel like it's speaking directly to them:\n${audienceParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-    : "";
-
-  const boundariesBlock = contentBoundaries
-    ? `\n\nCONTENT BOUNDARIES — the user has specified these hard limits. Do NOT suggest content that crosses these lines: ${contentBoundaries}`
-    : "";
-
-  const personalParts: string[] = [];
-  if (familyContext) {
-    personalParts.push(`LIFE CONTEXT — details about the user's life outside work they're comfortable sharing: ${familyContext}`);
-  }
-  if (morningRoutine) {
-    personalParts.push(`MORNING ROUTINE: ${morningRoutine}`);
-  }
-  if (hotTakes) {
-    personalParts.push(`HOT TAKES — controversial opinions the user is willing to stake their name on (great for engagement content): ${hotTakes}`);
-  }
-  const personalContextBlock = personalParts.length > 0
-    ? `\n\nPERSONAL CONTEXT — use these details for Personal bucket content and to add authentic human texture across all buckets:\n${personalParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-    : "";
-
-  const formattingParts: string[] = [];
-  if (emojiUsage) {
-    formattingParts.push(`EMOJI USAGE: ${emojiUsage}`);
-  }
-  if (formattingStyle) {
-    formattingParts.push(`FORMATTING STYLE: ${formattingStyle}`);
-  }
-  if (storytellingStyle) {
-    formattingParts.push(`STORYTELLING STYLE: ${storytellingStyle}`);
-  }
-  const formattingBlock = formattingParts.length > 0
-    ? `\n\nFORMATTING PREFERENCES — match these output style preferences in all generated content:\n${formattingParts.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-    : "";
+  const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
+  const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
   const config = await getPlatformConfig();
-  const defaultPrompt = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: ${JSON.stringify(answersJson)}. ${usedTitlesBlock}${deepDiveBlock}${goalBlock}${guardrailBlock}${voiceBlock}${offerBlock}${audienceBlock}${boundariesBlock}${personalContextBlock}${formattingBlock}
-${localMayorBlock}
+  const defaultUserPrompt = `${userProfileXml}
+${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
+
+<generation_instructions>
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
 The days must be, in order: ${targetDays.join(", ")}.
 
-The mix must be: ${daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`}. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.
+The mix must be: ${formatMixStr}. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.
 
 BUCKET DISTRIBUTION — this is the most important balance to get right:
-- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).
-- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.
-
-BUCKET DEFINITIONS — read these carefully:
-- "Personal" = genuine off-duty human content. Hobbies, passions, family moments, opinions on life, things they geek out about, who they are when they're NOT working. Do NOT tie Personal posts back to their business or add a work lesson at the end. The post should feel like it could exist even if they had a completely different career.
-- "Expert" = professional knowledge, hard-won lessons, industry insights, tips, myth-busting, client stories — their work expertise front and centre. Even Expert posts should feel like they're coming from a real human with personality, not a corporate newsletter.
-- "Local" = hyper-local content about their city, community, favourite spots, local events, neighbourhood energy — builds a sense of place and belonging.
-
-Content field definitions:
-- "hook": the opening line the creator should say on camera (for Reels) or the headline of the post (for Carousel/Static). This should be copy-pasteable spoken text.
-- "body": the full spoken script for Reels, or the main body text for Carousel/Static. This should be copy-pasteable text the creator delivers or writes directly into the post. Do NOT include filming instructions here.
-- "directions": filming, performance, or design directions. Tell the creator HOW to make the piece (e.g., shot type, energy, visuals, slide layout). This is NOT copy-pasteable post text.
-- "cta": the closing call-to-action the creator should say or write.
-- "caption": the social media caption to paste below the post, including hashtags if appropriate.
-- "musicSuggestion": music or audio vibe for Reels.
-- "duration": target length for Reels (e.g., "45-60 seconds") or read-time estimate for Carousels/Static.
-
-The JSON schema must be:
-{
-  "weekStarting": "${weekStarting}",
-  "days": [
-    {
-      "day": "${targetDays[0]}",
-      "format": "Reel",
-      "bucket": "Local",
-      "title": "...",
-      "hook": "...",
-      "body": "...",
-      "cta": "...",
-      "caption": "...",
-      "directions": "...",
-      "musicSuggestion": "...",
-      "duration": "..."
-    }
-  ]
-}
+${bucketDistStr}
 
 Days must be one of: ${targetDays.join(", ")}.
-Formats must be: Reel, Carousel, Static.
-Buckets must be: Personal, Expert, Local.`;
+</generation_instructions>`;
 
-  const prompt = (config.calendarPromptTemplate ?? defaultPrompt)
-    .replace(/\{\{questionnaireAnswers\}\}/g, JSON.stringify(answersJson))
-    .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesBlock)
-    .replace(/\{\{deepDiveBlock\}\}/g, deepDiveBlock)
-    .replace(/\{\{localMayorBlock\}\}/g, localMayorBlock)
-    .replace(/\{\{goalBlock\}\}/g, goalBlock)
-    .replace(/\{\{guardrailBlock\}\}/g, guardrailBlock)
-    .replace(/\{\{voiceBlock\}\}/g, voiceBlock)
-    .replace(/\{\{offerBlock\}\}/g, offerBlock)
-    .replace(/\{\{audienceBlock\}\}/g, audienceBlock)
-    .replace(/\{\{boundariesBlock\}\}/g, boundariesBlock)
-    .replace(/\{\{personalContextBlock\}\}/g, personalContextBlock)
-    .replace(/\{\{formattingBlock\}\}/g, formattingBlock)
+  const systemPrompt = (config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT)
+    .replace(/\{\{weekStarting\}\}/g, weekStarting)
+    .replace(/\{\{firstDay\}\}/g, targetDays[0]);
+
+  const userPrompt = (config.calendarPromptTemplate ? "" : defaultUserPrompt)
+    .replace(/\{\{questionnaireAnswers\}\}/g, userProfileXml)
+    .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
     .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
     .replace(/\{\{currentDay\}\}/g, currentDay)
     .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))
-    .replace(/\{\{formatMix\}\}/g, daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`)
-    .replace(/\{\{bucketDistribution\}\}/g, `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`)
+    .replace(/\{\{formatMix\}\}/g, formatMixStr)
+    .replace(/\{\{bucketDistribution\}\}/g, bucketDistStr)
     .replace(/\{\{weekStarting\}\}/g, weekStarting)
     .replace(/\{\{firstDay\}\}/g, targetDays[0]);
 
@@ -496,7 +313,8 @@ Buckets must be: Personal, Expert, Local.`;
       body: JSON.stringify({
         model,
         max_tokens: 4000,
-        messages: [{ role: "user", content: prompt }],
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
       }),
     });
 
