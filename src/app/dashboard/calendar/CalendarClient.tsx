@@ -463,17 +463,15 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
           const isPosted = posted[index];
           const tabDate = new Date(baseDate);
           tabDate.setDate(baseDate.getDate() + index);
-          const dateLabel = tabDate.toLocaleDateString("en-US", {
-            weekday: "short",
-            day: "numeric",
-          });
+          const weekday = tabDate.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+          const dayNum = tabDate.getDate();
           return (
             <button
               key={day.day}
               onClick={() => setActiveIndex(index)}
               className={`
                 shrink-0 w-12 h-12 rounded-full text-xs font-bold tracking-wider uppercase
-                flex flex-col items-center justify-center transition-all duration-200 ease-out snap-start
+                flex flex-col items-center justify-center transition-all duration-200 ease-out snap-start leading-none
                 ${
                   isActive
                     ? "bg-[#c8952a] text-[#1a1a1a] shadow-lg shadow-[#c8952a]/20"
@@ -482,7 +480,8 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
                 ${isPosted ? "line-through opacity-50" : ""}
               `}
             >
-              {dateLabel}
+              <span className="text-[10px]">{weekday}</span>
+              <span className="text-sm">{dayNum}</span>
             </button>
           );
         })}
