@@ -504,7 +504,7 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
     : session?.user?.email?.[0]?.toUpperCase() ?? "U";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+    <div className="max-w-2xl mx-auto lg:max-w-none lg:mx-0 space-y-4 sm:space-y-6">
       {/* ── Personal Info Header ── */}
       <div className="rounded-2xl border border-white/7 bg-[#111111] p-4 sm:p-6">
         <div className="flex items-center gap-4 mb-5">
