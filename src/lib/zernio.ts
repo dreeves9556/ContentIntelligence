@@ -127,5 +127,10 @@ export const zernio = {
       const params = new URLSearchParams({ accountId: zernioAccountId, startDate, endDate });
       return zernioFetch<ZernioAccountAnalytics>(`/analytics?${params.toString()}`);
     },
+
+    async getBestTime(zernioAccountId: string): Promise<unknown> {
+      const params = new URLSearchParams({ accountId: zernioAccountId });
+      return zernioFetch<unknown>(`/analytics/best-time?${params.toString()}`);
+    },
   },
 };

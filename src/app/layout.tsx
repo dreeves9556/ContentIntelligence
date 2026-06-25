@@ -3,6 +3,7 @@ import { Playfair_Display, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { Analytics } from "@vercel/analytics/next";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
@@ -49,6 +50,7 @@ export default function RootLayout({
           <ServiceWorkerRegister />
           {children}
         </SessionProvider>
+        <Analytics />
       </body>
     </html>
   );

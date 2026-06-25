@@ -19,6 +19,7 @@ import {
   Loader2,
   Database,
   Layers,
+  Clock,
 } from "lucide-react";
 import {
   LineChart,
@@ -31,6 +32,16 @@ import {
   Legend,
 } from "recharts";
 import { seedPostAnalytics, getCachedInsight } from "./actions";
+import {
+  DAY_LABELS_SHORT,
+  formatHour,
+  formatHourShort,
+  bestSlotForDay,
+  heatmapToLocalTime,
+  getTimezoneOffsetHours,
+  getTimezoneLabel,
+  type HeatmapData,
+} from "@/lib/best-time";
 
 function ConditionalLink({ href, className, children }: { href: string | null; className?: string; children: React.ReactNode }) {
   if (!href) return <span className={className}>{children}</span>;
@@ -73,8 +84,15 @@ export interface PostData {
   postUrl: string | null;
 }
 
+export interface BestTimeEntry {
+  platform: string;
+  heatmap: HeatmapData;
+  updatedAt: string;
+}
+
 interface AnalyticsClientProps {
   posts: PostData[];
+  bestTimes: BestTimeEntry[];
 }
 
 type SortKey = "date" | "views" | "engagement";
@@ -110,7 +128,102 @@ function computeEngagement(post: PostData) {
   return +((post.likes + post.comments) / post.views * 100).toFixed(1);
 }
 
-export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
+const PLATFORM_LABELS_LOWER: Record<string, string> = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
+  facebook: "Facebook",
+};
+
+function BestTimeHeatmap({ entry }: { entry: BestTimeEntry }) {
+  const offsetHours = getTimezoneOffsetHours();
+  const localData = heatmapToLocalTime(entry.heatmap, offsetHours);
+  const { grid, bestSlots } = localData;
+  const tzLabel = getTimezoneLabel();
+  const maxVal = Math.max(...grid.flat().filter((v) => v > 0), 1);
+
+  const colorForValue = (v: number) => {
+    if (v <= 0) return "rgba(255,255,255,0.03)";
+    const intensity = Math.min(v / maxVal, 1);
+    return `rgba(200, 149, 42, ${0.15 + intensity * 0.85})`;
+  };
+
+  const label = PLATFORM_LABELS_LOWER[entry.platform.toLowerCase()] ?? entry.platform;
+
+  return (
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Clock className="h-5 w-5 text-accent-primary shrink-0" />
+          <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+            Best Time to Post — {label}
+          </h3>
+        </div>
+      </div>
+      <p className="text-xs sm:text-sm text-text-muted mb-4 sm:mb-5">
+        Average engagement by day &amp; hour ({tzLabel}).
+      </p>
+
+      {/* Heatmap grid */}
+      <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <div className="min-w-[420px] sm:min-w-[480px]">
+          {/* Hour labels (top) */}
+          <div className="flex items-center gap-px mb-1">
+            <div className="w-8 sm:w-10 shrink-0" />
+            {Array.from({ length: 24 }, (_, h) => (
+              <div key={h} className="flex-1 text-center text-[9px] sm:text-[10px] text-text-muted">
+                {h % 3 === 0 ? formatHourShort(h) : ""}
+              </div>
+            ))}
+          </div>
+          {/* Day rows */}
+          {grid.map((row, dayIdx) => (
+            <div key={dayIdx} className="flex items-center gap-px mb-px">
+              <div className="w-8 sm:w-10 shrink-0 text-[9px] sm:text-[10px] font-medium text-text-muted text-right pr-1">
+                {DAY_LABELS_SHORT[dayIdx]}
+              </div>
+              {row.map((val, hourIdx) => (
+                <div
+                  key={hourIdx}
+                  className="flex-1 h-5 sm:h-6 rounded-sm transition-all hover:ring-1 hover:ring-accent-primary/50 cursor-default"
+                  style={{ background: colorForValue(val) }}
+                  title={`${DAY_LABELS_SHORT[dayIdx]} ${formatHour(hourIdx)} — ${val.toFixed(1)} avg engagement`}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Best slots summary */}
+      {bestSlots.length > 0 && (
+        <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-background-secondary">
+          <p className="text-xs font-bold tracking-wider text-accent-primary uppercase mb-3">
+            Top Posting Windows
+          </p>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            {bestSlots.slice(0, 5).map((slot, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-accent-primary/10 border border-accent-primary/20"
+              >
+                <span className="text-xs sm:text-sm font-medium text-text-primary">
+                  {DAY_LABELS_SHORT[slot.day]} {formatHour(slot.hour)}
+                </span>
+                <span className="text-[10px] sm:text-xs text-text-muted">
+                  {slot.engagement.toFixed(1)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AnalyticsClient({ posts, bestTimes }: AnalyticsClientProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [seeding, setSeeding] = useState(false);
@@ -476,6 +589,15 @@ export default function AnalyticsClient({ posts }: AnalyticsClientProps) {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Best Time to Post Heatmaps */}
+      {bestTimes.length > 0 && (
+        <div className="space-y-6">
+          {bestTimes.map((entry) => (
+            <BestTimeHeatmap key={entry.platform} entry={entry} />
+          ))}
+        </div>
+      )}
 
       {/* Recent Performance Table */}
       <div className="bg-background-card rounded-xl border border-background-secondary overflow-hidden">

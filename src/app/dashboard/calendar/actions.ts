@@ -13,6 +13,15 @@ import {
   CALENDAR_STRATEGY_SYSTEM_PROMPT,
 } from "@/lib/prompt-builder";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
+import {
+  DAY_NAMES,
+  DAY_LABELS_SHORT,
+  bestSlotForDay,
+  formatHour,
+  shiftGridToTimezone,
+  formatOffset,
+  type HeatmapData,
+} from "@/lib/best-time";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -41,6 +50,42 @@ export interface CalendarStrategyResult {
   insight?: string;
   generatedAt?: string;
   error?: string;
+}
+
+function buildBestTimesBlock(
+  bestTimeRows: { platform: string; heatmap: unknown }[],
+  targetDays: string[],
+  timezoneOffsetHours: number
+): string {
+  if (bestTimeRows.length === 0) return "";
+
+  const lines: string[] = [];
+  for (const dayName of targetDays) {
+    const dayIdx = DAY_NAMES.findIndex((d) => d === dayName.toUpperCase());
+    if (dayIdx < 0) continue;
+    const platformTimes: string[] = [];
+    for (const row of bestTimeRows) {
+      const heatmap = row.heatmap as HeatmapData;
+      if (!heatmap?.grid) continue;
+      const localGrid = shiftGridToTimezone(heatmap.grid, timezoneOffsetHours);
+      const slot = bestSlotForDay(localGrid, dayIdx);
+      if (slot) {
+        const platformLabel = row.platform.charAt(0).toUpperCase() + row.platform.slice(1);
+        platformTimes.push(`${platformLabel}: ${formatHour(slot.hour)}`);
+      }
+    }
+    if (platformTimes.length > 0) {
+      lines.push(`- ${dayName}: ${platformTimes.join(", ")}`);
+    }
+  }
+
+  if (lines.length === 0) return "";
+
+  const tzLabel = `UTC${formatOffset(timezoneOffsetHours)}`;
+  return `<best_posting_times>
+Based on the creator's historical engagement data, these are the optimal posting times (${tzLabel}) for each scheduled day. Align content suggestions with these windows when possible:
+${lines.join("\n")}
+</best_posting_times>`;
 }
 
 export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
@@ -213,7 +258,7 @@ export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResul
   return generateCalendarStrategy(session.user.id);
 }
 
-export async function generateWeeklyCalendar(): Promise<{ success: boolean; error?: string }> {
+export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -271,11 +316,23 @@ export async function generateWeeklyCalendar(): Promise<{ success: boolean; erro
   const targetDays = Array.from({ length: daysToPost }, (_, i) => DAY_NAMES[(today.getDay() + i) % 7]);
   const weekStarting = today.toISOString().split('T')[0];
 
+  // Fetch best-time-to-post heatmaps for connected platforms
+  const bestTimeRows = await prisma.bestTimeToPost.findMany({
+    where: { userId: session.user.id },
+    select: { platform: true, heatmap: true },
+  });
+  const bestTimesBlock = buildBestTimesBlock(
+    bestTimeRows.map((r) => ({ platform: r.platform, heatmap: r.heatmap })),
+    targetDays as string[],
+    timezoneOffsetHours
+  );
+
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
   const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
   const defaultUserPrompt = `${userProfileXml}
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
+${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
 
 <generation_instructions>
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
@@ -297,6 +354,7 @@ Days must be one of: ${targetDays.join(", ")}.
   const userPrompt = (config.calendarPromptTemplate ? "" : defaultUserPrompt)
     .replace(/\{\{questionnaireAnswers\}\}/g, userProfileXml)
     .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
+    .replace(/\{\{bestTimesBlock\}\}/g, bestTimesBlock)
     .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
     .replace(/\{\{currentDay\}\}/g, currentDay)
     .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))

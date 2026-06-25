@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { generateWeeklyCalendar } from "./actions";
+import { getTimezoneOffsetHours } from "@/lib/best-time";
 import { Sparkles, Loader2, RefreshCw } from "lucide-react";
 
 const statusSteps = [
@@ -48,7 +49,7 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
     setProgress(0);
 
     try {
-      const result = await generateWeeklyCalendar();
+      const result = await generateWeeklyCalendar(getTimezoneOffsetHours());
       if (!result.success) {
         setError(result.error || "Failed to generate calendar");
       }

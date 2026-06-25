@@ -28,6 +28,16 @@ export default async function CalendarPage() {
   });
   const connectedPlatforms = zernioAccounts.map((a) => a.platform);
 
+  // Fetch best-time-to-post heatmaps for connected platforms
+  const bestTimeRows = await prisma.bestTimeToPost.findMany({
+    where: { userId: session.user.id },
+    select: { platform: true, heatmap: true },
+  });
+  const bestTimes = bestTimeRows.map((r) => ({
+    platform: r.platform,
+    heatmap: r.heatmap as unknown as { grid: number[][]; bestSlots: { day: number; hour: number; engagement: number }[] },
+  }));
+
   // Empty state - no calendar generated yet
   if (!calendar) {
     return (
@@ -110,7 +120,7 @@ export default async function CalendarPage() {
       </div>
 
       {/* Focus Mode Calendar */}
-      <CalendarClient days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} />
+      <CalendarClient days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} />
     </div>
   );
 }

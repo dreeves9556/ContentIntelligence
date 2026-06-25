@@ -5,6 +5,14 @@ import type { ContentFormat, ContentBucket, CalendarDay } from "./actions";
 import { addToArchive, removeFromArchive } from "./actions";
 import { CopyButton } from "@/components/CopyButton";
 import {
+  bestSlotForDay,
+  formatHour,
+  dayNameToIndex,
+  heatmapToLocalTime,
+  getTimezoneOffsetHours,
+  type HeatmapData,
+} from "@/lib/best-time";
+import {
   Video,
   Images,
   FileText,
@@ -60,6 +68,11 @@ function FormatBadge({ format }: { format: ContentFormat }) {
 type DayOfWeek = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
 
 type TimeSlot = { platform: string; time: string; note?: string };
+
+export interface CalendarBestTimeEntry {
+  platform: string;
+  heatmap: HeatmapData;
+}
 
 const bestTimesByFormatAndDay: Record<ContentFormat, Record<DayOfWeek, TimeSlot[]>> = {
   Reel: {
@@ -196,9 +209,26 @@ function BucketBadge({ bucket }: { bucket: ContentBucket }) {
   );
 }
 
-function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms }: { day: CalendarDay; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[] }) {
+function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes }: { day: CalendarDay; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[] }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
+
+  // Compute real best posting times from heatmap data for this day (converted to local timezone)
+  const dayIdx = dayNameToIndex(day.day);
+  const realTimeSlots: TimeSlot[] = [];
+  if (dayIdx >= 0) {
+    const offsetHours = getTimezoneOffsetHours();
+    for (const entry of bestTimes) {
+      const localHeatmap = heatmapToLocalTime(entry.heatmap, offsetHours);
+      const slot = bestSlotForDay(localHeatmap.grid, dayIdx);
+      if (slot) {
+        const platformLabel = entry.platform.charAt(0).toUpperCase() + entry.platform.slice(1);
+        realTimeSlots.push({ platform: platformLabel, time: formatHour(slot.hour) });
+      }
+    }
+  }
+  const hasRealData = realTimeSlots.length > 0;
+  const fallbackSlots = bestTimesByFormatAndDay[day.format][day.day as DayOfWeek];
 
   return (
     <div className={`group bg-background-card rounded-xl border border-white/10 overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/5 ${isPosted ? "opacity-60 hover:border-accent-primary/30" : "hover:border-accent-primary/30"}`}>
@@ -331,9 +361,14 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
         <div className="flex items-center gap-2 text-accent-primary">
           <Clock className="h-4 w-4 shrink-0" />
           <span className="text-sm font-bold tracking-wider uppercase">Best Time to Post</span>
+          {hasRealData && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/20 normal-case tracking-normal">
+              from your data
+            </span>
+          )}
         </div>
         <div className="space-y-2.5">
-          {bestTimesByFormatAndDay[day.format][day.day as DayOfWeek].map((item: TimeSlot) => (
+          {(hasRealData ? realTimeSlots : fallbackSlots).map((item: TimeSlot) => (
             <div key={item.platform} className="flex items-start justify-between gap-3 text-sm">
               <span className="text-text-primary font-medium">{item.platform}</span>
               <div className="text-right">
@@ -344,6 +379,11 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
               </div>
             </div>
           ))}
+          {!hasRealData && (
+            <p className="text-xs text-text-muted/60 pt-1">
+              Connect your accounts &amp; sync analytics to get real optimal times based on your engagement data.
+            </p>
+          )}
         </div>
       </div>
 
@@ -409,7 +449,7 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms 
   );
 }
 
-export default function CalendarClient({ days, weekStarting, connectedPlatforms }: { days: CalendarDay[]; weekStarting: string; connectedPlatforms: string[] }) {
+export default function CalendarClient({ days, weekStarting, connectedPlatforms, bestTimes }: { days: CalendarDay[]; weekStarting: string; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
   const [isPending, startTransition] = useTransition();
@@ -490,7 +530,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
 
       {/* Focused Day Card */}
       <div className="transition-all duration-300 ease-in-out">
-        <DayCard day={activeDay} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} />
+        <DayCard day={activeDay} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} />
       </div>
     </div>
   );

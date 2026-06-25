@@ -3,9 +3,11 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { zernio } from "@/lib/zernio";
 import { generateAIInsight } from "../actions";
 import { getSyncFrequencyMinutes } from "@/lib/platform-config";
+import { normalizeBestTimeResponse } from "@/lib/best-time";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -106,6 +108,26 @@ export async function syncAnalytics() {
       }
     } catch (err) {
       console.error(`Failed to sync analytics for ${account.platform}:`, err);
+    }
+
+    // Fetch & store best posting times for this platform
+    try {
+      const rawBestTime = await zernio.analytics.getBestTime(account.zernioAccountId);
+      const heatmapData = normalizeBestTimeResponse(rawBestTime);
+      const hasData = heatmapData.bestSlots.length > 0;
+      if (hasData) {
+        await prisma.bestTimeToPost.upsert({
+          where: { userId_platform: { userId: session.user.id, platform: account.platform } },
+          update: { heatmap: heatmapData as unknown as Prisma.InputJsonValue },
+          create: {
+            userId: session.user.id,
+            platform: account.platform,
+            heatmap: heatmapData as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to fetch best-time for ${account.platform}:`, err);
     }
   }
 

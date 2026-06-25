@@ -30,13 +30,25 @@ export default async function AnalyticsPage() {
     },
   });
 
+  // Fetch best-time-to-post heatmaps for connected platforms
+  const bestTimeRows = await prisma.bestTimeToPost.findMany({
+    where: { userId: session.user.id },
+    select: { platform: true, heatmap: true, updatedAt: true },
+  });
+
   // Serialize dates to ISO strings for the client component
   const serializedPosts = posts.map((p) => ({
     ...p,
     publishedAt: p.publishedAt.toISOString(),
   }));
 
-  const content = <AnalyticsClient posts={serializedPosts} />;
+  const serializedBestTimes = bestTimeRows.map((r) => ({
+    platform: r.platform,
+    heatmap: r.heatmap as unknown as { grid: number[][]; bestSlots: { day: number; hour: number; engagement: number }[] },
+    updatedAt: r.updatedAt.toISOString(),
+  }));
+
+  const content = <AnalyticsClient posts={serializedPosts} bestTimes={serializedBestTimes} />;
 
   if (!canAccessAnalytics(plan)) {
     return (
