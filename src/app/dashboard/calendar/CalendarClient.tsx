@@ -457,21 +457,23 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent snap-x snap-mandatory">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
         {days.map((day, index) => {
           const isActive = index === activeIndex;
           const isPosted = posted[index];
           const tabDate = new Date(baseDate);
           tabDate.setDate(baseDate.getDate() + index);
-          const weekday = tabDate.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
-          const dayNum = tabDate.getDate();
+          const dateLabel = tabDate.toLocaleDateString("en-US", {
+            weekday: "short",
+            day: "numeric",
+          });
           return (
             <button
               key={day.day}
               onClick={() => setActiveIndex(index)}
               className={`
-                shrink-0 w-12 h-12 rounded-full text-xs font-bold tracking-wider uppercase
-                flex flex-col items-center justify-center transition-all duration-200 ease-out snap-start leading-none
+                shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase
+                transition-all duration-200 ease-out sm:flex-1 sm:min-w-0
                 ${
                   isActive
                     ? "bg-[#c8952a] text-[#1a1a1a] shadow-lg shadow-[#c8952a]/20"
@@ -480,8 +482,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
                 ${isPosted ? "line-through opacity-50" : ""}
               `}
             >
-              <span className="text-[10px]">{weekday}</span>
-              <span className="text-sm">{dayNum}</span>
+              {dateLabel}
             </button>
           );
         })}
