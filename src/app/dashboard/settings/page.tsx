@@ -151,7 +151,7 @@ export default async function SettingsPage() {
   }).format(new Date(questionnaire.updatedAt));
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8 max-w-3xl lg:max-w-none">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
