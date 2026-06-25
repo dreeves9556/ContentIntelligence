@@ -472,8 +472,8 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
               key={day.day}
               onClick={() => setActiveIndex(index)}
               className={`
-                shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase
-                transition-all duration-200 ease-out snap-start
+                shrink-0 w-12 h-12 rounded-full text-xs font-bold tracking-wider uppercase
+                flex flex-col items-center justify-center transition-all duration-200 ease-out snap-start
                 ${
                   isActive
                     ? "bg-[#c8952a] text-[#1a1a1a] shadow-lg shadow-[#c8952a]/20"
