@@ -457,7 +457,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent snap-x snap-mandatory">
         {days.map((day, index) => {
           const isActive = index === activeIndex;
           const isPosted = posted[index];
@@ -473,7 +473,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms 
               onClick={() => setActiveIndex(index)}
               className={`
                 shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase
-                transition-all duration-200 ease-out sm:flex-1 sm:min-w-0
+                transition-all duration-200 ease-out snap-start
                 ${
                   isActive
                     ? "bg-[#c8952a] text-[#1a1a1a] shadow-lg shadow-[#c8952a]/20"
