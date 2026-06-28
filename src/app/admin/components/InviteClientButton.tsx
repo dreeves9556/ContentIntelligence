@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { UserPlus, X, Link2, Copy, Check, Loader2, Mail } from "lucide-react";
-import { createInviteLink } from "../actions";
+import { createClientProfile } from "../actions";
 
 export function InviteClientButton() {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState("");
-  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -15,7 +15,7 @@ export function InviteClientButton() {
   function handleClose() {
     setShowModal(false);
     setEmail("");
-    setGeneratedUrl(null);
+    setGeneratedPassword(null);
     setError(null);
     setCopied(false);
   }
@@ -24,9 +24,9 @@ export function InviteClientButton() {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await createInviteLink(email);
-      if ("url" in result) {
-        setGeneratedUrl(result.url);
+      const result = await createClientProfile(email);
+      if ("password" in result) {
+        setGeneratedPassword(result.password);
         if (result.error) {
           setError(result.error);
         }
@@ -37,8 +37,9 @@ export function InviteClientButton() {
   }
 
   function handleCopy() {
-    if (!generatedUrl) return;
-    navigator.clipboard.writeText(generatedUrl).then(() => {
+    if (!generatedPassword) return;
+    const credentials = `Email: ${email}\nPassword: ${generatedPassword}`;
+    navigator.clipboard.writeText(credentials).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -68,7 +69,7 @@ export function InviteClientButton() {
               <X className="h-5 w-5" />
             </button>
 
-            {!generatedUrl ? (
+            {!generatedPassword ? (
               <>
                 <div className="mb-6">
                   <div className="w-12 h-12 bg-[#c8952a]/10 rounded-full flex items-center justify-center mb-4">
@@ -81,7 +82,7 @@ export function InviteClientButton() {
                     Invite New Client
                   </h3>
                   <p className="text-sm text-[#787878]">
-                    Generate a secure registration link to send to your client.
+                    Create a client account with a randomly generated password. Share the credentials with your client so they can log in.
                   </p>
                 </div>
 
@@ -121,12 +122,12 @@ export function InviteClientButton() {
                     {isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Generating…
+                        Creating Account…
                       </>
                     ) : (
                       <>
                         <Link2 className="h-4 w-4" />
-                        Generate Invite Link
+                        Create Client Account
                       </>
                     )}
                   </button>
@@ -142,15 +143,22 @@ export function InviteClientButton() {
                     className="text-xl font-semibold text-[#e8e8e8] mb-1"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
-                    Link Generated
+                    Account Created
                   </h3>
                   <p className="text-sm text-[#787878]">
-                    An invitation email has been sent to <span className="text-[#c8952a]">{email}</span>. You can also copy the link below to share manually. Expires in 7 days.
+                    Share these credentials with <span className="text-[#c8952a]">{email}</span> so they can log in. They will be prompted to complete onboarding after their first login.
                   </p>
                 </div>
 
-                <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-3 mb-4">
-                  <p className="text-xs text-[#787878] break-all font-mono">{generatedUrl}</p>
+                <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-4 mb-4 space-y-2">
+                  <div>
+                    <p className="text-xs text-[#787878] uppercase tracking-wider mb-1">Email</p>
+                    <p className="text-sm text-[#e8e8e8] font-mono break-all">{email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#787878] uppercase tracking-wider mb-1">Password</p>
+                    <p className="text-sm text-[#e8e8e8] font-mono break-all">{generatedPassword}</p>
+                  </div>
                 </div>
 
                 <div className="flex gap-3">

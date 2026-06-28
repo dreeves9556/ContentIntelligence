@@ -110,7 +110,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             Send Invitations
           </h3>
           <p className="text-sm text-[#787878] mt-1">
-            Paste email addresses separated by commas, spaces, or new lines. All invites will be assigned the selected plan.
+            Paste email addresses separated by commas, spaces, or new lines. Accounts will be created with randomly generated passwords — copy the credentials to share with your clients.
           </p>
         </div>
 
@@ -169,12 +169,12 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Sending Invites…
+                Creating Accounts…
               </>
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                Send Invitations
+                Create Accounts
               </>
             )}
           </button>
@@ -186,7 +186,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 flex items-center gap-1.5">
                 <Check className="h-4 w-4" />
-                {successCount} sent
+                {successCount} created
               </span>
               {failCount > 0 && (
                 <span className="text-red-400 flex items-center gap-1.5">
@@ -214,13 +214,13 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                       {r.error}
                     </span>
                   )}
-                  {r.url && (
+                  {r.password && (
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(r.url!);
+                        navigator.clipboard.writeText(`Email: ${r.email}\nPassword: ${r.password!}`);
                       }}
                       className="text-[#787878] hover:text-[#c8952a] transition-colors shrink-0"
-                      title="Copy link"
+                      title="Copy credentials"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </button>

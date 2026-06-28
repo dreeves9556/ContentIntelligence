@@ -21,6 +21,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { saveProfileSurvey, deleteProfileSurvey, updateOnboarding } from "./actions";
+import ChangePasswordForm from "./ChangePasswordForm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -559,6 +560,11 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
             />
           </div>
           <p className="text-xs text-text-muted">The more you fill in below, the more bespoke your social posts become.</p>
+        </div>
+
+        {/* Change password */}
+        <div className="mt-5 pt-5 border-t border-white/7">
+          <ChangePasswordForm />
         </div>
 
         {/* Sign out */}
