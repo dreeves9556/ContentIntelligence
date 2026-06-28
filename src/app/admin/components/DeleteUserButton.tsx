@@ -98,14 +98,20 @@ function DeleteConfirmModal({
   const trackRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
   const startedAtXRef = useRef<number>(0);
+  const progressRef = useRef(0);
+  const maxDistanceRef = useRef(0);
 
   const SLIDE_THRESHOLD = 0.92;
+  const KNOB_WIDTH = 48;
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (isPending || completed) return;
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      if (trackRef.current) {
+        maxDistanceRef.current = trackRef.current.offsetWidth - KNOB_WIDTH;
+      }
       setIsSliding(true);
       startedAtXRef.current = e.clientX;
     },
@@ -114,12 +120,11 @@ function DeleteConfirmModal({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isSliding || !trackRef.current) return;
-      const trackWidth = trackRef.current.offsetWidth;
-      const knobWidth = 48;
-      const maxDistance = trackWidth - knobWidth;
+      if (!isSliding) return;
       const delta = e.clientX - startedAtXRef.current;
+      const maxDistance = maxDistanceRef.current || 1;
       const progress = Math.min(1, Math.max(0, delta / maxDistance));
+      progressRef.current = progress;
       setSliderProgress(progress);
     },
     [isSliding]
@@ -128,13 +133,14 @@ function DeleteConfirmModal({
   const handlePointerUp = useCallback(() => {
     if (!isSliding) return;
     setIsSliding(false);
-    if (sliderProgress >= SLIDE_THRESHOLD) {
+    if (progressRef.current >= SLIDE_THRESHOLD) {
       setCompleted(true);
       onDelete();
     } else {
+      progressRef.current = 0;
       setSliderProgress(0);
     }
-  }, [isSliding, sliderProgress, onDelete]);
+  }, [isSliding, onDelete]);
 
   useEffect(() => {
     if (completed) return;
@@ -145,7 +151,7 @@ function DeleteConfirmModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [completed, isPending, onClose]);
 
-  const knobTranslate = `translateX(${sliderProgress * 100}%)`;
+  const knobTranslate = `translateX(${sliderProgress * maxDistanceRef.current}px)`;
 
   return (
     <div

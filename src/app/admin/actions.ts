@@ -247,7 +247,8 @@ export async function deleteUser(
   try {
     await prisma.user.delete({ where: { id: userId } });
     return { success: true };
-  } catch {
+  } catch (err) {
+    console.error("[ADMIN DELETE USER] Error:", err);
     return { success: false, error: "Failed to delete user." };
   }
 }
