@@ -232,6 +232,26 @@ export async function deleteInvite(
   }
 }
 
+export async function deleteUser(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (session.user.id === userId) {
+    return { success: false, error: "You cannot delete your own account." };
+  }
+
+  try {
+    await prisma.user.delete({ where: { id: userId } });
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to delete user." };
+  }
+}
+
 export async function adminResetPassword(
   userId: string
 ): Promise<{ success: boolean; error?: string }> {

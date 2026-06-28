@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { Users, UserPlus, Crown, Shield, FileText, CalendarDays, Mail, Share2 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -6,6 +7,7 @@ import { InviteClientButton } from "./components/InviteClientButton";
 import PlanSwitcher from "./components/PlanSwitcher";
 import RoleSwitcher from "./components/RoleSwitcher";
 import ResetPasswordButton from "./components/ResetPasswordButton";
+import DeleteUserButton from "./components/DeleteUserButton";
 import type { UserPlan } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +73,8 @@ function StatusPill({ status }: { status: "ACTIVE" | "PENDING" }) {
 
 export default async function AdminPage() {
   const users = await getUsers();
+  const session = await auth();
+  const currentUserId = session?.user?.id;
   const totalClients = users.filter((u) => u.role === "USER").length;
   const adminCount = users.filter((u) => u.role === "ADMIN").length;
 
@@ -162,6 +166,7 @@ export default async function AdminPage() {
                 <RoleSwitcher userId={user.id} currentRole={user.role} />
                 <PlanSwitcher userId={user.id} currentPlan={user.plan} />
                 <ResetPasswordButton userId={user.id} userEmail={user.email} />
+                <DeleteUserButton userId={user.id} userName={user.name} userEmail={user.email} isSelf={currentUserId === user.id} />
                 <StatusPill status={user.status} />
                 <span className="text-xs text-[#787878]">{format(user.createdAt, "MMM d, yyyy")}</span>
               </div>
@@ -245,7 +250,10 @@ export default async function AdminPage() {
                     <StatusPill status={user.status} />
                   </td>
                   <td className="py-4 px-6">
-                    <ResetPasswordButton userId={user.id} userEmail={user.email} />
+                    <div className="flex items-center gap-2">
+                      <ResetPasswordButton userId={user.id} userEmail={user.email} />
+                      <DeleteUserButton userId={user.id} userName={user.name} userEmail={user.email} isSelf={currentUserId === user.id} />
+                    </div>
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-4 text-sm">
