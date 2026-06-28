@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2, AlertTriangle, Loader2, X } from "lucide-react";
 import { deleteUser } from "../actions";
 
@@ -20,6 +21,7 @@ export default function DeleteUserButton({
   const [showConfirm, setShowConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   if (isSelf) {
     return (
@@ -63,6 +65,7 @@ export default function DeleteUserButton({
               const result = await deleteUser(userId);
               if (result.success) {
                 setShowConfirm(false);
+                router.refresh();
               } else {
                 setError(result.error ?? "Failed to delete user.");
               }

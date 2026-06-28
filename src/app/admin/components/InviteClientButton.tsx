@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { UserPlus, X, Link2, Copy, Check, Loader2, Mail } from "lucide-react";
 import { createClientProfile } from "../actions";
 
@@ -11,6 +12,7 @@ export function InviteClientButton() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleClose() {
     setShowModal(false);
@@ -27,6 +29,7 @@ export function InviteClientButton() {
       const result = await createClientProfile(email);
       if ("password" in result) {
         setGeneratedPassword(result.password);
+        router.refresh();
         if (result.error) {
           setError(result.error);
         }
