@@ -53,7 +53,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const plan = (session?.user?.plan ?? "CREATOR") as UserPlan;
+  const plan = (session?.user?.plan ?? "CALENDAR_ONLY") as UserPlan;
   const navItems = getNavItems(plan);
 
   const handleLogout = () => {

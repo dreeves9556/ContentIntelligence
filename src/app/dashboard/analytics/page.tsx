@@ -13,7 +13,7 @@ export default async function AnalyticsPage() {
     redirect("/login");
   }
 
-  const plan = (session.user.plan ?? "CREATOR") as UserPlan;
+  const plan = (session.user.plan ?? "CALENDAR_ONLY") as UserPlan;
 
   const posts = await prisma.postAnalytics.findMany({
     where: { userId: session.user.id },

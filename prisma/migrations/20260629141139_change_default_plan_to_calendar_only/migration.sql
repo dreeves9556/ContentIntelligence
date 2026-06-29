@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "invite_tokens" ALTER COLUMN "plan" SET DEFAULT 'CALENDAR_ONLY';
+
+-- AlterTable
+ALTER TABLE "users" ALTER COLUMN "plan" SET DEFAULT 'CALENDAR_ONLY';

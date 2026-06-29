@@ -16,7 +16,7 @@ model User {
   password      String?        // For credentials auth, nullable for OAuth
   image         String?
   role          UserRole       @default(USER)
-  plan          UserPlan       @default(CREATOR)
+  plan          UserPlan       @default(CALENDAR_ONLY)
   tokenVersion  Int            @default(0)  // Incremented on password reset to invalidate existing JWTs
   authorDisplayName  String?  // Public byline name shown on articles
   authorImage        String?  // URL to headshot
@@ -151,7 +151,7 @@ model InviteToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-  plan      UserPlan @default(CREATOR)
+  plan      UserPlan @default(CALENDAR_ONLY)
 
   @@map("invite_tokens")
 }

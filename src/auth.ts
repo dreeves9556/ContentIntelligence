@@ -128,7 +128,7 @@ export const {
 
         session.user.id = token.id as string;
         session.user.role = token.role as "USER" | "ADMIN";
-        session.user.plan = (token.plan ?? "CREATOR") as "CALENDAR_ONLY" | "CREATOR" | "PRO";
+        session.user.plan = (token.plan ?? "CALENDAR_ONLY") as "CALENDAR_ONLY" | "CREATOR" | "PRO";
         (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }
       return session;

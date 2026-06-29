@@ -40,7 +40,7 @@ interface InvitesClientProps {
 export default function InvitesClient({ initialInvites }: InvitesClientProps) {
   const router = useRouter();
   const [emails, setEmails] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState<UserPlan>("CREATOR");
+  const [selectedPlan, setSelectedPlan] = useState<UserPlan>("CALENDAR_ONLY");
   const [results, setResults] = useState<BulkInviteResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [invites, setInvites] = useState<PendingInvite[]>(initialInvites);

@@ -47,7 +47,7 @@ export default async function IntegrationsPage() {
     redirect("/login");
   }
 
-  const plan = (session.user.plan ?? "CREATOR") as UserPlan;
+  const plan = (session.user.plan ?? "CALENDAR_ONLY") as UserPlan;
 
   const zernioAccounts = await prisma.zernioAccount.findMany({
     where: { userId: session.user.id },

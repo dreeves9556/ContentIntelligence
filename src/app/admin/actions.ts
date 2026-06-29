@@ -28,7 +28,7 @@ export async function createClientProfile(email: string, plan?: UserPlan): Promi
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const invitePlan = plan ?? "CREATOR";
+  const invitePlan = plan ?? "CALENDAR_ONLY";
 
   const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existingUser) {
@@ -120,7 +120,7 @@ export async function getPendingInvites(): Promise<PendingInvite[]> {
   return invites.map((i) => ({
     id: i.id,
     email: i.email,
-    plan: (i.plan ?? "CREATOR") as UserPlan,
+    plan: (i.plan ?? "CALENDAR_ONLY") as UserPlan,
     expiresAt: i.expiresAt.toISOString(),
     createdAt: i.createdAt.toISOString(),
   }));
