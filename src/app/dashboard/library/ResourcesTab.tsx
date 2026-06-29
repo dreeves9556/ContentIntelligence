@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { BookOpen, Tag, Calendar, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { BookOpen, Tag, Calendar, Search, ChevronDown, ChevronUp, Mail } from "lucide-react";
 import type { ResourcePostData } from "@/app/admin/resources/actions";
 
 function formatDate(iso: string) {
@@ -41,6 +41,15 @@ function AuthorByline({ post }: { post: ResourcePostData }) {
         <p className="text-xs font-semibold text-text-primary leading-tight">{name}</p>
         {post.authorOrganization && (
           <p className="text-[10px] text-text-muted leading-tight">{post.authorOrganization}</p>
+        )}
+        {post.authorContactEmail && (
+          <a
+            href={`mailto:${post.authorContactEmail}`}
+            className="text-[10px] text-accent-primary leading-tight mt-0.5 hover:underline inline-flex items-center gap-1"
+          >
+            <Mail className="h-2.5 w-2.5" />
+            {post.authorContactEmail}
+          </a>
         )}
       </div>
     </div>

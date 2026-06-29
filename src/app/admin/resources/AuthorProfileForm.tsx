@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import { User, Save, Loader2, CheckCircle2, Building2, ImageIcon } from "lucide-react";
+import { User, Save, Loader2, CheckCircle2, Building2, ImageIcon, Mail } from "lucide-react";
 import type { AdminAuthorProfile } from "./actions";
 import { updateAdminAuthorProfile } from "./actions";
 
@@ -79,6 +79,15 @@ export default function AuthorProfileForm({ initial }: { initial: AdminAuthorPro
                 {form.organization.trim() && (
                   <p className="text-xs text-[#787878] leading-tight mt-0.5">{form.organization.trim()}</p>
                 )}
+                {form.contactEmail.trim() && (
+                  <a
+                    href={`mailto:${form.contactEmail.trim()}`}
+                    className="text-xs text-[#c8952a] leading-tight mt-0.5 hover:underline inline-flex items-center gap-1"
+                  >
+                    <Mail className="h-3 w-3" />
+                    {form.contactEmail.trim()}
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -135,6 +144,24 @@ export default function AuthorProfileForm({ initial }: { initial: AdminAuthorPro
                 />
               </div>
               <p className="text-xs text-[#3a3a3a] mt-1">Paste a direct image URL (e.g. from Cloudinary, Supabase Storage, or any CDN)</p>
+            </div>
+
+            {/* Contact email */}
+            <div>
+              <label className="block text-xs font-bold tracking-wider text-[#787878] uppercase mb-1.5">
+                Contact Email <span className="text-[#3a3a3a] font-normal normal-case tracking-normal">optional</span>
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#3a3a3a]" />
+                <input
+                  type="email"
+                  value={form.contactEmail}
+                  onChange={(e) => handleChange("contactEmail", e.target.value)}
+                  placeholder="e.g. sarah@example.com"
+                  className="w-full pl-9 pr-4 py-2.5 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-[#e8e8e8] placeholder:text-[#3a3a3a] focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 text-sm"
+                />
+              </div>
+              <p className="text-xs text-[#3a3a3a] mt-1">Shown as a clickable mailto link in your article byline</p>
             </div>
           </div>
         </div>

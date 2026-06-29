@@ -47,12 +47,14 @@ export interface ResourcePostData {
   authorDisplayName: string | null;
   authorImage: string | null;
   authorOrganization: string | null;
+  authorContactEmail: string | null;
 }
 
 export interface AdminAuthorProfile {
   displayName: string;
   image: string;
   organization: string;
+  contactEmail: string;
 }
 
 const AUTHOR_SELECT = {
@@ -60,6 +62,7 @@ const AUTHOR_SELECT = {
   authorDisplayName: true,
   authorImage: true,
   authorOrganization: true,
+  authorContactEmail: true,
 } as const;
 
 function mapPost(p: {
@@ -76,6 +79,7 @@ function mapPost(p: {
     authorDisplayName: string | null;
     authorImage: string | null;
     authorOrganization: string | null;
+    authorContactEmail: string | null;
   };
 }): ResourcePostData {
   return {
@@ -91,6 +95,7 @@ function mapPost(p: {
     authorDisplayName: p.author.authorDisplayName,
     authorImage: p.author.authorImage,
     authorOrganization: p.author.authorOrganization,
+    authorContactEmail: p.author.authorContactEmail,
   };
 }
 
@@ -120,12 +125,13 @@ export async function getAdminAuthorProfile(): Promise<AdminAuthorProfile> {
   const id = await requireAdmin();
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { name: true, authorDisplayName: true, authorImage: true, authorOrganization: true },
+    select: { name: true, authorDisplayName: true, authorImage: true, authorOrganization: true, authorContactEmail: true },
   });
   return {
     displayName: user?.authorDisplayName ?? user?.name ?? "",
     image: user?.authorImage ?? "",
     organization: user?.authorOrganization ?? "",
+    contactEmail: user?.authorContactEmail ?? "",
   };
 }
 
@@ -133,6 +139,7 @@ export async function updateAdminAuthorProfile(data: {
   displayName: string;
   image: string;
   organization: string;
+  contactEmail: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const id = await requireAdmin();
@@ -142,6 +149,7 @@ export async function updateAdminAuthorProfile(data: {
         authorDisplayName: data.displayName.trim() || null,
         authorImage: data.image.trim() || null,
         authorOrganization: data.organization.trim() || null,
+        authorContactEmail: data.contactEmail.trim() || null,
       },
     });
     revalidatePath("/admin/resources");

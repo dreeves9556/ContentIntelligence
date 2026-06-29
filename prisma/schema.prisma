@@ -21,6 +21,7 @@ model User {
   authorDisplayName  String?  // Public byline name shown on articles
   authorImage        String?  // URL to headshot
   authorOrganization String?  // Optional org/title shown under name
+  authorContactEmail String?  // Optional contact email shown as mailto link in byline
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   questionnaires Questionnaire[]
