@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import webpush from "web-push";
 import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
+import { summarizeFollowerGrowth } from "@/lib/follower-stats";
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -210,6 +211,43 @@ export async function generateAIInsight(userId: string): Promise<AIInsightResult
     `${i + 1}. "${p.title}" (${p.format}) — ${p.views} views, ${p.likes} likes, ${p.comments} comments`
   ).join("\n");
 
+  // Fetch follower growth data for the AI prompt
+  const followerStatsRows = await prisma.followerStats.findMany({
+    where: { userId },
+    orderBy: { date: "asc" },
+    select: { platform: true, date: true, followerCount: true, growthDelta: true, growthPercent: true },
+  });
+
+  const PLATFORM_LABELS_LOWER: Record<string, string> = {
+    instagram: "Instagram",
+    tiktok: "TikTok",
+    linkedin: "LinkedIn",
+    youtube: "YouTube",
+    facebook: "Facebook",
+  };
+
+  const followerGrowthSummary = followerStatsRows.length > 0
+    ? Object.entries(
+        followerStatsRows.reduce<Record<string, typeof followerStatsRows>>((acc, row) => {
+          if (!acc[row.platform]) acc[row.platform] = [];
+          acc[row.platform].push(row);
+          return acc;
+        }, {})
+      )
+      .map(([platform, rows]) =>
+        summarizeFollowerGrowth(
+          rows.map((r) => ({
+            date: r.date.toISOString().split("T")[0],
+            followerCount: r.followerCount,
+            growthDelta: r.growthDelta,
+            growthPercent: r.growthPercent,
+          })),
+          PLATFORM_LABELS_LOWER[platform.toLowerCase()] ?? platform
+        )
+      )
+      .join("\n")
+    : "";
+
   const config = await getPlatformConfig();
   const defaultPrompt = `You are a social media content coach. Analyze this creator's recent performance data and provide ONE concise, actionable insight (2-3 sentences max). Be specific with numbers and give a clear recommendation.
 
@@ -224,8 +262,8 @@ ${formatSummary}
 
 TOP PERFORMING POSTS:
 ${topPosts}
-
-Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step.`;
+${followerGrowthSummary ? `\nFOLLOWER GROWTH:\n${followerGrowthSummary}\n` : ""}
+Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step. If follower growth data is available, mention how many followers were gained this week and which platform grew the most.`;
 
   const prompt = (config.insightPromptTemplate ?? defaultPrompt)
     .replace(/\{\{totalPosts\}\}/g, String(posts.length))
@@ -233,7 +271,8 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
     .replace(/\{\{avgEngagement\}\}/g, String(avgEngagement))
     .replace(/\{\{viewsTrend\}\}/g, String(viewsTrend))
     .replace(/\{\{formatSummary\}\}/g, formatSummary)
-    .replace(/\{\{topPosts\}\}/g, topPosts);
+    .replace(/\{\{topPosts\}\}/g, topPosts)
+    .replace(/\{\{followerGrowth\}\}/g, followerGrowthSummary);
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

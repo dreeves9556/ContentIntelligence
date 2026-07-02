@@ -26,7 +26,10 @@ BREAKDOWN BY FORMAT:
 TOP PERFORMING POSTS:
 {{topPosts}}
 
-Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step.`;
+FOLLOWER GROWTH:
+{{followerGrowth}}
+
+Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step. If follower growth data is available, mention how many followers were gained this week and which platform grew the most.`;
 
 const DEFAULT_CALENDAR_PROMPT = `You are an elite personal brand content strategist. Your job is to help this creator build an audience that follows THEM — the human — not just their business. The best personal brands on social media win because people see a real person with real interests, opinions, and a life outside work. Review these client questionnaire answers: {{questionnaireAnswers}}. {{usedTitlesBlock}}{{deepDiveBlock}}{{goalBlock}}{{guardrailBlock}}{{voiceBlock}}{{offerBlock}}{{audienceBlock}}{{boundariesBlock}}{{personalContextBlock}}{{formattingBlock}}
 Generate a {{daysToPost}}-day content calendar starting today, which is {{currentDay}}, and running for the next {{daysToPost}} consecutive days.

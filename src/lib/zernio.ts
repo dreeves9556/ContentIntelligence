@@ -82,6 +82,15 @@ export interface ZernioAccountAnalytics {
   }>;
 }
 
+export interface ZernioFollowerStats {
+  points: Array<{
+    date: string;
+    followerCount: number;
+    growthDelta: number;
+    growthPercent: number;
+  }>;
+}
+
 export const zernio = {
   profiles: {
     async create(name: string): Promise<ZernioProfile> {
@@ -131,6 +140,11 @@ export const zernio = {
     async getBestTime(zernioAccountId: string): Promise<unknown> {
       const params = new URLSearchParams({ accountId: zernioAccountId });
       return zernioFetch<unknown>(`/analytics/best-time?${params.toString()}`);
+    },
+
+    async getFollowerStats(zernioAccountId: string): Promise<unknown> {
+      const params = new URLSearchParams({ accountId: zernioAccountId });
+      return zernioFetch<unknown>(`/accounts/follower-stats?${params.toString()}`);
     },
   },
 };

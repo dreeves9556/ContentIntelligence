@@ -5,6 +5,7 @@ import CalendarStrategyNote from "./CalendarStrategyNote";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { autoSyncAnalyticsIfNeeded } from "../integrations/actions";
 import {
   Sparkles,
   Video,
@@ -19,6 +20,11 @@ export default async function CalendarPage() {
   if (!session?.user) {
     redirect("/login");
   }
+
+  // Auto-sync analytics once per day per account (fire-and-forget)
+  autoSyncAnalyticsIfNeeded().catch((err) =>
+    console.error("Auto analytics sync failed:", err)
+  );
 
   const calendar = await getWeeklyCalendar();
 

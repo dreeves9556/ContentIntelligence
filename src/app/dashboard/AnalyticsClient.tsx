@@ -20,6 +20,7 @@ import {
   Database,
   Layers,
   Clock,
+  UserPlus,
 } from "lucide-react";
 import {
   LineChart,
@@ -90,9 +91,18 @@ export interface BestTimeEntry {
   updatedAt: string;
 }
 
+export interface FollowerStatsData {
+  platform: string;
+  date: string; // ISO string from server
+  followerCount: number;
+  growthDelta: number;
+  growthPercent: number;
+}
+
 interface AnalyticsClientProps {
   posts: PostData[];
   bestTimes: BestTimeEntry[];
+  followerStats: FollowerStatsData[];
 }
 
 type SortKey = "date" | "views" | "engagement";
@@ -223,7 +233,177 @@ function BestTimeHeatmap({ entry }: { entry: BestTimeEntry }) {
   );
 }
 
-export default function AnalyticsClient({ posts, bestTimes }: AnalyticsClientProps) {
+const PLATFORM_LINE_COLORS: Record<string, string> = {
+  instagram: "#c8952a",
+  tiktok: "#0fcfe3",
+  linkedin: "#4f8eff",
+  youtube: "#ff4757",
+  facebook: "#3b82f6",
+};
+
+function buildFollowerGrowthData(followerStats: FollowerStatsData[]) {
+  const byPlatform: Record<string, FollowerStatsData[]> = {};
+  for (const stat of followerStats) {
+    if (!byPlatform[stat.platform]) byPlatform[stat.platform] = [];
+    byPlatform[stat.platform].push(stat);
+  }
+
+  const allDates = new Set<string>();
+  for (const stats of Object.values(byPlatform)) {
+    for (const s of stats) allDates.add(s.date);
+  }
+  const sortedDates = Array.from(allDates).sort();
+
+  const chartData = sortedDates.map((date) => {
+    const entry: Record<string, number | string> = { date };
+    for (const [platform, stats] of Object.entries(byPlatform)) {
+      const point = stats.find((s) => s.date === date);
+      entry[platform] = point ? point.followerCount : 0;
+    }
+    return entry;
+  });
+
+  return { chartData, platforms: Object.keys(byPlatform) };
+}
+
+function FollowerGrowthChart({ followerStats }: { followerStats: FollowerStatsData[] }) {
+  const { chartData, platforms } = buildFollowerGrowthData(followerStats);
+
+  const summaries = platforms.map((platform) => {
+    const stats = followerStats.filter((s) => s.platform === platform);
+    const latest = stats[stats.length - 1];
+    const weekAgoIdx = Math.max(0, stats.length - 8);
+    const weekAgo = stats[weekAgoIdx];
+    const weeklyDelta = latest ? latest.followerCount - (weekAgo?.followerCount ?? latest.followerCount) : 0;
+    const weeklyPercent =
+      latest && weekAgo && weekAgo.followerCount > 0
+        ? ((weeklyDelta / weekAgo.followerCount) * 100).toFixed(1)
+        : "0";
+    return {
+      platform,
+      label: PLATFORM_LABELS_LOWER[platform.toLowerCase()] ?? platform,
+      latestCount: latest?.followerCount ?? 0,
+      weeklyDelta,
+      weeklyPercent,
+    };
+  });
+
+  const formatDateShort = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  // Thin out X-axis ticks on small screens to prevent label overlap
+  const tickInterval = chartData.length > 30 ? Math.floor(chartData.length / 8) : 0;
+
+  return (
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <UserPlus className="h-5 w-5 text-accent-primary shrink-0" />
+          <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+            Follower Growth
+          </h3>
+        </div>
+        <p className="text-xs sm:text-sm text-text-muted mt-1">
+          Daily follower count across your connected platforms
+        </p>
+      </div>
+
+      {/* Per-platform summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+        {summaries.map((s) => {
+          const sign = s.weeklyDelta >= 0 ? "+" : "";
+          const isPositive = s.weeklyDelta >= 0;
+          return (
+            <div
+              key={s.platform}
+              className="flex items-center justify-between rounded-lg bg-background-secondary/50 border border-background-secondary px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="text-xs text-text-muted truncate">{s.label}</p>
+                <p className="text-base sm:text-lg font-bold text-text-primary mt-0.5">
+                  {formatNumber(s.latestCount)}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p
+                  className={`text-sm font-medium ${isPositive ? "text-brand-expert" : "text-red-400"}`}
+                >
+                  {sign}{s.weeklyDelta}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {sign}{s.weeklyPercent}%
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Line chart */}
+      <div className="h-64 sm:h-72 w-full overflow-x-auto">
+        <div className="min-w-[280px] h-full w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+              <XAxis
+                dataKey="date"
+                stroke="#787878"
+                tick={{ fill: "#787878", fontSize: 10 }}
+                tickLine={false}
+                tickFormatter={formatDateShort}
+                minTickGap={15}
+                interval={tickInterval}
+              />
+            <YAxis
+              stroke="#787878"
+              tick={{ fill: "#787878", fontSize: 12 }}
+              tickLine={false}
+              tickFormatter={(value) => formatNumber(value)}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#1a1a1a",
+                border: "1px solid #2a2a2a",
+                borderRadius: "8px",
+                color: "#e8e8e8",
+              }}
+              labelFormatter={(label) => formatDateShort(String(label))}
+              formatter={(value, name) => [
+                typeof value === "number" ? formatNumber(value) : value,
+                PLATFORM_LABELS_LOWER[String(name).toLowerCase()] ?? String(name),
+              ]}
+            />
+            <Legend
+              wrapperStyle={{ paddingTop: "20px" }}
+              iconType="circle"
+              formatter={(value) =>
+                PLATFORM_LABELS_LOWER[String(value).toLowerCase()] ?? String(value)
+              }
+            />
+            {platforms.map((platform) => (
+              <Line
+                key={platform}
+                type="monotone"
+                dataKey={platform}
+                name={platform}
+                stroke={PLATFORM_LINE_COLORS[platform.toLowerCase()] ?? "#c8952a"}
+                strokeWidth={2.5}
+                dot={{ r: 3, strokeWidth: 1 }}
+                activeDot={{ r: 5 }}
+                connectNulls
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AnalyticsClient({ posts, bestTimes, followerStats }: AnalyticsClientProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [seeding, setSeeding] = useState(false);
@@ -589,6 +769,9 @@ export default function AnalyticsClient({ posts, bestTimes }: AnalyticsClientPro
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Follower Growth Chart */}
+      {followerStats.length > 0 && <FollowerGrowthChart followerStats={followerStats} />}
 
       {/* Best Time to Post Heatmaps */}
       {bestTimes.length > 0 && (

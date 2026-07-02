@@ -35,6 +35,7 @@ model User {
   profileSurveys   ProfileSurvey[]
   zernioAccounts   ZernioAccount[]
   bestTimeToPosts  BestTimeToPost[]
+  followerStats    FollowerStats[]
   resourcePosts    ResourcePost[]
   bugReports      BugReport[]
   accounts      Account[]
@@ -331,6 +332,22 @@ model BugReport {
   updatedAt   DateTime        @updatedAt
 
   @@map("bug_reports")
+}
+
+model FollowerStats {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform      String   // e.g. "instagram", "tiktok", "linkedin"
+  date          DateTime // The day the follower count was recorded (date-only, stored at midnight UTC)
+  followerCount Int      @default(0)
+  growthDelta   Int      @default(0)   // net new followers vs previous day
+  growthPercent Float    @default(0)   // percentage growth vs previous day
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, platform, date])
+  @@map("follower_stats")
 }
 
 model BestTimeToPost {

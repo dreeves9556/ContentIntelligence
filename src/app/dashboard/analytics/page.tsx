@@ -36,6 +36,13 @@ export default async function AnalyticsPage() {
     select: { platform: true, heatmap: true, updatedAt: true },
   });
 
+  // Fetch follower stats for connected platforms
+  const followerStatsRows = await prisma.followerStats.findMany({
+    where: { userId: session.user.id },
+    orderBy: { date: "asc" },
+    select: { platform: true, date: true, followerCount: true, growthDelta: true, growthPercent: true },
+  });
+
   // Serialize dates to ISO strings for the client component
   const serializedPosts = posts.map((p) => ({
     ...p,
@@ -48,7 +55,15 @@ export default async function AnalyticsPage() {
     updatedAt: r.updatedAt.toISOString(),
   }));
 
-  const content = <AnalyticsClient posts={serializedPosts} bestTimes={serializedBestTimes} />;
+  const serializedFollowerStats = followerStatsRows.map((r) => ({
+    platform: r.platform,
+    date: r.date.toISOString(),
+    followerCount: r.followerCount,
+    growthDelta: r.growthDelta,
+    growthPercent: r.growthPercent,
+  }));
+
+  const content = <AnalyticsClient posts={serializedPosts} bestTimes={serializedBestTimes} followerStats={serializedFollowerStats} />;
 
   if (!canAccessAnalytics(plan)) {
     return (
