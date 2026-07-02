@@ -107,6 +107,14 @@ interface AnalyticsClientProps {
 
 type SortKey = "date" | "views" | "engagement";
 type SortOrder = "asc" | "desc";
+type Section = "overview" | "audience" | "bestTimes" | "performance";
+
+const SECTIONS: { id: Section; label: string; icon: typeof TrendingUp }[] = [
+  { id: "overview", label: "Overview", icon: TrendingUp },
+  { id: "audience", label: "Audience", icon: UserPlus },
+  { id: "bestTimes", label: "Best Times", icon: Clock },
+  { id: "performance", label: "Post Performance", icon: BarChart2 },
+];
 
 const KNOWN_PLATFORMS = new Set(["INSTAGRAM", "TIKTOK", "LINKEDIN", "YOUTUBE", "FACEBOOK"]);
 
@@ -413,17 +421,33 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats }: Ana
   const [activePlatform, setActivePlatform] = useState<string>("ALL");
   const [insightExpanded, setInsightExpanded] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
+  const [activeSection, setActiveSection] = useState<Section>("overview");
 
   const platformTabs = useMemo(() => {
-    const present = new Set(posts.map((p) => derivePlatform(p.format)));
+    const present = new Set<string>();
+    posts.forEach((p) => present.add(derivePlatform(p.format)));
+    followerStats.forEach((s) => present.add(s.platform.toUpperCase()));
+    bestTimes.forEach((b) => present.add(b.platform.toUpperCase()));
     const order = ["INSTAGRAM", "TIKTOK", "LINKEDIN", "YOUTUBE", "FACEBOOK", "OTHER"];
+    const seen = new Set(order);
+    present.forEach((p) => { if (!seen.has(p)) order.push(p); });
     return order.filter((pl) => present.has(pl));
-  }, [posts]);
+  }, [posts, followerStats, bestTimes]);
 
   const filteredPosts = useMemo(() => {
     if (activePlatform === "ALL") return posts;
     return posts.filter((p) => derivePlatform(p.format) === activePlatform);
   }, [posts, activePlatform]);
+
+  const filteredFollowerStats = useMemo(() => {
+    if (activePlatform === "ALL") return followerStats;
+    return followerStats.filter((s) => s.platform.toUpperCase() === activePlatform);
+  }, [followerStats, activePlatform]);
+
+  const filteredBestTimes = useMemo(() => {
+    if (activePlatform === "ALL") return bestTimes;
+    return bestTimes.filter((b) => b.platform.toUpperCase() === activePlatform);
+  }, [bestTimes, activePlatform]);
 
   const fetchInsight = useCallback(async () => {
     setAiLoading(true);
@@ -603,6 +627,30 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats }: Ana
         </div>
       )}
 
+      {/* Section Sub-Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-background-card border border-background-secondary rounded-xl overflow-x-auto">
+        {SECTIONS.map((section) => {
+          const Icon = section.icon;
+          return (
+            <button
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                activeSection === section.id
+                  ? "bg-accent-primary text-background-primary"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Overview Section */}
+      {activeSection === "overview" && (
+        <>
       {/* AI Insights Box */}
       <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
         <div className="flex items-start gap-4">
@@ -771,17 +819,45 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats }: Ana
       </div>
 
       {/* Follower Growth Chart */}
-      {followerStats.length > 0 && <FollowerGrowthChart followerStats={followerStats} />}
-
-      {/* Best Time to Post Heatmaps */}
-      {bestTimes.length > 0 && (
-        <div className="space-y-6">
-          {bestTimes.map((entry) => (
-            <BestTimeHeatmap key={entry.platform} entry={entry} />
-          ))}
-        </div>
+      {activeSection === "overview" && filteredFollowerStats.length > 0 && <FollowerGrowthChart followerStats={filteredFollowerStats} />}
+      </>
       )}
 
+      {/* Audience Section */}
+      {activeSection === "audience" && (
+        <>
+          {filteredFollowerStats.length > 0 ? (
+            <FollowerGrowthChart followerStats={filteredFollowerStats} />
+          ) : (
+            <div className="bg-background-card rounded-xl p-12 border border-background-secondary text-center">
+              <UserPlus className="h-10 w-10 text-text-muted mx-auto mb-3" />
+              <p className="text-text-muted text-sm">{activePlatform !== "ALL" ? `No audience data for ${PLATFORM_LABELS[activePlatform] ?? activePlatform}` : "No audience data yet — connect a social account to start tracking follower growth"}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Best Times Section */}
+      {activeSection === "bestTimes" && (
+        <>
+          {filteredBestTimes.length > 0 ? (
+            <div className="space-y-6">
+              {filteredBestTimes.map((entry) => (
+                <BestTimeHeatmap key={entry.platform} entry={entry} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-background-card rounded-xl p-12 border border-background-secondary text-center">
+              <Clock className="h-10 w-10 text-text-muted mx-auto mb-3" />
+              <p className="text-text-muted text-sm">{activePlatform !== "ALL" ? `No best-time data for ${PLATFORM_LABELS[activePlatform] ?? activePlatform}` : "No best-time data yet — connect a social account and sync analytics to see optimal posting times"}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Post Performance Section */}
+      {activeSection === "performance" && (
+        <>
       {/* Recent Performance Table */}
       <div className="bg-background-card rounded-xl border border-background-secondary overflow-hidden">
         <div className="p-6 border-b border-background-secondary">
@@ -925,6 +1001,8 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats }: Ana
           </>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
