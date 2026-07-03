@@ -38,7 +38,7 @@ const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 async function syncSingleAccount(
   userId: string,
-  account: { zernioAccountId: string; platform: string },
+  account: { zernioAccountId: string; platform: string; zernioProfileId: string },
   startStr: string,
   endStr: string
 ): Promise<number> {
@@ -166,6 +166,37 @@ async function syncSingleAccount(
     }
   }
 
+  // Fetch & store per-platform content decay
+  try {
+    const rawDecay = await zernio.analytics.getProfileAnalytics(
+      account.zernioProfileId,
+      "content-decay",
+      { platform: account.platform.toLowerCase() }
+    );
+    const normalized = normalizeContentDecay(rawDecay);
+    if (normalized.buckets.length > 0) {
+      const wrapped = { kind: "contentDecay" as const, payload: normalized };
+      await prisma.deepAnalytics.upsert({
+        where: {
+          userId_platform_dataType: {
+            userId,
+            platform: account.platform,
+            dataType: "content_decay",
+          },
+        },
+        update: { data: wrapped as unknown as Prisma.InputJsonValue },
+        create: {
+          userId,
+          platform: account.platform,
+          dataType: "content_decay",
+          data: wrapped as unknown as Prisma.InputJsonValue,
+        },
+      });
+    }
+  } catch (err) {
+    console.error(`Failed to fetch content-decay for ${account.platform}:`, err);
+  }
+
   return synced;
 }
 
@@ -196,10 +227,10 @@ export async function syncAnalytics() {
 
   // Sync profile-level deep analytics (content-decay, daily-metrics, posting-frequency)
   const profileId = zernioAccounts[0].zernioProfileId;
-  const profileEndpoints: { endpoint: "content-decay" | "daily-metrics" | "posting-frequency"; dataType: string; normalize: (raw: unknown) => unknown }[] = [
-    { endpoint: "content-decay", dataType: "content_decay", normalize: (r) => normalizeContentDecay(r) },
-    { endpoint: "daily-metrics", dataType: "daily_metrics", normalize: (r) => normalizeDailyMetrics(r) },
-    { endpoint: "posting-frequency", dataType: "posting_frequency", normalize: (r) => normalizePostingFrequency(r) },
+  const profileEndpoints: { endpoint: "content-decay" | "daily-metrics" | "posting-frequency"; dataType: string; normalize: (raw: unknown) => { kind: string; payload: unknown } }[] = [
+    { endpoint: "content-decay", dataType: "content_decay", normalize: (r) => ({ kind: "contentDecay", payload: normalizeContentDecay(r) }) },
+    { endpoint: "daily-metrics", dataType: "daily_metrics", normalize: (r) => ({ kind: "dailyMetrics", payload: normalizeDailyMetrics(r) }) },
+    { endpoint: "posting-frequency", dataType: "posting_frequency", normalize: (r) => ({ kind: "postingFrequency", payload: normalizePostingFrequency(r) }) },
   ];
   for (const cfg of profileEndpoints) {
     try {

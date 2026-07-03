@@ -1,4 +1,5 @@
 import type { QuestionnaireFormData } from "./questionnaire-actions";
+import type { TrendHeadline } from "./rss-trends";
 
 type ProfileSurveyRow = { surveyType: string; answersJson: unknown };
 
@@ -281,6 +282,26 @@ export function buildUserProfileXml(ctx: PromptContext): string {
   if (deepDives) blocks.push(deepDives);
 
   return blocks.join("\n\n");
+}
+
+const CATEGORY_LABELS: Record<TrendHeadline["category"], string> = {
+  social_media: "Social Media",
+  content_marketing: "Content Marketing",
+  creator_coaching: "Creator & Personal Brand",
+  business: "Business & Entrepreneurship",
+};
+
+export function buildTrendingTopicsBlock(headlines: TrendHeadline[]): string {
+  if (headlines.length === 0) return "";
+
+  const lines = headlines.map(
+    (h) => `- [${CATEGORY_LABELS[h.category]}] ${h.title}`
+  );
+
+  return `<trending_industry_topics>
+These are real headlines published TODAY from leading social media, content marketing, and creator economy sources. Use them as inspiration signals — reference the themes, angles, or conversations that fit this creator's brand and audience. Do NOT copy headlines verbatim. Use them to make content feel timely and culturally relevant.
+${lines.join("\n")}
+</trending_industry_topics>`;
 }
 
 export function buildUsedTitlesBlock(titles: string[]): string {

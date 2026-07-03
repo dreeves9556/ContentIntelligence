@@ -29,7 +29,7 @@ export default function SyncButton() {
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-row-reverse items-center gap-3">
       <button
         onClick={handleSync}
         disabled={status === "loading"}

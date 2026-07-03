@@ -48,6 +48,7 @@ import {
   getTimezoneLabel,
   type HeatmapData,
 } from "@/lib/best-time";
+import { generateLifespanInsight, generateCadenceRecommendation, type ContentDecayBucket } from "@/lib/deep-analytics";
 
 function ConditionalLink({ href, className, children }: { href: string | null; className?: string; children: React.ReactNode }) {
   if (!href) return <span className={className}>{children}</span>;
@@ -758,24 +759,95 @@ function PostReactionsCard({ entry }: { entry: DeepAnalyticsEntry }) {
 }
 
 function ContentDecayCard({ entry }: { entry: DeepAnalyticsEntry }) {
-  const data = entry.data.payload as { buckets: { order: number; label: string; pctOfFinal: number; postCount: number }[] };
+  const data = entry.data.payload as { buckets: ContentDecayBucket[] };
   const buckets = data.buckets ?? [];
   if (buckets.length === 0) return null;
 
+  const label = PLATFORM_LABELS_LOWER[entry.platform.toLowerCase()] ?? entry.platform;
   const chartData = buckets.map((b) => ({ label: b.label, pct: b.pctOfFinal, postCount: b.postCount }));
+  const totalPosts = buckets.reduce((s, b) => s + b.postCount, 0);
+  const gradId = `decayGrad-${entry.platform}`;
+
+  const lifespanInsight = generateLifespanInsight(buckets, entry.platform);
+  const cadenceRec = generateCadenceRecommendation(buckets);
 
   return (
     <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-background-secondary">
       <div className="flex items-center gap-2 mb-1">
         <Timer className="h-5 w-5 text-accent-primary shrink-0" />
         <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
-          Content Decay
+          Content Decay — {label}
         </h3>
       </div>
       <p className="text-xs sm:text-sm text-text-muted mb-4 sm:mb-5">
-        How quickly engagement accumulates after publishing — use this to understand content lifespan
+        How quickly engagement accumulates after publishing — based on {formatNumber(totalPosts)} posts
       </p>
 
+      {/* Lifespan Insight */}
+      {lifespanInsight && (
+        <div className="flex items-start gap-3 mb-3 p-3 rounded-lg bg-accent-primary/10 border border-accent-primary/20">
+          <Timer className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
+          <p className="text-sm text-text-primary leading-relaxed">{lifespanInsight}</p>
+        </div>
+      )}
+
+      {/* Cadence Recommendation */}
+      {cadenceRec && (
+        <div className="flex items-start gap-3 mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <TrendingUp className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-text-primary leading-relaxed">{cadenceRec}</p>
+        </div>
+      )}
+
+      {/* Area Chart */}
+      <div className="h-48 w-full mb-4 overflow-x-auto">
+        <div className="min-w-[280px] h-full w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <defs>
+                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#c8952a" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#c8952a" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+              <XAxis
+                dataKey="label"
+                stroke="#787878"
+                tick={{ fill: "#787878", fontSize: 10 }}
+                tickLine={false}
+                minTickGap={20}
+              />
+              <YAxis
+                stroke="#787878"
+                tick={{ fill: "#787878", fontSize: 10 }}
+                tickLine={false}
+                domain={[0, 100]}
+                tickFormatter={(v) => `${v}%`}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #2a2a2a",
+                  borderRadius: "8px",
+                  color: "#e8e8e8",
+                }}
+                formatter={(value) => [`${Number(value).toFixed(1)}%`, "Engagement Reached"]}
+              />
+              <Area
+                type="monotone"
+                dataKey="pct"
+                stroke="#c8952a"
+                strokeWidth={2.5}
+                fill={`url(#${gradId})`}
+                dot={{ fill: "#c8952a", strokeWidth: 1, r: 3 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Bucket breakdown bars */}
       <div className="space-y-3">
         {chartData.map((b) => (
           <div key={b.label}>
@@ -902,16 +974,17 @@ function PostingFrequencyCard({ entry }: { entry: DeepAnalyticsEntry }) {
                   Best: {best.postsPerWeek}/wk → {best.avgEngagementRate.toFixed(1)}% engagement
                 </span>
               </div>
-              <div className="flex items-end gap-1 h-32">
+              <div className="flex items-end gap-2 h-32 pt-5">
                 {sorted.map((r) => {
-                  const heightPct = (r.avgEngagementRate / maxRate) * 100;
+                  const BAR_MAX_PX = 80;
+                  const barH = Math.max(Math.round((r.avgEngagementRate / maxRate) * BAR_MAX_PX), 3);
                   const isBest = r.postsPerWeek === best.postsPerWeek;
                   return (
                     <div key={r.postsPerWeek} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                      <span className="text-[10px] text-text-muted">{r.avgEngagementRate.toFixed(0)}%</span>
+                      <span className="text-[10px] text-text-muted">{r.avgEngagementRate.toFixed(1)}%</span>
                       <div
                         className={`w-full rounded-t transition-all ${isBest ? "bg-accent-primary" : "bg-accent-primary/40"}`}
-                        style={{ height: `${Math.max(heightPct, 2)}%` }}
+                        style={{ height: `${barH}px` }}
                       />
                       <span className="text-[10px] text-text-muted">{r.postsPerWeek}/wk</span>
                     </div>
@@ -1118,7 +1191,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
             Analytics
@@ -1126,6 +1199,9 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           <p className="text-text-muted mt-1">
             Track your content performance and audience growth
           </p>
+        </div>
+        <div className="sm:hidden absolute top-0 right-0">
+          <SyncButton />
         </div>
         {posts.length === 0 && (
           <button
@@ -1196,7 +1272,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
             );
           })}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto hidden sm:block">
           <SyncButton />
         </div>
       </div>

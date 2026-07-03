@@ -9,9 +9,11 @@ import { getPlatformConfig, type PlatformConfigData } from "@/lib/platform-confi
 import {
   buildUserProfileXml,
   buildUsedTitlesBlock,
+  buildTrendingTopicsBlock,
   CALENDAR_SYSTEM_PROMPT,
   CALENDAR_STRATEGY_SYSTEM_PROMPT,
 } from "@/lib/prompt-builder";
+import { fetchTrendingHeadlines } from "@/lib/rss-trends";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import {
   DAY_NAMES,
@@ -289,7 +291,10 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     select: { title: true },
   });
 
-  const config = await getPlatformConfig();
+  const [config, trendHeadlines] = await Promise.all([
+    getPlatformConfig(),
+    fetchTrendingHeadlines(),
+  ]);
   const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
   if (!apiKey) {
     console.error("Anthropic API key is not configured");
@@ -299,6 +304,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const model = config.anthropicModel || "claude-opus-4-8";
 
   const usedTitlesXml = buildUsedTitlesBlock(recentArchived.map((p: { title: string }) => p.title));
+  const trendingTopicsBlock = buildTrendingTopicsBlock(trendHeadlines);
 
   const userProfileXml = buildUserProfileXml({
     answers,
@@ -347,6 +353,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
 ${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
 ${demographicsBlock ? `\n${demographicsBlock}` : ""}
+${trendingTopicsBlock ? `\n${trendingTopicsBlock}` : ""}
 
 <generation_instructions>
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
