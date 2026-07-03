@@ -31,6 +31,7 @@ model User {
   socialProfiles   SocialProfile[]
   postAnalytics    PostAnalytics[]
   contentArchives  ContentArchive[]
+  contentFeedback  ContentFeedback[]
   pushSubscriptions PushSubscription[]
   profileSurveys   ProfileSurvey[]
   zernioAccounts   ZernioAccount[]
@@ -214,6 +215,23 @@ model ContentArchive {
 
   @@unique([userId, weekStarting, dayIndex])
   @@map("content_archives")
+}
+
+model ContentFeedback {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStarting String
+  dayIndex     Int
+  title        String
+  format       String
+  bucket       String
+  feedback     String   // "up" | "down"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, weekStarting, dayIndex])
+  @@map("content_feedback")
 }
 
 model PostAnalytics {

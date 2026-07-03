@@ -24,7 +24,15 @@ import {
   formatOffset,
   type HeatmapData,
 } from "@/lib/best-time";
-import { summarizeDemographicsForAI } from "@/lib/deep-analytics";
+import { summarizeDemographicsForAI, type ContentDecay, type PostingFrequency } from "@/lib/deep-analytics";
+import {
+  buildPerformanceSignalsBlock,
+  buildContentPerformanceBlock,
+  buildFollowerTrendBlock,
+  buildCadenceBlock,
+  buildFeedbackBlock,
+  matchArchiveToAnalytics,
+} from "@/lib/performance-prompt";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -288,7 +296,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     where: { userId: session.user.id },
     orderBy: { archivedAt: "desc" },
     take: 50,
-    select: { title: true },
+    select: { title: true, format: true, bucket: true, caption: true, hook: true },
   });
 
   const [config, trendHeadlines] = await Promise.all([
@@ -346,6 +354,53 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     ? `<audience_demographics>\nBased on analytics data, here is the creator's audience composition. Tailor content tone, topics, and references to resonate with this audience:\n${demographicsSummary}\n</audience_demographics>`
     : "";
 
+  // Analytics-driven context blocks
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [analyticsRows, followerRows, cadenceRows, feedbackRows] = await Promise.all([
+    prisma.postAnalytics.findMany({
+      where: { userId: session.user.id, publishedAt: { gte: ninetyDaysAgo } },
+      select: { title: true, format: true, views: true, likes: true, comments: true },
+    }),
+    prisma.followerStats.findMany({
+      where: { userId: session.user.id, date: { gte: thirtyDaysAgo } },
+      select: { platform: true, date: true, followerCount: true, growthDelta: true },
+    }),
+    prisma.deepAnalytics.findMany({
+      where: { userId: session.user.id, dataType: { in: ["posting_frequency", "content_decay"] } },
+      select: { platform: true, dataType: true, data: true },
+    }),
+    prisma.contentFeedback.findMany({
+      where: { userId: session.user.id },
+      orderBy: { updatedAt: "desc" },
+      take: 30,
+      select: { title: true, format: true, bucket: true, feedback: true },
+    }),
+  ]);
+
+  const performanceBlock = buildPerformanceSignalsBlock(analyticsRows);
+
+  const matches = matchArchiveToAnalytics(recentArchived, analyticsRows);
+  const contentPerformanceBlock = buildContentPerformanceBlock(matches);
+
+  const followerTrendBlock = buildFollowerTrendBlock(followerRows);
+
+  let postingFrequency: PostingFrequency | null = null;
+  const decayByPlatform: { platform: string; decay: ContentDecay }[] = [];
+  for (const row of cadenceRows) {
+    const wrapped = row.data as unknown as { kind?: string; payload?: unknown };
+    if (row.dataType === "posting_frequency" && wrapped?.kind === "postingFrequency" && wrapped.payload) {
+      postingFrequency = wrapped.payload as PostingFrequency;
+    }
+    if (row.dataType === "content_decay" && wrapped?.kind === "contentDecay" && wrapped.payload) {
+      decayByPlatform.push({ platform: row.platform, decay: wrapped.payload as ContentDecay });
+    }
+  }
+
+  const feedbackBlock = buildFeedbackBlock(feedbackRows);
+
+  const cadenceBlock = buildCadenceBlock(postingFrequency, decayByPlatform, daysToPost);
+
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
   const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
@@ -353,6 +408,11 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
 ${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
 ${demographicsBlock ? `\n${demographicsBlock}` : ""}
+${performanceBlock ? `\n${performanceBlock}` : ""}
+${contentPerformanceBlock ? `\n${contentPerformanceBlock}` : ""}
+${followerTrendBlock ? `\n${followerTrendBlock}` : ""}
+${cadenceBlock ? `\n${cadenceBlock}` : ""}
+${feedbackBlock ? `\n${feedbackBlock}` : ""}
 ${trendingTopicsBlock ? `\n${trendingTopicsBlock}` : ""}
 
 <generation_instructions>
@@ -377,6 +437,11 @@ Days must be one of: ${targetDays.join(", ")}.
     .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
     .replace(/\{\{bestTimesBlock\}\}/g, bestTimesBlock)
     .replace(/\{\{demographicsBlock\}\}/g, demographicsBlock)
+    .replace(/\{\{performanceBlock\}\}/g, performanceBlock)
+    .replace(/\{\{contentPerformanceBlock\}\}/g, contentPerformanceBlock)
+    .replace(/\{\{followerTrendBlock\}\}/g, followerTrendBlock)
+    .replace(/\{\{cadenceBlock\}\}/g, cadenceBlock)
+    .replace(/\{\{feedbackBlock\}\}/g, feedbackBlock)
     .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
     .replace(/\{\{currentDay\}\}/g, currentDay)
     .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))
@@ -522,4 +587,41 @@ export async function removeFromArchive(
   });
 
   revalidatePath("/dashboard/library");
+}
+
+export async function addFeedback(
+  weekStarting: string,
+  dayIndex: number,
+  dayContent: CalendarDay,
+  feedback: "up" | "down"
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  await prisma.contentFeedback.upsert({
+    where: {
+      userId_weekStarting_dayIndex: {
+        userId: session.user.id,
+        weekStarting,
+        dayIndex,
+      },
+    },
+    update: {
+      title: dayContent.title,
+      format: dayContent.format,
+      bucket: dayContent.bucket,
+      feedback,
+    },
+    create: {
+      userId: session.user.id,
+      weekStarting,
+      dayIndex,
+      title: dayContent.title,
+      format: dayContent.format,
+      bucket: dayContent.bucket,
+      feedback,
+    },
+  });
+
+  revalidatePath("/dashboard/calendar");
 }

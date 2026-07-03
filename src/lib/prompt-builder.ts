@@ -22,6 +22,9 @@ const SURVEY_LABELS: Record<string, Record<string, string>> = {
     favoriteClientType: "Favorite client type",
     clientBiggestFear: "Client biggest fear",
     clientRedFlag: "Client red flag",
+    clientMisbeliefs: "What clients wrongly believe they should do first (myth-busting fuel)",
+    clientDreamOutcome: "Client's dream outcome in their own words",
+    beforeAfterStory: "A real client before → after story",
   },
 };
 
@@ -212,6 +215,33 @@ function buildDeepDiveSurveysBlock(profileSurveys: ProfileSurveyRow[]): string {
   return blocks.join("\n\n");
 }
 
+function buildProofPointsBlock(answers: QuestionnaireFormData): string {
+  const parts: string[] = [];
+  if (hasText(answers.numbersThatImpress)) {
+    parts.push(`- PROOF NUMBERS — real numbers from the user's career. Weave these into hooks and bodies for instant credibility (specific beats generic): ${answers.numbersThatImpress}`);
+  }
+  if (hasText(answers.recentWin)) {
+    parts.push(`- RECENT WIN — something good that happened in their business in the last 30 days. Great fuel for a timely, current-feeling post: ${answers.recentWin}`);
+  }
+  if (hasText(answers.faqTop3)) {
+    parts.push(`- TOP QUESTIONS THEY GET ASKED — answering these makes guaranteed-relevant Expert content: ${answers.faqTop3}`);
+  }
+  if (parts.length === 0) return "";
+  return `<proof_points>\nConcrete specifics that separate this creator from generic AI content. Use them to make hooks and bodies feel earned and credible.\n${parts.join("\n")}\n</proof_points>`;
+}
+
+function buildSeasonalContextBlock(answers: QuestionnaireFormData): string {
+  const parts: string[] = [];
+  if (hasText(answers.seasonalRhythm)) {
+    parts.push(`- SEASONAL RHYTHM — how their business changes through the year. Align content angles with the current time of year: ${answers.seasonalRhythm}`);
+  }
+  if (hasText(answers.upcomingEvents)) {
+    parts.push(`- UPCOMING EVENTS (next ~60 days) — real, dated material. Where natural, build content that promotes or references these: ${answers.upcomingEvents}`);
+  }
+  if (parts.length === 0) return "";
+  return `<seasonal_context>\nUse these to make the calendar feel timely and anchored in the creator's real life — not evergreen-generic.\n${parts.join("\n")}\n</seasonal_context>`;
+}
+
 function buildGoalAndGuardrailBlocks(answers: QuestionnaireFormData): string {
   const parts: string[] = [];
   if (hasText(answers.primaryGoal)) {
@@ -256,6 +286,12 @@ export function buildUserProfileXml(ctx: PromptContext): string {
 
   const goalGuardrails = buildGoalAndGuardrailBlocks(answers);
   if (goalGuardrails) blocks.push(goalGuardrails);
+
+  const proofPoints = buildProofPointsBlock(answers);
+  if (proofPoints) blocks.push(proofPoints);
+
+  const seasonal = buildSeasonalContextBlock(answers);
+  if (seasonal) blocks.push(seasonal);
 
   const voice = buildVoiceBlock(answers);
   if (voice) blocks.push(voice);

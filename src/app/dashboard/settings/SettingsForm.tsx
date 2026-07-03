@@ -496,6 +496,61 @@ export default function SettingsForm({
           />
         </div>
         <div>
+          <FieldLabel>Numbers that impress you (proof points for content)</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Stats, milestones, or metrics that build credibility</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "100+ deals closed", "15 years in the business", "$50M in sales volume"`}
+            value={formData.numbersThatImpress}
+            onChange={(e) => set("numbersThatImpress", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>A recent win worth bragging about</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">A deal, client result, or achievement from the last 30 days</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "Just closed a deal 3 days after listing, above asking price"`}
+            value={formData.recentWin}
+            onChange={(e) => set("recentWin", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Top 3 questions you get asked all the time</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Your FAQ — these make great content topics</p>
+          <textarea
+            rows={3}
+            placeholder={`1. How much down payment do I need?\n2. Is now a good time to buy?\n3. ...`}
+            value={formData.faqTop3}
+            onChange={(e) => set("faqTop3", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Seasonal rhythm of your business</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">When does your market heat up or slow down?</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "Spring is listing season, December is dead, September picks back up"`}
+            value={formData.seasonalRhythm}
+            onChange={(e) => set("seasonalRhythm", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
+          <FieldLabel>Upcoming events or launches in the next 30-60 days</FieldLabel>
+          <p className="text-xs text-text-muted mb-3">Open houses, course launches, market updates, speaking gigs</p>
+          <textarea
+            rows={2}
+            placeholder={`e.g. "Open house on the 15th, new lead magnet launching next week"`}
+            value={formData.upcomingEvents}
+            onChange={(e) => set("upcomingEvents", e.target.value)}
+            className={textareaClass}
+          />
+        </div>
+        <div>
           <FieldLabel>Words or catchphrases you use a lot</FieldLabel>
           <p className="text-xs text-text-muted mb-3">Things you say all the time and want to be known for</p>
           <textarea

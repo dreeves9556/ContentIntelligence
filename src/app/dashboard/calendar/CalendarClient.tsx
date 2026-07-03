@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import type { ContentFormat, ContentBucket, CalendarDay } from "./actions";
-import { addToArchive, removeFromArchive } from "./actions";
+import { addToArchive, removeFromArchive, addFeedback } from "./actions";
 import { CopyButton } from "@/components/CopyButton";
 import {
   bestSlotForDay,
@@ -26,6 +26,8 @@ import {
   ExternalLink,
   CheckCircle2,
   Circle,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 type Platform = "instagram" | "tiktok" | "youtube" | "facebook" | "linkedin";
@@ -209,7 +211,7 @@ function BucketBadge({ bucket }: { bucket: ContentBucket }) {
   );
 }
 
-function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes }: { day: CalendarDay; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[] }) {
+function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes, feedback, onFeedback }: { day: CalendarDay; dayIndex: number; weekStarting: string; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; feedback: "up" | "down" | null; onFeedback: (value: "up" | "down") => void; }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
 
@@ -420,6 +422,47 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms,
         );
       })()}
 
+      {/* Feedback (thumbs up/down) */}
+      <div className="p-5 sm:p-6 border-t border-white/10">
+        <div className="flex items-center gap-2 text-text-muted mb-3">
+          <span className="text-sm font-bold tracking-wider uppercase">Was this suggestion helpful?</span>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => onFeedback("up")}
+            disabled={isPending}
+            className={`
+              flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+              text-sm font-bold transition-all duration-200
+              ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${feedback === "up"
+                ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                : "bg-background-secondary/50 text-text-muted border border-white/10 hover:text-green-400 hover:border-green-500/20"
+              }
+            `}
+          >
+            <ThumbsUp className="h-4 w-4 shrink-0" />
+            <span>Good</span>
+          </button>
+          <button
+            onClick={() => onFeedback("down")}
+            disabled={isPending}
+            className={`
+              flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
+              text-sm font-bold transition-all duration-200
+              ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${feedback === "down"
+                ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                : "bg-background-secondary/50 text-text-muted border border-white/10 hover:text-red-400 hover:border-red-500/20"
+              }
+            `}
+          >
+            <ThumbsDown className="h-4 w-4 shrink-0" />
+            <span>Off</span>
+          </button>
+        </div>
+      </div>
+
       {/* Posted toggle */}
       <div className="p-5 sm:p-6 border-t border-white/10">
         <button
@@ -452,15 +495,17 @@ function DayCard({ day, isPosted, onTogglePosted, isPending, connectedPlatforms,
 export default function CalendarClient({ days, weekStarting, connectedPlatforms, bestTimes }: { days: CalendarDay[]; weekStarting: string; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
+  const [feedbackState, setFeedbackState] = useState<("up" | "down" | null)[]>(Array(days.length).fill(null));
   const [isPending, startTransition] = useTransition();
   const activeDay = days[activeIndex];
 
   const baseDate = new Date(weekStarting);
-  const storageKey = `calendar-posted-${weekStarting}`;
+  const postedKey = `calendar-posted-${weekStarting}`;
+  const feedbackKey = `calendar-feedback-${weekStarting}`;
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(storageKey);
+      const saved = localStorage.getItem(postedKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length === days.length) {
@@ -470,15 +515,37 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
     } catch {
       // ignore localStorage errors
     }
-  }, [storageKey, days.length]);
+  }, [postedKey, days.length]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(posted));
+      localStorage.setItem(postedKey, JSON.stringify(posted));
     } catch {
       // ignore localStorage errors
     }
-  }, [posted, storageKey]);
+  }, [posted, postedKey]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(feedbackKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === days.length) {
+          setFeedbackState(parsed);
+        }
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [feedbackKey, days.length]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(feedbackKey, JSON.stringify(feedbackState));
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [feedbackState, feedbackKey]);
 
   const togglePosted = (index: number) => {
     const next = [...posted];
@@ -492,6 +559,19 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
         await removeFromArchive(weekStarting, index);
       }
     });
+  };
+
+  const handleFeedback = (index: number, value: "up" | "down") => {
+    const next = [...feedbackState];
+    // Toggle off if clicking the same value
+    next[index] = next[index] === value ? null : value;
+    setFeedbackState(next);
+    const newFeedback = next[index];
+    if (newFeedback) {
+      startTransition(async () => {
+        await addFeedback(weekStarting, index, days[index], newFeedback);
+      });
+    }
   };
 
   return (
@@ -530,7 +610,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
 
       {/* Focused Day Card */}
       <div className="transition-all duration-300 ease-in-out">
-        <DayCard day={activeDay} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} />
+        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} />
       </div>
     </div>
   );

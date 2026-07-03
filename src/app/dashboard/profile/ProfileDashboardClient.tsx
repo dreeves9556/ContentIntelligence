@@ -152,6 +152,9 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
       { key: "favoriteClientType", label: "Describe your absolute favourite type of client to work with?", placeholder: "Not just demographics — what's their energy, attitude, situation?" },
       { key: "clientBiggestFear", label: "What is the single biggest fear your ideal client has?", placeholder: "The thing that keeps them awake at 2am before signing..." },
       { key: "clientRedFlag", label: "A red flag that tells you to politely walk away from a client?", placeholder: "The moment you know it's not a good fit..." },
+      { key: "clientMisbeliefs", label: "What do clients wrongly believe they should do first? (myth-busting fuel)", placeholder: "The common misconception you love correcting in your content..." },
+      { key: "clientDreamOutcome", label: "What is your client's dream outcome — in their own words?", placeholder: "The transformation they fantasize about but rarely say out loud..." },
+      { key: "beforeAfterStory", label: "A real client before → after story?", placeholder: "Where they started, what you did, where they ended up..." },
     ],
   },
 ];

@@ -12,6 +12,11 @@ export interface QuestionnaireFormData {
   daysToPost: number;
   primaryGoal: string;
   antiBrandWords: string;
+  numbersThatImpress: string;
+  recentWin: string;
+  faqTop3: string;
+  seasonalRhythm: string;
+  upcomingEvents: string;
   contentSample: string;
   signaturePhrases: string;
   brandWords: string;
