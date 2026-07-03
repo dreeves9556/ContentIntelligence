@@ -18,6 +18,7 @@ import {
   Shield,
   Lock,
   Settings,
+  Brain,
 } from "lucide-react";
 import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const ALL_NAV_ITEMS = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, alwaysUnlocked: false },
   { name: "Content Library", href: "/dashboard/library", icon: Library, alwaysUnlocked: true },
+  { name: "Brand Brain", href: "/dashboard/brand-brain", icon: Brain, alwaysUnlocked: true },
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug, alwaysUnlocked: false },
   { name: "Profile", href: "/dashboard/profile", icon: User, alwaysUnlocked: true },
   { name: "Brand Settings", href: "/dashboard/settings", icon: Settings, alwaysUnlocked: true },

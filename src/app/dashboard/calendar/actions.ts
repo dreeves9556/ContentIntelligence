@@ -33,6 +33,9 @@ import {
   buildFeedbackBlock,
   matchArchiveToAnalytics,
 } from "@/lib/performance-prompt";
+import { getRelevantMemories, touchMemories } from "@/lib/memory/memory-service";
+import { summarizeMemoriesForPrompt } from "@/lib/memory/memory-summarizer";
+import { runLearningPipeline, learnFromFeedback } from "@/lib/memory/memory-builder";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -401,10 +404,14 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 
   const cadenceBlock = buildCadenceBlock(postingFrequency, decayByPlatform, daysToPost);
 
+  // Load persistent AI memories (HIGH/CRITICAL + pinned) and build memory block
+  const relevantMemories = await getRelevantMemories(session.user.id);
+  const memoryBlock = summarizeMemoriesForPrompt(relevantMemories);
+
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
   const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
-  const defaultUserPrompt = `${userProfileXml}
+  const defaultUserPrompt = `${memoryBlock ? `${memoryBlock}\n\n` : ""}${userProfileXml}
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
 ${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
 ${demographicsBlock ? `\n${demographicsBlock}` : ""}
@@ -437,6 +444,7 @@ Days must be one of: ${targetDays.join(", ")}.
     .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
     .replace(/\{\{bestTimesBlock\}\}/g, bestTimesBlock)
     .replace(/\{\{demographicsBlock\}\}/g, demographicsBlock)
+    .replace(/\{\{memoryBlock\}\}/g, memoryBlock)
     .replace(/\{\{performanceBlock\}\}/g, performanceBlock)
     .replace(/\{\{contentPerformanceBlock\}\}/g, contentPerformanceBlock)
     .replace(/\{\{followerTrendBlock\}\}/g, followerTrendBlock)
@@ -513,6 +521,18 @@ Days must be one of: ${targetDays.join(", ")}.
         },
       });
     }
+
+    // Touch memories that were used in this prompt (updates lastUsedAt)
+    if (relevantMemories.length > 0) {
+      touchMemories(relevantMemories.map((m) => m.id)).catch((err) =>
+        console.error("Memory touch failed:", err)
+      );
+    }
+
+    // Run learning pipeline in the background — may create new memories from analytics/feedback
+    runLearningPipeline(session.user.id).catch((err) =>
+      console.error("Memory learning pipeline failed:", err)
+    );
 
     // Generate AI insight in the background
     generateAIInsight(session.user.id).catch((err) =>
@@ -622,6 +642,11 @@ export async function addFeedback(
       feedback,
     },
   });
+
+  // Learn from feedback — creates warning memories for thumbs-down (background)
+  learnFromFeedback(session.user.id, feedback, dayContent).catch((err) =>
+    console.error("Memory learning from feedback failed:", err)
+  );
 
   revalidatePath("/dashboard/calendar");
 }

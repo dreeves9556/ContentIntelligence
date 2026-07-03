@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { buildMemoriesFromSurvey } from "@/lib/memory/memory-builder";
 
 export async function saveProfileSurvey(
   surveyType: string,
@@ -24,6 +25,12 @@ export async function saveProfileSurvey(
   });
 
   revalidatePath("/dashboard/profile");
+
+  // Build/update memories from survey answers (background, non-blocking)
+  buildMemoriesFromSurvey(session.user.id, surveyType, answers).catch((err) =>
+    console.error("Memory creation from survey failed:", err)
+  );
+
   return { success: true };
 }
 

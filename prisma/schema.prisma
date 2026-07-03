@@ -40,6 +40,7 @@ model User {
   deepAnalytics    DeepAnalytics[]
   resourcePosts    ResourcePost[]
   bugReports      BugReport[]
+  creatorMemories CreatorMemory[]
   accounts      Account[]
   sessions      Session[]
 
@@ -394,4 +395,55 @@ model DeepAnalytics {
 
   @@unique([userId, platform, dataType])
   @@map("deep_analytics")
+}
+
+enum MemoryType {
+  IDENTITY
+  VOICE
+  AUDIENCE
+  CONTENT
+  PERFORMANCE
+  STRATEGY
+  PREFERENCE
+  WARNING
+}
+
+enum Importance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MemorySource {
+  QUESTIONNAIRE
+  PROFILE_SURVEY
+  ANALYTICS
+  CONTENT_FEEDBACK
+  AI_GENERATED
+  ADMIN
+  SYSTEM
+}
+
+model CreatorMemory {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memoryType  MemoryType
+  title       String
+  summary     String
+  evidence    String?
+  confidence  Int         @default(50) // 0-100
+  importance  Importance  @default(MEDIUM)
+  source      MemorySource @default(SYSTEM)
+  metadata    Json?
+  embedding   String?     // Nullable — reserved for future vector support (pgvector / OpenAI embeddings)
+  pinned      Boolean     @default(false) // User-pinned memories always included in prompts
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  lastUsedAt  DateTime?
+
+  @@index([userId, memoryType])
+  @@index([userId, importance])
+  @@map("creator_memories")
 }

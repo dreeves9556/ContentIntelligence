@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { validateQuestionnaire } from "@/lib/validation";
+import { buildMemoriesFromQuestionnaire } from "@/lib/memory/memory-builder";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -34,6 +35,11 @@ export async function POST(req: NextRequest) {
         data: { title, content: data, userId },
       });
     }
+
+    // Build initial AI memories from questionnaire answers (background, non-blocking)
+    buildMemoriesFromQuestionnaire(userId, data as never).catch((err) =>
+      console.error("Memory creation from questionnaire failed:", err)
+    );
 
     return NextResponse.json({ success: true });
   } catch (err) {

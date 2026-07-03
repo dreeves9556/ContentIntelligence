@@ -28,7 +28,9 @@ import {
   Circle,
   ThumbsUp,
   ThumbsDown,
+  AlertCircle,
 } from "lucide-react";
+import { GenerateButton } from "./GenerateButton";
 
 type Platform = "instagram" | "tiktok" | "youtube" | "facebook" | "linkedin";
 
@@ -497,11 +499,34 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
   const [feedbackState, setFeedbackState] = useState<("up" | "down" | null)[]>(Array(days.length).fill(null));
   const [isPending, startTransition] = useTransition();
+  const [showRegenModal, setShowRegenModal] = useState(false);
   const activeDay = days[activeIndex];
 
   const baseDate = new Date(weekStarting);
   const postedKey = `calendar-posted-${weekStarting}`;
   const feedbackKey = `calendar-feedback-${weekStarting}`;
+
+  // On mount, jump to today's card if within range, or last day + regen prompt if past
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startDate = new Date(baseDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(baseDate);
+    endDate.setDate(endDate.getDate() + days.length - 1);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (today >= startDate && today <= endDate) {
+      const diffDays = Math.round((today.getTime() - startDate.getTime()) / 86400000);
+      setActiveIndex(Math.min(Math.max(diffDays, 0), days.length - 1));
+    } else if (today > endDate) {
+      setActiveIndex(days.length - 1);
+      setShowRegenModal(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     try {
@@ -576,6 +601,30 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
 
   return (
     <div className="space-y-6">
+      {/* Regeneration prompt modal */}
+      {showRegenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background-card rounded-2xl border border-white/10 p-8 max-w-md w-full text-center space-y-5">
+            <div className="p-4 bg-accent-primary/10 rounded-full w-fit mx-auto">
+              <AlertCircle className="h-8 w-8 text-accent-primary" />
+            </div>
+            <h2 className="text-xl font-bold text-text-primary" style={{ fontFamily: "var(--font-playfair)" }}>
+              Your Calendar Has Expired
+            </h2>
+            <p className="text-text-muted text-sm">
+              This calendar's date range has passed. Generate a new calendar to get fresh content recommendations for the coming week.
+            </p>
+            <GenerateButton regenerate />
+            <button
+              onClick={() => setShowRegenModal(false)}
+              className="text-sm text-text-muted hover:text-text-primary transition-colors"
+            >
+              Continue with expired calendar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
         {days.map((day, index) => {

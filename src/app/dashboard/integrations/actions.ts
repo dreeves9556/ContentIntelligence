@@ -9,6 +9,7 @@ import { generateAIInsight } from "../actions";
 import { normalizeBestTimeResponse } from "@/lib/best-time";
 import { normalizeFollowerStatsResponse } from "@/lib/follower-stats";
 import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, normalizePostingFrequency } from "@/lib/deep-analytics";
+import { runLearningPipeline } from "@/lib/memory/memory-builder";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -264,6 +265,11 @@ export async function syncAnalytics() {
       where: { userId: session.user.id },
       data: { lastSyncAt: now },
     });
+
+    // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics
+    runLearningPipeline(session.user.id).catch((err) =>
+      console.error("Memory learning pipeline failed:", err)
+    );
 
     generateAIInsight(session.user.id).catch((err) =>
       console.error("Background AI insight generation failed:", err)
