@@ -6,9 +6,9 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { zernio } from "@/lib/zernio";
 import { generateAIInsight } from "../actions";
-import { getSyncFrequencyMinutes } from "@/lib/platform-config";
 import { normalizeBestTimeResponse } from "@/lib/best-time";
 import { normalizeFollowerStatsResponse } from "@/lib/follower-stats";
+import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, normalizePostingFrequency } from "@/lib/deep-analytics";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -133,6 +133,39 @@ async function syncSingleAccount(
     console.error(`Failed to fetch follower-stats for ${account.platform}:`, err);
   }
 
+  // Fetch & store platform-specific deep analytics
+  const deepConfigs = PLATFORM_DEEP_ANALYTICS[account.platform.toLowerCase()];
+  if (deepConfigs) {
+    for (const cfg of deepConfigs) {
+      try {
+        const rawDeep = cfg.useAccountPath
+          ? await zernio.analytics.getAccountAnalytics(account.zernioAccountId, cfg.endpoint)
+          : await zernio.analytics.getDeepAnalytics(account.zernioAccountId, cfg.endpoint);
+        const normalized = cfg.normalize(rawDeep);
+        await prisma.deepAnalytics.upsert({
+          where: {
+            userId_platform_dataType: {
+              userId,
+              platform: account.platform,
+              dataType: cfg.dataType,
+            },
+          },
+          update: {
+            data: normalized as unknown as Prisma.InputJsonValue,
+          },
+          create: {
+            userId,
+            platform: account.platform,
+            dataType: cfg.dataType,
+            data: normalized as unknown as Prisma.InputJsonValue,
+          },
+        });
+      } catch (err) {
+        console.error(`Failed to fetch deep analytics ${cfg.endpoint} for ${account.platform}:`, err);
+      }
+    }
+  }
+
   return synced;
 }
 
@@ -148,26 +181,7 @@ export async function syncAnalytics() {
     return { success: false, message: "No connected accounts" };
   }
 
-  const syncFreqMinutes = await getSyncFrequencyMinutes();
   const now = new Date();
-  const minSyncTime = new Date(now.getTime() - syncFreqMinutes * 60 * 1000);
-
-  const recentSync = zernioAccounts.some(
-    (a) => a.lastSyncAt && a.lastSyncAt > minSyncTime
-  );
-
-  if (recentSync) {
-    const oldestSync = zernioAccounts
-      .filter((a) => a.lastSyncAt)
-      .sort((a, b) => (a.lastSyncAt!.getTime() - b.lastSyncAt!.getTime()))[0];
-    const nextAvailable = new Date(
-      (oldestSync?.lastSyncAt ?? now).getTime() + syncFreqMinutes * 60 * 1000
-    );
-    return {
-      success: false,
-      message: `Sync throttled. Try again after ${nextAvailable.toLocaleTimeString()}.`,
-    };
-  }
 
   const startDate = new Date(now);
   startDate.setDate(now.getDate() - 90);
@@ -178,6 +192,38 @@ export async function syncAnalytics() {
 
   for (const account of zernioAccounts) {
     synced += await syncSingleAccount(session.user.id, account, startStr, endStr);
+  }
+
+  // Sync profile-level deep analytics (content-decay, daily-metrics, posting-frequency)
+  const profileId = zernioAccounts[0].zernioProfileId;
+  const profileEndpoints: { endpoint: "content-decay" | "daily-metrics" | "posting-frequency"; dataType: string; normalize: (raw: unknown) => unknown }[] = [
+    { endpoint: "content-decay", dataType: "content_decay", normalize: (r) => normalizeContentDecay(r) },
+    { endpoint: "daily-metrics", dataType: "daily_metrics", normalize: (r) => normalizeDailyMetrics(r) },
+    { endpoint: "posting-frequency", dataType: "posting_frequency", normalize: (r) => normalizePostingFrequency(r) },
+  ];
+  for (const cfg of profileEndpoints) {
+    try {
+      const raw = await zernio.analytics.getProfileAnalytics(profileId, cfg.endpoint);
+      const normalized = cfg.normalize(raw);
+      await prisma.deepAnalytics.upsert({
+        where: {
+          userId_platform_dataType: {
+            userId: session.user.id,
+            platform: "ALL",
+            dataType: cfg.dataType,
+          },
+        },
+        update: { data: normalized as unknown as Prisma.InputJsonValue },
+        create: {
+          userId: session.user.id,
+          platform: "ALL",
+          dataType: cfg.dataType,
+          data: normalized as unknown as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      console.error(`Failed to fetch profile analytics ${cfg.endpoint}:`, err);
+    }
   }
 
   // Regenerate AI insight with fresh data (cheap Haiku call)
@@ -194,6 +240,7 @@ export async function syncAnalytics() {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/analytics");
   return { success: true, synced };
 }
 
@@ -238,5 +285,6 @@ export async function autoSyncAnalyticsIfNeeded() {
       console.error("Background AI insight generation failed:", err)
     );
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/analytics");
   }
 }

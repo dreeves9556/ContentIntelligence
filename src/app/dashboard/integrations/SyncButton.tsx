@@ -33,22 +33,22 @@ export default function SyncButton() {
       <button
         onClick={handleSync}
         disabled={status === "loading"}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+        className="flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
         style={{ background: "#c8952a", color: "#0a0a0a" }}
       >
         <RefreshCw className={`h-4 w-4 ${status === "loading" ? "animate-spin" : ""}`} />
-        {status === "loading" ? "Syncing…" : "Sync Analytics"}
+        <span className="hidden sm:inline">{status === "loading" ? "Syncing…" : "Sync Analytics"}</span>
       </button>
       {status === "success" && (
         <span className="flex items-center gap-1.5 text-sm text-green-400">
           <CheckCircle className="h-4 w-4" />
-          {message}
+          <span className="hidden sm:inline">{message}</span>
         </span>
       )}
       {status === "error" && (
         <span className="flex items-center gap-1.5 text-sm text-red-400">
           <AlertCircle className="h-4 w-4" />
-          {message}
+          <span className="hidden sm:inline">{message}</span>
         </span>
       )}
     </div>

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Plug, Share2, Music2, Users, PlayCircle, Zap } from "lucide-react";
 import ZernioCard from "./ZernioCard";
-import SyncButton from "./SyncButton";
 import { getEnabledPlatforms } from "@/lib/platform-config";
 import LockedTabOverlay from "@/components/LockedTabOverlay";
 import { canAccessIntegrations, CREATOR_ACCOUNT_LIMIT } from "@/lib/tiers";
@@ -79,7 +78,6 @@ export default async function IntegrationsPage() {
             Connect your social accounts to pull real analytics data
           </p>
         </div>
-        {zernioAccounts.length > 0 && <SyncButton />}
       </div>
 
       {/* Info banner */}

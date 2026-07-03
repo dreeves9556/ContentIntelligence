@@ -91,6 +91,25 @@ export interface ZernioFollowerStats {
   }>;
 }
 
+export type DeepAnalyticsEndpoint =
+  | "instagram/demographics"
+  | "instagram/follower-history"
+  | "instagram/account-insights"
+  | "youtube/channel-insights"
+  | "youtube/demographics"
+  | "tiktok/account-insights"
+  | "linkedin/org-aggregate-analytics"
+  | "facebook/page-insights";
+
+export type ProfileAnalyticsEndpoint =
+  | "content-decay"
+  | "daily-metrics"
+  | "posting-frequency";
+
+export type AccountLevelEndpoint =
+  | DeepAnalyticsEndpoint
+  | "linkedin-aggregate-analytics";
+
 export const zernio = {
   profiles: {
     async create(name: string): Promise<ZernioProfile> {
@@ -145,6 +164,30 @@ export const zernio = {
     async getFollowerStats(zernioAccountId: string): Promise<unknown> {
       const params = new URLSearchParams({ accountId: zernioAccountId });
       return zernioFetch<unknown>(`/accounts/follower-stats?${params.toString()}`);
+    },
+
+    async getDeepAnalytics(
+      zernioAccountId: string,
+      endpoint: DeepAnalyticsEndpoint
+    ): Promise<unknown> {
+      const params = new URLSearchParams({ accountId: zernioAccountId });
+      return zernioFetch<unknown>(`/analytics/${endpoint}?${params.toString()}`);
+    },
+
+    async getAccountAnalytics(
+      zernioAccountId: string,
+      path: string
+    ): Promise<unknown> {
+      return zernioFetch<unknown>(`/accounts/${zernioAccountId}/${path}`);
+    },
+
+    async getProfileAnalytics(
+      profileId: string,
+      endpoint: ProfileAnalyticsEndpoint,
+      params?: Record<string, string>
+    ): Promise<unknown> {
+      const searchParams = new URLSearchParams({ profileId, ...params });
+      return zernioFetch<unknown>(`/analytics/${endpoint}?${searchParams.toString()}`);
     },
   },
 };

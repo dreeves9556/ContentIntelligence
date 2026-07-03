@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import webpush from "web-push";
 import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
 import { summarizeFollowerGrowth } from "@/lib/follower-stats";
+import { summarizeDemographicsForAI } from "@/lib/deep-analytics";
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -248,6 +249,15 @@ export async function generateAIInsight(userId: string): Promise<AIInsightResult
       .join("\n")
     : "";
 
+  // Fetch demographics data for the AI prompt
+  const demographicsRows = await prisma.deepAnalytics.findMany({
+    where: { userId, dataType: "demographics" },
+    select: { platform: true, data: true },
+  });
+  const demographicsSummary = summarizeDemographicsForAI(
+    demographicsRows.map((r) => ({ platform: r.platform, data: r.data as unknown as { kind: string; payload: unknown } }))
+  );
+
   const config = await getPlatformConfig();
   const defaultPrompt = `You are a social media content coach. Analyze this creator's recent performance data and provide ONE concise, actionable insight (2-3 sentences max). Be specific with numbers and give a clear recommendation.
 
@@ -263,7 +273,8 @@ ${formatSummary}
 TOP PERFORMING POSTS:
 ${topPosts}
 ${followerGrowthSummary ? `\nFOLLOWER GROWTH:\n${followerGrowthSummary}\n` : ""}
-Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step. If follower growth data is available, mention how many followers were gained this week and which platform grew the most.`;
+${demographicsSummary ? `\nAUDIENCE DEMOGRAPHICS:\n${demographicsSummary}\n` : ""}
+Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step. If follower growth data is available, mention how many followers were gained this week and which platform grew the most. If demographics data is available, mention the audience composition (e.g., "Your audience is 65% women aged 25-34") and tailor the recommendation to that audience.`;
 
   const prompt = (config.insightPromptTemplate ?? defaultPrompt)
     .replace(/\{\{totalPosts\}\}/g, String(posts.length))
@@ -272,7 +283,8 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
     .replace(/\{\{viewsTrend\}\}/g, String(viewsTrend))
     .replace(/\{\{formatSummary\}\}/g, formatSummary)
     .replace(/\{\{topPosts\}\}/g, topPosts)
-    .replace(/\{\{followerGrowth\}\}/g, followerGrowthSummary);
+    .replace(/\{\{followerGrowth\}\}/g, followerGrowthSummary)
+    .replace(/\{\{demographics\}\}/g, demographicsSummary);
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

@@ -22,6 +22,7 @@ import {
   formatOffset,
   type HeatmapData,
 } from "@/lib/best-time";
+import { summarizeDemographicsForAI } from "@/lib/deep-analytics";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -327,12 +328,25 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     timezoneOffsetHours
   );
 
+  // Fetch demographics for AI content generation (e.g., "Your audience is 65% women aged 25-34")
+  const demographicsRows = await prisma.deepAnalytics.findMany({
+    where: { userId: session.user.id, dataType: "demographics" },
+    select: { platform: true, data: true },
+  });
+  const demographicsSummary = summarizeDemographicsForAI(
+    demographicsRows.map((r) => ({ platform: r.platform, data: r.data as unknown as { kind: string; payload: unknown } }))
+  );
+  const demographicsBlock = demographicsSummary
+    ? `<audience_demographics>\nBased on analytics data, here is the creator's audience composition. Tailor content tone, topics, and references to resonate with this audience:\n${demographicsSummary}\n</audience_demographics>`
+    : "";
+
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
   const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
   const defaultUserPrompt = `${userProfileXml}
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
 ${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
+${demographicsBlock ? `\n${demographicsBlock}` : ""}
 
 <generation_instructions>
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
@@ -355,6 +369,7 @@ Days must be one of: ${targetDays.join(", ")}.
     .replace(/\{\{questionnaireAnswers\}\}/g, userProfileXml)
     .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
     .replace(/\{\{bestTimesBlock\}\}/g, bestTimesBlock)
+    .replace(/\{\{demographicsBlock\}\}/g, demographicsBlock)
     .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
     .replace(/\{\{currentDay\}\}/g, currentDay)
     .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))

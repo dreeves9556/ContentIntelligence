@@ -36,6 +36,7 @@ model User {
   zernioAccounts   ZernioAccount[]
   bestTimeToPosts  BestTimeToPost[]
   followerStats    FollowerStats[]
+  deepAnalytics    DeepAnalytics[]
   resourcePosts    ResourcePost[]
   bugReports      BugReport[]
   accounts      Account[]
@@ -361,4 +362,18 @@ model BestTimeToPost {
 
   @@unique([userId, platform])
   @@map("best_time_to_post")
+}
+
+model DeepAnalytics {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform  String   // e.g. "instagram", "youtube", "tiktok", "linkedin", "facebook"
+  dataType  String   // e.g. "demographics", "account_insights", "retention", "channel_insights", etc.
+  data      Json     // Normalized deep analytics payload
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, platform, dataType])
+  @@map("deep_analytics")
 }
