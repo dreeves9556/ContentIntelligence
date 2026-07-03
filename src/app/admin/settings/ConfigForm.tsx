@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Save, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Save, Loader2, CheckCircle, AlertCircle, Lock } from "lucide-react";
 import { updatePlatformConfig } from "./actions";
 
 const ALL_PLATFORMS = [
@@ -133,15 +133,6 @@ export default function ConfigForm({
   const [anthropicApiKey, setAnthropicApiKey] = useState(
     initial.anthropicApiKey ?? ""
   );
-  const [insightPrompt, setInsightPrompt] = useState(
-    initial.insightPromptTemplate ?? ""
-  );
-  const [calendarPrompt, setCalendarPrompt] = useState(
-    initial.calendarPromptTemplate ?? ""
-  );
-  const [calendarStrategyPrompt, setCalendarStrategyPrompt] = useState(
-    initial.calendarStrategyPromptTemplate ?? ""
-  );
   const [showZernioKey, setShowZernioKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [status, setStatus] = useState<
@@ -166,9 +157,6 @@ export default function ConfigForm({
         analyticsSyncFrequencyMinutes: parseInt(syncMinutes, 10) || 60,
         anthropicModel: anthropicModel.trim() || "claude-opus-4-8",
         anthropicApiKey: anthropicApiKey.trim() || null,
-        insightPromptTemplate: insightPrompt.trim() || null,
-        calendarPromptTemplate: calendarPrompt.trim() || null,
-        calendarStrategyPromptTemplate: calendarStrategyPrompt.trim() || null,
       });
       if (result.success) {
         setStatus({ type: "success", message: "Settings saved successfully." });
@@ -354,59 +342,48 @@ export default function ConfigForm({
           )}
         </div>
 
-        {/* Insight Prompt Template */}
+        {/* Insight Prompt Template (locked) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[#e8e8e8]">
+            <label className="text-sm font-medium text-[#e8e8e8] flex items-center gap-1.5">
               Insight Prompt Template
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#787878] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+                <Lock className="h-3 w-3" /> Locked
+              </span>
             </label>
-            <button
-              type="button"
-              onClick={() => setInsightPrompt(DEFAULT_INSIGHT_PROMPT)}
-              className="text-xs text-[#c8952a] hover:underline"
-            >
-              Reset to default
-            </button>
           </div>
           <textarea
-            value={insightPrompt}
-            onChange={(e) => setInsightPrompt(e.target.value)}
-            placeholder={DEFAULT_INSIGHT_PROMPT}
+            value={initial.insightPromptTemplate ?? DEFAULT_INSIGHT_PROMPT}
+            readOnly
             rows={8}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#e8e8e8] placeholder:text-[#555] focus:border-[#c8952a] focus:outline-none font-mono resize-y"
+            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#787878] focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
           />
           <p className="text-xs text-[#555] mt-1.5">
-            Template for AI insights shown on the Analytics dashboard. Use{" "}
+            Template for AI insights shown on the Analytics dashboard. Placeholders:{" "}
             <code className="text-[#c8952a]">{"{{totalPosts}}"}</code>,{" "}
             <code className="text-[#c8952a]">{"{{totalViews}}"}</code>,{" "}
             <code className="text-[#c8952a]">{"{{avgEngagement}}"}</code>,{" "}
             <code className="text-[#c8952a]">{"{{viewsTrend}}"}</code>,{" "}
             <code className="text-[#c8952a]">{"{{formatSummary}}"}</code>,{" "}
-            <code className="text-[#c8952a]">{"{{topPosts}}"}</code> as
-            placeholders. Leave empty to use the built-in default.
+            <code className="text-[#c8952a]">{"{{topPosts}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=CoreOS%20Prompt%20Suggestion%3A%20Insight" className="text-[#c8952a] hover:underline">Suggest changes to the developer</a>.
           </p>
         </div>
 
-        {/* Calendar Prompt Template */}
+        {/* Calendar Prompt Template (locked) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[#e8e8e8]">
+            <label className="text-sm font-medium text-[#e8e8e8] flex items-center gap-1.5">
               Calendar Prompt Template
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#787878] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+                <Lock className="h-3 w-3" /> Locked
+              </span>
             </label>
-            <button
-              type="button"
-              onClick={() => setCalendarPrompt(DEFAULT_CALENDAR_PROMPT)}
-              className="text-xs text-[#c8952a] hover:underline"
-            >
-              Reset to default
-            </button>
           </div>
           <textarea
-            value={calendarPrompt}
-            onChange={(e) => setCalendarPrompt(e.target.value)}
-            placeholder={DEFAULT_CALENDAR_PROMPT}
+            value={initial.calendarPromptTemplate ?? DEFAULT_CALENDAR_PROMPT}
+            readOnly
             rows={12}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#e8e8e8] placeholder:text-[#555] focus:border-[#c8952a] focus:outline-none font-mono resize-y"
+            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#787878] focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
           />
           <p className="text-xs text-[#555] mt-1.5">
             Template for weekly calendar generation. Placeholders:{" "}
@@ -427,31 +404,25 @@ export default function ConfigForm({
             <code className="text-[#c8952a]">{"{{formatMix}}"}</code>,
             <code className="text-[#c8952a]">{"{{bucketDistribution}}"}</code>,
             <code className="text-[#c8952a]">{"{{weekStarting}}"}</code>,
-            <code className="text-[#c8952a]">{"{{firstDay}}"}</code>. Leave empty
-            to use the built-in default.
+            <code className="text-[#c8952a]">{"{{firstDay}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=CoreOS%20Prompt%20Suggestion%3A%20Calendar" className="text-[#c8952a] hover:underline">Suggest changes to the developer</a>.
           </p>
         </div>
 
-        {/* Calendar Strategy Prompt Template */}
+        {/* Calendar Strategy Prompt Template (locked) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[#e8e8e8]">
+            <label className="text-sm font-medium text-[#e8e8e8] flex items-center gap-1.5">
               Calendar Strategy Prompt Template
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#787878] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+                <Lock className="h-3 w-3" /> Locked
+              </span>
             </label>
-            <button
-              type="button"
-              onClick={() => setCalendarStrategyPrompt(DEFAULT_CALENDAR_STRATEGY_PROMPT)}
-              className="text-xs text-[#c8952a] hover:underline"
-            >
-              Reset to default
-            </button>
           </div>
           <textarea
-            value={calendarStrategyPrompt}
-            onChange={(e) => setCalendarStrategyPrompt(e.target.value)}
-            placeholder={DEFAULT_CALENDAR_STRATEGY_PROMPT}
+            value={initial.calendarStrategyPromptTemplate ?? DEFAULT_CALENDAR_STRATEGY_PROMPT}
+            readOnly
             rows={12}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#e8e8e8] placeholder:text-[#555] focus:border-[#c8952a] focus:outline-none font-mono resize-y"
+            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#787878] focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
           />
           <p className="text-xs text-[#555] mt-1.5">
             Template for the AI Strategy Note shown on the Content Calendar page.
@@ -461,8 +432,7 @@ export default function ConfigForm({
             <code className="text-[#c8952a]">{"{{bucketMix}}"}</code>,
             <code className="text-[#c8952a]">{"{{daySummary}}"}</code>,
             <code className="text-[#c8952a]">{"{{primaryGoal}}"}</code>,
-            <code className="text-[#c8952a]">{"{{antiBrandWords}}"}</code>. Leave empty
-            to use the built-in default.
+            <code className="text-[#c8952a]">{"{{antiBrandWords}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=CoreOS%20Prompt%20Suggestion%3A%20Calendar%20Strategy" className="text-[#c8952a] hover:underline">Suggest changes to the developer</a>.
           </p>
         </div>
       </section>

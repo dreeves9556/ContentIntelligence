@@ -19,9 +19,6 @@ export async function updatePlatformConfig(
     "analyticsSyncFrequencyMinutes",
     "anthropicModel",
     "anthropicApiKey",
-    "insightPromptTemplate",
-    "calendarPromptTemplate",
-    "calendarStrategyPromptTemplate",
   ];
 
   const update: Record<string, unknown> = {};
