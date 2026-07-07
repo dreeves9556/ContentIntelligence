@@ -109,6 +109,9 @@ export async function getResourcePosts(): Promise<ResourcePostData[]> {
 }
 
 export async function getPublishedResourcePosts(): Promise<ResourcePostData[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
   const posts = await prisma.resourcePost.findMany({
     where: { published: true },
     orderBy: { publishedAt: "desc" },

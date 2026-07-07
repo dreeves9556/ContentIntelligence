@@ -10,6 +10,7 @@ import { normalizeBestTimeResponse } from "@/lib/best-time";
 import { normalizeFollowerStatsResponse } from "@/lib/follower-stats";
 import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, normalizePostingFrequency } from "@/lib/deep-analytics";
 import { runLearningPipeline } from "@/lib/memory/memory-builder";
+import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -204,6 +205,15 @@ async function syncSingleAccount(
 export async function syncAnalytics() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const rateLimit = checkActionRateLimit(
+    `analytics_sync:${session.user.id}`,
+    10,
+    60 * 60 * 1000
+  );
+  if (!rateLimit.allowed) {
+    return { success: false, message: `Too many sync requests. Please try again in ${formatRetryTime(rateLimit.retryAfterMs ?? 0)}.` };
+  }
 
   const zernioAccounts = await prisma.zernioAccount.findMany({
     where: { userId: session.user.id },

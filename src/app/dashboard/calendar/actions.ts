@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { generateAIInsight } from "../actions";
 import { getPlatformConfig, type PlatformConfigData } from "@/lib/platform-config";
+import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
 import {
   buildUserProfileXml,
   buildUsedTitlesBlock,
@@ -292,6 +293,18 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 
   if (!session?.user?.id) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  const rateLimit = checkActionRateLimit(
+    `calendar_gen:${session.user.id}`,
+    5,
+    10 * 60 * 1000
+  );
+  if (!rateLimit.allowed) {
+    return {
+      success: false,
+      error: `Too many calendar generations. Please try again in ${formatRetryTime(rateLimit.retryAfterMs ?? 0)}.`,
+    };
   }
 
   const questionnaire = await prisma.questionnaire.findFirst({

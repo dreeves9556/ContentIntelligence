@@ -89,6 +89,10 @@ export async function seedPostAnalytics() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
+  if (process.env.NODE_ENV === "production" && session.user.role !== "ADMIN") {
+    return { success: false, message: "Seeding is disabled in production." };
+  }
+
   // Check if user already has seed data
   const existing = await prisma.postAnalytics.count({
     where: { userId: session.user.id },

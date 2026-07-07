@@ -152,7 +152,7 @@ export function InviteClientButton() {
                   </h3>
                   <p className="text-sm text-text-muted">
                     {emailSent ? (
-                      <>A welcome email with login credentials and a password reset link has been sent to <span className="text-accent-primary">{email}</span>.</>
+                      <>A welcome email with a password setup link has been sent to <span className="text-accent-primary">{email}</span>. The temporary password below is a backup — share it only if they cannot access the email.</>
                     ) : (
                       <>Share these credentials with <span className="text-accent-primary">{email}</span> so they can log in. They will be prompted to complete onboarding after their first login.</>
                     )}

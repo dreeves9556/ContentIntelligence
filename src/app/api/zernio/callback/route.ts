@@ -23,6 +23,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const existingAccount = await prisma.zernioAccount.findFirst({
+    where: { userId },
+    select: { zernioProfileId: true },
+  });
+  if (existingAccount && existingAccount.zernioProfileId !== profileId) {
+    return NextResponse.redirect(
+      new URL("/dashboard/integrations?error=invalid_profile", req.nextUrl.origin)
+    );
+  }
+
   try {
     // List accounts under this profile to find the newly connected one
     const accounts = await zernio.accounts.list(profileId);

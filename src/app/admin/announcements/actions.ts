@@ -486,7 +486,12 @@ export async function cancelScheduledBroadcast(id: string): Promise<{ success: b
   }
 }
 
-export async function processDueBroadcasts(): Promise<{ processed: number; sent: number; failed: number }> {
+export async function processDueBroadcasts(secret?: string): Promise<{ processed: number; sent: number; failed: number }> {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || secret !== cronSecret) {
+    throw new Error("Unauthorized");
+  }
+
   const dueBroadcasts = await prisma.scheduledBroadcast.findMany({
     where: {
       status: "PENDING",

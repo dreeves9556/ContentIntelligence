@@ -55,8 +55,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("Zernio connect error:", message);
-    return NextResponse.json({ error: "Failed to initiate connection", detail: message }, { status: 500 });
+    console.error("Zernio connect error:", error);
+    return NextResponse.json({ error: "Failed to initiate connection" }, { status: 500 });
   }
 }

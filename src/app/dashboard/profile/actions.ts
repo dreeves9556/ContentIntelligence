@@ -6,6 +6,24 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { buildMemoriesFromSurvey } from "@/lib/memory/memory-builder";
+import { validateQuestionnaire } from "@/lib/validation";
+
+const VALID_SURVEY_TYPES = [
+  "TRENCH_WARFARE",
+  "ORIGIN_STORY",
+  "CLIENT_AVATAR",
+  "LOCAL_MAYOR",
+  "WEEKLY_CONTEXT",
+  "MONTHLY_CONTEXT",
+] as const;
+
+function validateSurveyAnswers(answers: Record<string, string>): boolean {
+  for (const [key, value] of Object.entries(answers)) {
+    if (typeof key !== "string" || key.length > 100) return false;
+    if (typeof value !== "string" || value.length > 5000) return false;
+  }
+  return Object.keys(answers).length <= 50;
+}
 
 export async function saveProfileSurvey(
   surveyType: string,
@@ -13,6 +31,14 @@ export async function saveProfileSurvey(
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated." };
+
+  if (!VALID_SURVEY_TYPES.includes(surveyType as typeof VALID_SURVEY_TYPES[number])) {
+    return { success: false, error: "Invalid survey type." };
+  }
+
+  if (!answers || typeof answers !== "object" || !validateSurveyAnswers(answers)) {
+    return { success: false, error: "Invalid survey data." };
+  }
 
   await prisma.profileSurvey.upsert({
     where: { userId_surveyType: { userId: session.user.id, surveyType } },
@@ -54,20 +80,24 @@ export async function updateOnboarding(
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated." };
 
+  const validation = validateQuestionnaire(answers);
+  if (!validation.success || !validation.data) {
+    return { success: false, error: validation.error ?? "Invalid questionnaire data." };
+  }
+
   const existing = await prisma.questionnaire.findFirst({
     where: { userId: session.user.id },
   });
 
   if (!existing) return { success: false, error: "No onboarding record found." };
 
-  const name =
-    typeof answers.name === "string" ? answers.name : undefined;
+  const validatedData = validation.data;
 
   await prisma.questionnaire.update({
     where: { id: existing.id },
     data: {
-      content: answers as unknown as Prisma.InputJsonValue,
-      ...(name ? { title: `Brand Questionnaire — ${name}` } : {}),
+      content: validatedData as unknown as Prisma.InputJsonValue,
+      ...(validatedData.name ? { title: `Brand Questionnaire — ${validatedData.name}` } : {}),
     },
   });
 

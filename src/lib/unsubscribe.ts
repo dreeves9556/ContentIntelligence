@@ -1,7 +1,11 @@
 import { createHmac } from "crypto";
 
 function getSecret(): string {
-  return process.env.UNSUBSCRIBE_SECRET ?? process.env.NEXTAUTH_SECRET ?? "fallback-unsubscribe-secret";
+  const secret = process.env.UNSUBSCRIBE_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error("Unsubscribe secret is not configured");
+  }
+  return secret;
 }
 
 export function generateUnsubscribeToken(userId: string, email: string): string {

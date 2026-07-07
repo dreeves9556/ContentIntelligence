@@ -70,6 +70,42 @@ export function clearRateLimit(key: string) {
   store.delete(key);
 }
 
+interface ActionRateEntry {
+  count: number;
+  windowStart: number;
+}
+
+const actionStore = new Map<string, ActionRateEntry>();
+
+export function checkActionRateLimit(
+  key: string,
+  maxRequests: number,
+  windowMs: number
+): { allowed: boolean; retryAfterMs?: number } {
+  cleanup();
+  const now = Date.now();
+  const entry = actionStore.get(key);
+
+  if (!entry) {
+    actionStore.set(key, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+
+  if (now - entry.windowStart > windowMs) {
+    entry.count = 1;
+    entry.windowStart = now;
+    return { allowed: true };
+  }
+
+  entry.count += 1;
+
+  if (entry.count > maxRequests) {
+    return { allowed: false, retryAfterMs: windowMs - (now - entry.windowStart) };
+  }
+
+  return { allowed: true };
+}
+
 export function formatRetryTime(ms: number): string {
   const minutes = Math.ceil(ms / (60 * 1000));
   if (minutes >= 60) {
