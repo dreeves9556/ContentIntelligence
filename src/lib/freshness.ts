@@ -200,7 +200,7 @@ export function buildUsedHooksBlock(posts: ArchivePostForFreshness[], maxHooks: 
   if (hooks.length === 0) return "";
 
   const list = hooks.map((h, i) => `${i + 1}. "${h.trim().slice(0, 150)}"`).join("\n");
-  return `<used_hooks>\nRecently used opening hooks — do NOT repeat these opening patterns, sentence structures, or phrasings. The goal is not just different words but different APPROACHES to opening a post:\n${list}\n</used_hooks>`;
+  return `<used_hooks>\nRecently used opening hooks. Do NOT repeat these opening patterns, sentence structures, or phrasings. The goal is not just different words but different APPROACHES to opening a post:\n${list}\n</used_hooks>`;
 }
 
 export function buildArchetypeHistoryBlock(posts: ArchivePostForFreshness[]): string {
@@ -240,17 +240,17 @@ export function buildArchetypeHistoryBlock(posts: ArchivePostForFreshness[]): st
 
   if (overused.length > 0) {
     sections.push(
-      `\nOVERUSED — these archetypes have been used too frequently. AVOID or significantly reduce them this week:\n${overused.map(([a]) => `- ${a}`).join("\n")}`
+      `\nOVERUSED: these archetypes have been used too frequently. AVOID or significantly reduce them this week:\n${overused.map(([a]) => `- ${a}`).join("\n")}`
     );
   }
 
   if (underused.length > 0) {
     sections.push(
-      `\nUNDERUSED — these archetypes have been rarely or never used. LEAN INTO at least 2 of them this week:\n${underused.map((a) => `- ${a}`).join("\n")}`
+      `\nUNDERUSED: these archetypes have been rarely or never used. LEAN INTO at least 2 of them this week:\n${underused.map((a) => `- ${a}`).join("\n")}`
     );
   }
 
-  return `<archetype_history>\nThis is a structural analysis of the creator's recent content. Use it to ROTATE approaches and avoid falling into repetitive patterns — even when the topic is different, the same structural archetype feels stale to the audience.\n${sections.join("\n")}\n</archetype_history>`;
+  return `<archetype_history>\nThis is a structural analysis of the creator's recent content. Use it to ROTATE approaches and avoid falling into repetitive patterns. Even when the topic is different, the same structural archetype feels stale to the audience.\n${sections.join("\n")}\n</archetype_history>`;
 }
 
 export function buildThemesExploredBlock(posts: ArchivePostForFreshness[]): string {
@@ -272,62 +272,62 @@ export function buildThemesExploredBlock(posts: ArchivePostForFreshness[]): stri
     bucketLines.push(`- ${bucket}: ${titles.slice(0, 6).map((t) => `"${t}"`).join(", ")}`);
   }
 
-  return `<themes_explored>\nThese are the topics and themes the creator has ALREADY covered in recent posts. Do not re-tread the same ground — find new angles, new stories, or untouched topics. The questionnaire data is raw material, not a script. Each week should explore NEW territory.\n\nRECURRING KEYWORDS (themes already explored — try different ones):\n${themes.map((t) => `- ${t}`).join("\n")}\n\nRECENT POSTS BY BUCKET (for context on what's been done):\n${bucketLines.join("\n")}\n</themes_explored>`;
+  return `<themes_explored>\nThese are the topics and themes the creator has ALREADY covered in recent posts. Do not re-tread the same ground. Find new angles, new stories, or untouched topics. The questionnaire data is raw material, not a script. Each week should explore NEW territory.\n\nRECURRING KEYWORDS (themes already explored, try different ones):\n${themes.map((t) => `- ${t}`).join("\n")}\n\nRECENT POSTS BY BUCKET (for context on what's been done):\n${bucketLines.join("\n")}\n</themes_explored>`;
 }
 
 const CREATIVE_CONSTRAINTS_POOL: string[] = [
   // ── Hook style constraints ──
   "Open at least one post with a question this week.",
   "Open at least one post with a bold, provocative statement that makes people stop scrolling.",
-  "Use a contrarian hook for at least one post — start with a position people might disagree with.",
+  "Use a contrarian hook for at least one post: start with a position people might disagree with.",
   "Open at least one post with a one-word or two-word punchy opening (e.g., 'Stop.' or 'Listen up.')",
-  "Open at least one post mid-story — drop the audience into the middle of a moment without context.",
+  "Open at least one post mid-story: drop the audience into the middle of a moment without context.",
   "Open at least one post with a surprising statistic or number from the creator's experience.",
   "Open at least one post with a direct challenge to the audience ('You're doing X wrong.')",
   // ── Structural / archetype constraints ──
   "Include at least one contrarian or hot-take post that challenges a common belief in your industry.",
-  "Use a behind-the-scenes angle for at least one post — show the process, not just the result.",
+  "Use a behind-the-scenes angle for at least one post: show the process, not just the result.",
   "Tell a story (not a list or tips) for at least one post. Narrative arc with a beginning, middle, and end.",
-  "Make at least one post a myth-bust — debunk a common misconception in your industry.",
+  "Make at least one post a myth-bust: debunk a common misconception in your industry.",
   "Use a day-in-the-life framing for at least one post.",
   "Try a before-and-after transformation angle for at least one post.",
   "Use a this-vs-that comparison angle for at least one post.",
-  "Try a rapid-fire or quick-tips format for at least one post — punchy, fast-paced value.",
-  "Make at least one post a client story or case study (anonymized if needed) — show, don't tell.",
+  "Try a rapid-fire or quick-tips format for at least one post: punchy, fast-paced value.",
+  "Make at least one post a client story or case study (anonymized if needed): show, don't tell.",
   "Include at least one post that takes the audience behind a specific decision the creator made.",
   "Include at least one post that's purely entertaining or funny, with no business lesson attached.",
-  "Structure one post as a mini-rant — short, punchy, opinionated, with a clear point.",
+  "Structure one post as a mini-rant: short, punchy, opinionated, with a clear point.",
   "Use a 'things I wish I knew before...' framing for at least one post.",
-  "Try an 'unpopular opinion' format for at least one post — something the creator genuinely believes that most people don't.",
-  "Include at least one post structured as a Q&A — answer a question the creator gets asked all the time.",
-  "Make at least one post a 'reaction' — react to something in the industry, a trend, or a common practice.",
+  "Try an 'unpopular opinion' format for at least one post: something the creator genuinely believes that most people don't.",
+  "Include at least one post structured as a Q&A: answer a question the creator gets asked all the time.",
+  "Make at least one post a 'reaction': react to something in the industry, a trend, or a common practice.",
   // ── Emotional / vulnerability constraints ──
   "Share a failure or mistake in at least one post, and what was learned from it.",
   "Include at least one post where the creator shares something they changed their mind about.",
-  "Use humour or self-deprecation in at least one post — don't take yourself too seriously.",
-  "Include at least one post that shows a moment of doubt or vulnerability — real human emotion, not a lesson.",
-  "Share something the creator is currently struggling with or working on — work-in-progress, not polished advice.",
-  "Include at least one post expressing genuine gratitude — for a specific person, client, or moment.",
+  "Use humour or self-deprecation in at least one post: don't take yourself too seriously.",
+  "Include at least one post that shows a moment of doubt or vulnerability: real human emotion, not a lesson.",
+  "Share something the creator is currently struggling with or working on: work-in-progress, not polished advice.",
+  "Include at least one post expressing genuine gratitude: for a specific person, client, or moment.",
   // ── Local / temporal constraints ──
-  "Make at least one post hyper-local — reference a specific local spot, event, or neighbourhood detail.",
+  "Make at least one post hyper-local: reference a specific local spot, event, or neighbourhood detail.",
   "Make at least one post that ties into something happening THIS week (current event, season, holiday, trend).",
-  "Reference the current weather or season in at least one post — make it feel like it was made today.",
+  "Reference the current weather or season in at least one post: make it feel like it was made today.",
   // ── Audience interaction constraints ──
   "Include at least one post that directly responds to a question or DM the creator gets frequently.",
-  "End at least one post with a question to the audience instead of a CTA — spark a conversation.",
+  "End at least one post with a question to the audience instead of a CTA: spark a conversation.",
   "Include at least one post that asks the audience to vote or choose between options.",
   "Make at least one post that references a specific comment or reply from a follower.",
   // ── Format / delivery constraints ──
-  "Make at least one post feel like a text message or voice note — casual, unpolished, intimate.",
+  "Make at least one post feel like a text message or voice note: casual, unpolished, intimate.",
   "Use a 'steal my...' framing for at least one post (e.g., 'steal my morning routine,' 'steal my follow-up template').",
-  "Include at least one post that's a hot take delivered calmly — the contrast between calm tone and bold claim is the hook.",
+  "Include at least one post that's a hot take delivered calmly: the contrast between calm tone and bold claim is the hook.",
   "Try a 'two truths and a lie' format for at least one post about the creator's industry.",
-  "Include at least one post that breaks the fourth wall — acknowledge the act of making content itself.",
-  "Make at least one post that's a mini-lesson — one specific, actionable tip, nothing else.",
+  "Include at least one post that breaks the fourth wall: acknowledge the act of making content itself.",
+  "Make at least one post that's a mini-lesson: one specific, actionable tip, nothing else.",
   "Include at least one post where the creator predicts something about their industry in the next 6-12 months.",
   "Use a 'what I would tell my younger self' angle for at least one post.",
   "Include at least one post that connects two seemingly unrelated topics from the creator's life.",
-  "Make at least one post that's a response to something the creator saw on social media this week — a stitch or reaction energy.",
+  "Make at least one post that's a response to something the creator saw on social media this week: a stitch or reaction energy.",
   "Include at least one post that lists the creator's current favourite tools, apps, or resources.",
   "Use a 'common question, uncommon answer' structure for at least one post.",
 ];
@@ -368,11 +368,11 @@ export function buildVariationDirectiveBlock(generationCount: number): string {
 
   if (isVeryHigh) {
     lines.push(
-      "FRESHNESS CRITICAL — This creator has been using the system for many weeks. The questionnaire data has been fed into the prompt many times. You MUST find new angles, new stories, and new structural approaches. Do NOT recycle the same anecdotes, hot takes, or hook patterns. The creator's audience has seen the same themes repeatedly — give them something genuinely fresh.",
+      "FRESHNESS CRITICAL: This creator has been using the system for many weeks. The questionnaire data has been fed into the prompt many times. You MUST find new angles, new stories, and new structural approaches. Do NOT recycle the same anecdotes, hot takes, or hook patterns. The creator's audience has seen the same themes repeatedly. Give them something genuinely fresh.",
     );
   } else if (isHigh) {
     lines.push(
-      "FRESHNESS WARNING — This creator has generated several calendars. The questionnaire tropes are becoming familiar. Actively seek new angles and avoid repeating the same stories or structural patterns. Use the archetype history and themes explored blocks above to identify what's been overused.",
+      "FRESHNESS WARNING: This creator has generated several calendars. The questionnaire tropes are becoming familiar. Actively seek new angles and avoid repeating the same stories or structural patterns. Use the archetype history and themes explored blocks above to identify what's been overused.",
     );
   } else {
     lines.push(
@@ -381,7 +381,7 @@ export function buildVariationDirectiveBlock(generationCount: number): string {
   }
 
   lines.push(
-    "VARIETY RULES:\n- Vary hook styles across posts within this week AND across weeks (question, bold statement, story, contrarian, direct address).\n- Rotate content archetypes — don't let listicles or myth-busts dominate.\n- If a specific anecdote, hot take, or proof point was used in recent posts, let it rest for at least 3-4 weeks before revisiting.\n- The same topic can be approached from multiple angles, but only if the ANGLE is genuinely different (not just reworded).\n- When in doubt, choose the less obvious angle.",
+    "VARIETY RULES:\n- Vary hook styles across posts within this week AND across weeks (question, bold statement, story, contrarian, direct address).\n- Rotate content archetypes. Don't let listicles or myth-busts dominate.\n- If a specific anecdote, hot take, or proof point was used in recent posts, let it rest for at least 3-4 weeks before revisiting.\n- The same topic can be approached from multiple angles, but only if the ANGLE is genuinely different (not just reworded).\n- When in doubt, choose the less obvious angle.",
   );
 
   return `<variation_directive>\n${lines.join("\n")}\n</variation_directive>`;
@@ -459,11 +459,11 @@ export function buildAnecdoteCooldownBlock(
 
   if (fresh.length > 0) {
     sections.push(
-      `FRESH ANECDOTES (not yet used — great material to draw from this week):\n${fresh.map((f) => `- ${f.label}: "${f.snippet}..."`).join("\n")}`,
+      `FRESH ANECDOTES (not yet used, great material to draw from this week):\n${fresh.map((f) => `- ${f.label}: "${f.snippet}..."`).join("\n")}`,
     );
   }
 
-  return `<anecdote_cooldown>\nThe creator's questionnaire and survey answers contain specific stories, opinions, and experiences. Some have already been turned into posts — let those rest. Others are untapped — prioritize them.\n${sections.join("\n\n")}\n</anecdote_cooldown>`;
+  return `<anecdote_cooldown>\nThe creator's questionnaire and survey answers contain specific stories, opinions, and experiences. Some have already been turned into posts, let those rest. Others are untapped, prioritize them.\n${sections.join("\n\n")}\n</anecdote_cooldown>`;
 }
 
 // ─── #3: Content Gap Analysis ───────────────────────────────────────
@@ -609,8 +609,8 @@ export function buildAudienceFatigueBlock(rows: AnalyticsRowForFatigue[]): strin
   if (change > -15) return ""; // Not declining significantly
 
   const lines: string[] = [
-    `ENGAGEMENT TREND: Recent 4 weeks avg engagement rate is ${recentRate.toFixed(1)}% vs ${previousRate.toFixed(1)}% in the previous 4 weeks — a ${change.toFixed(0)}% decline.`,
-    "AUDIENCE FATIGUE DETECTED — engagement is declining. This is a strong signal that content is becoming repetitive or stale for this audience.",
+    `ENGAGEMENT TREND: Recent 4 weeks avg engagement rate is ${recentRate.toFixed(1)}% vs ${previousRate.toFixed(1)}% in the previous 4 weeks, a ${change.toFixed(0)}% decline.`,
+    "AUDIENCE FATIGUE DETECTED: engagement is declining. This is a strong signal that content is becoming repetitive or stale for this audience.",
     "ACTION REQUIRED: Push harder for fresh approaches this week. Try new topics, new archetypes, and new hook styles. Avoid the overused archetypes listed above. Consider more personal/off-duty content to re-engage the audience emotionally.",
   ];
 
@@ -648,7 +648,7 @@ export function buildFreshInputBlock(
     }
   }
   if (weeklyLines.length > 0) {
-    parts.push(`WEEKLY CONTEXT (fresh input from the creator for THIS week — prioritize over older questionnaire material):\n${weeklyLines.join("\n")}`);
+    parts.push(`WEEKLY CONTEXT (fresh input from the creator for THIS week, prioritize over older questionnaire material):\n${weeklyLines.join("\n")}`);
   }
 
   const monthlyLines: string[] = [];
@@ -658,12 +658,12 @@ export function buildFreshInputBlock(
     }
   }
   if (monthlyLines.length > 0) {
-    parts.push(`MONTHLY CONTEXT (broader strokes for this month — use as a strategic backdrop):\n${monthlyLines.join("\n")}`);
+    parts.push(`MONTHLY CONTEXT (broader strokes for this month, use as a strategic backdrop):\n${monthlyLines.join("\n")}`);
   }
 
   if (parts.length === 0) return "";
 
-  return `<fresh_input>\nThis is current, time-bound input from the creator — not from the original questionnaire. It represents what's happening in their life and business RIGHT NOW. Weave it into this week's content where it fits naturally. This takes priority over older questionnaire material when there's overlap.\n${parts.join("\n\n")}\n</fresh_input>`;
+  return `<fresh_input>\nThis is current, time-bound input from the creator, not from the original questionnaire. It represents what's happening in their life and business RIGHT NOW. Weave it into this week's content where it fits naturally. This takes priority over older questionnaire material when there's overlap.\n${parts.join("\n\n")}\n</fresh_input>`;
 }
 
 // ─── #7: Arc / Campaign Directive ───────────────────────────────────
@@ -671,5 +671,5 @@ export function buildFreshInputBlock(
 export function buildArcDirectiveBlock(arcTheme: string): string {
   if (!arcTheme || arcTheme.trim().length === 0) return "";
 
-  return `<content_arc>\nThe creator has defined a thematic arc for this period: "${arcTheme.trim()}". Thread this theme through the week's content — each post should connect to this arc from a different angle. The arc is a connective thread, not a constraint — posts should still stand alone, but together they should build toward a narrative or message.\n</content_arc>`;
+  return `<content_arc>\nThe creator has defined a thematic arc for this period: "${arcTheme.trim()}". Thread this theme through the week's content. Each post should connect to this arc from a different angle. The arc is a connective thread, not a constraint. Posts should still stand alone, but together they should build toward a narrative or message.\n</content_arc>`;
 }

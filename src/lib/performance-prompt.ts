@@ -100,12 +100,12 @@ export function buildPerformanceSignalsBlock(rows: AnalyticsPostRow[]): string {
   ];
   if (topLines.length > 0) {
     sections.push(
-      `TOP PERFORMERS — study these. Extract the hook patterns, topics, and angles that resonate with this audience and lean into MORE content like this (without repeating the exact posts):\n${topLines.join("\n")}`
+      `TOP PERFORMERS: study these. Extract the hook patterns, topics, and angles that resonate with this audience and lean into MORE content like this (without repeating the exact posts):\n${topLines.join("\n")}`
     );
   }
   if (bottomLines.length > 0) {
     sections.push(
-      `WEAKEST PERFORMERS — avoid repeating the patterns, topics, or angles of these posts:\n${bottomLines.join("\n")}`
+      `WEAKEST PERFORMERS: avoid repeating the patterns, topics, or angles of these posts:\n${bottomLines.join("\n")}`
     );
   }
 
@@ -178,7 +178,7 @@ export function buildContentPerformanceBlock(matches: MatchedPost[]): string {
   const bucketLines = summarize("bucket");
   const formatLines = summarize("format");
 
-  return `<content_performance>\nPerformance of this creator's own published calendar content, broken down by bucket and format (${matches.length} matched posts). Weight the week's bucket and format mix toward what performs — while still respecting the minimum distribution rules.\nBY BUCKET:\n${bucketLines.join("\n")}\nBY FORMAT:\n${formatLines.join("\n")}\n</content_performance>`;
+  return `<content_performance>\nPerformance of this creator's own published calendar content, broken down by bucket and format (${matches.length} matched posts). Weight the week's bucket and format mix toward what performs, while still respecting the minimum distribution rules.\nBY BUCKET:\n${bucketLines.join("\n")}\nBY FORMAT:\n${formatLines.join("\n")}\n</content_performance>`;
 }
 
 // ─── Follower growth trend ─────────────────────────────────────────
@@ -250,14 +250,14 @@ export function buildFeedbackBlock(rows: FeedbackRow[]): string {
   const sections: string[] = [];
   if (loved.length > 0) {
     sections.push(
-      `CONTENT THE USER LOVED — generate more ideas with similar angles, energy, and structure:\n${loved.map((r) => `- "${r.title}" (${r.format}, ${r.bucket})`).join("\n")}`
+      `CONTENT THE USER LOVED: generate more ideas with similar angles, energy, and structure:\n${loved.map((r) => `- "${r.title}" (${r.format}, ${r.bucket})`).join("\n")}`
     );
   }
   if (rejected.length > 0) {
     sections.push(
-      `CONTENT THE USER REJECTED — do NOT generate ideas with similar angles, topics, or framing:\n${rejected.map((r) => `- "${r.title}" (${r.format}, ${r.bucket})`).join("\n")}`
+      `CONTENT THE USER REJECTED: do NOT generate ideas with similar angles, topics, or framing:\n${rejected.map((r) => `- "${r.title}" (${r.format}, ${r.bucket})`).join("\n")}`
     );
   }
 
-  return `<user_feedback>\nDirect thumbs up/down feedback from the user on previously generated content ideas. This is the strongest signal of their taste — treat it as authoritative.\n${sections.join("\n\n")}\n</user_feedback>`;
+  return `<user_feedback>\nDirect thumbs up/down feedback from the user on previously generated content ideas. This is the strongest signal of their taste, treat it as authoritative.\n${sections.join("\n\n")}\n</user_feedback>`;
 }

@@ -53,7 +53,7 @@ export function summarizeMemoriesForPrompt(
   if (sections.length === 0) return "";
 
   return `<creator_memory>
-This is the AI's accumulated long-term memory about this creator — built up over time from their questionnaire, surveys, analytics, and feedback patterns. These are strategic insights that should shape every content decision. Treat them as authoritative context that overrides generic assumptions:
+This is the AI's accumulated long-term memory about this creator, built up over time from their questionnaire, surveys, analytics, and feedback patterns. These are strategic insights that should shape every content decision. Treat them as authoritative context that overrides generic assumptions:
 
 ${sections.join("\n\n")}
 </creator_memory>`;

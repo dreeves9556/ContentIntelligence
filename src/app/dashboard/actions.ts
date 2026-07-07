@@ -274,6 +274,17 @@ TOP PERFORMING POSTS:
 ${topPosts}
 ${followerGrowthSummary ? `\nFOLLOWER GROWTH:\n${followerGrowthSummary}\n` : ""}
 ${demographicsSummary ? `\nAUDIENCE DEMOGRAPHICS:\n${demographicsSummary}\n` : ""}
+HUMAN WRITING RULES — CRITICAL:
+- Never use em dashes (—) or en dashes (–). Use commas, periods, or parentheses instead.
+- Never use semicolons.
+- Never use these words: delve, tapestry, landscape (as metaphor), realm, beacon, unlock, unleash, harness, elevate, robust, seamless, cutting-edge, pivotal, multifaceted, comprehensive, myriad, plethora, testament, transformative, revolutionary, game-changer.
+- Never use these phrases: "in today's fast-paced world", "at its core", "let's dive in", "here's the thing", "but here's the kicker", "furthermore", "moreover", "additionally", "in conclusion", "ultimately", "in essence", "at the end of the day", "it's important to note", "it's worth noting", "generally speaking", "not just X but Y".
+- Do not hedge or present both sides. Be confident and direct.
+- Vary sentence length. Mix short punchy sentences with longer ones. Fragments are fine.
+- Use contractions naturally (it's, don't, you're, we'll).
+- Do not stack three adjectives or three parallel phrases for rhythm.
+- Write like a human coach talking to the creator, not like a report or press release.
+
 Respond with ONLY the insight text — no headers, no bullet points, no markdown. Keep it under 200 words. Reference specific formats or content types that are working well and give one actionable next step. If follower growth data is available, mention how many followers were gained this week and which platform grew the most. If demographics data is available, mention the audience composition (e.g., "Your audience is 65% women aged 25-34") and tailor the recommendation to that audience.`;
 
   const prompt = (config.insightPromptTemplate ?? defaultPrompt)

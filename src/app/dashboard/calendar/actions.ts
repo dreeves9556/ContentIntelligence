@@ -182,7 +182,7 @@ export async function generateCalendarStrategy(
   }, {} as Record<string, number>);
 
   const daySummary = calendar.days.map((day) =>
-    `${day.day}: ${day.format} — ${day.bucket} — "${day.title}"`
+    `${day.day}: ${day.format}, ${day.bucket}, "${day.title}"`
   ).join("\n");
 
   const userProfileXml = buildUserProfileXml({
@@ -524,7 +524,7 @@ The days must be, in order: ${targetDays.join(", ")}.
 
 The mix must be: ${formatMixStr}. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.
 
-BUCKET DISTRIBUTION — this is the most important balance to get right:
+BUCKET DISTRIBUTION: this is the most important balance to get right:
 ${bucketDistStr}
 
 Days must be one of: ${targetDays.join(", ")}.

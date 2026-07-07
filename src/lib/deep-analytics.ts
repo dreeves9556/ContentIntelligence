@@ -305,13 +305,13 @@ export function generateLifespanInsight(buckets: ContentDecayBucket[], platform?
   // Fast decay: 50%+ in first bucket
   if (firstBucket && firstBucket.pctOfFinal >= 50) {
     const eightyBucket = eightyPct ?? lastBucket;
-    return `${platformLabel} get ${firstBucket.pctOfFinal.toFixed(0)}% of total engagement within ${firstBucket.label} and ${eightyBucket.pctOfFinal.toFixed(0)}% within ${eightyBucket.label}. Content has a short lifespan — most impact happens fast.`;
+    return `${platformLabel} get ${firstBucket.pctOfFinal.toFixed(0)}% of total engagement within ${firstBucket.label} and ${eightyBucket.pctOfFinal.toFixed(0)}% within ${eightyBucket.label}. Content has a short lifespan, most impact happens fast.`;
   }
 
   // Moderate decay
   if (halfLife && eightyPct) {
     if (stillGrowing) {
-      return `${platformLabel} reach ${halfLife.pctOfFinal.toFixed(0)}% of engagement by ${halfLife.label} and keep growing — ${lastBucket.label} still accumulating engagement. Content has a long lifespan.`;
+      return `${platformLabel} reach ${halfLife.pctOfFinal.toFixed(0)}% of engagement by ${halfLife.label} and keep growing, ${lastBucket.label} still accumulating engagement. Content has a long lifespan.`;
     }
     return `${platformLabel} reach ${halfLife.pctOfFinal.toFixed(0)}% of engagement by ${halfLife.label} and ${eightyPct.pctOfFinal.toFixed(0)}% by ${eightyPct.label}.`;
   }
@@ -330,25 +330,25 @@ export function generateCadenceRecommendation(buckets: ContentDecayBucket[]): st
 
   // Fast decay: 80% within first bucket
   if (firstBucket && firstBucket.pctOfFinal >= 80) {
-    return "Content decays fast — consider posting daily to maintain consistent visibility and reach.";
+    return "Content decays fast, consider posting daily to maintain consistent visibility and reach.";
   }
 
   // Moderate decay: 80% within first 2 buckets
   if (eightyPct && sorted.indexOf(eightyPct) <= 1) {
-    return "Content has a moderate lifespan — aim for 4-5 posts per week to keep momentum.";
+    return "Content has a moderate lifespan, aim for 4-5 posts per week to keep momentum.";
   }
 
   // Slow decay: 80% takes 3+ buckets
   if (eightyPct && sorted.indexOf(eightyPct) >= 2) {
-    return "Content has a long lifespan — 2-3 posts per week is sufficient. Focus on quality over quantity.";
+    return "Content has a long lifespan, 2-3 posts per week is sufficient. Focus on quality over quantity.";
   }
 
   // Very slow / still growing
   if (lastBucket.pctOfFinal < 90) {
-    return "Content continues to accumulate engagement over time — 2-3 posts per week is ideal. Evergreen content performs well.";
+    return "Content continues to accumulate engagement over time, 2-3 posts per week is ideal. Evergreen content performs well.";
   }
 
-  return "Content has a steady engagement lifespan — maintain a consistent posting schedule of 3-4 posts per week.";
+  return "Content has a steady engagement lifespan, maintain a consistent posting schedule of 3-4 posts per week.";
 }
 
 export function normalizeDailyMetrics(raw: unknown): DailyMetrics {
