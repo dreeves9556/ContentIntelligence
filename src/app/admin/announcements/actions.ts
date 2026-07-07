@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getAnthropicApiKey, getAnthropicModel } from "@/lib/platform-config";
+import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
 export type EmailSegment = "all" | "CALENDAR_ONLY" | "CREATOR" | "PRO" | "connected" | "unconnected";
 
@@ -213,45 +214,48 @@ async function executeBroadcast(
   const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  let users: { email: string | null }[] = [];
+  let users: { id: string; email: string | null }[] = [];
 
   if (segment === "all") {
     users = await prisma.user.findMany({
-      where: { email: { not: null } },
-      select: { email: true },
+      where: { email: { not: null }, emailUnsubscribed: false },
+      select: { id: true, email: true },
     });
   } else if (segment === "connected") {
     users = await prisma.user.findMany({
       where: {
         email: { not: null },
+        emailUnsubscribed: false,
         zernioAccounts: { some: {} },
       },
-      select: { email: true },
+      select: { id: true, email: true },
       distinct: ["id"],
     });
   } else if (segment === "unconnected") {
     users = await prisma.user.findMany({
       where: {
         email: { not: null },
+        emailUnsubscribed: false,
         zernioAccounts: { none: {} },
       },
-      select: { email: true },
+      select: { id: true, email: true },
     });
   } else {
     users = await prisma.user.findMany({
       where: {
         email: { not: null },
+        emailUnsubscribed: false,
         plan: segment,
       },
-      select: { email: true },
+      select: { id: true, email: true },
     });
   }
 
-  const emails = users
-    .map((u) => u.email!)
-    .filter((e) => e.includes("@"));
+  const recipients = users
+    .filter((u) => u.email && u.email.includes("@"))
+    .map((u) => ({ id: u.id, email: u.email! }));
 
-  if (emails.length === 0) {
+  if (recipients.length === 0) {
     return { success: false, sent: 0, failed: 0, errors: ["No recipients found for this segment."] };
   }
 
@@ -259,23 +263,32 @@ async function executeBroadcast(
   let failed = 0;
   const errors: string[] = [];
 
-  for (const email of emails) {
+  for (const recipient of recipients) {
+    const unsubscribeUrl = buildUnsubscribeUrl(recipient.id, recipient.email);
+    const footerHtml = `${htmlContent}
+      <div style="border-top:1px solid #E2E8F0;margin-top:32px;padding-top:20px;text-align:center;">
+        <p style="margin:0;font-size:11px;color:#5B6472;line-height:1.6;">
+          You received this email because you have a The Local Post account.<br/>
+          <a href="${unsubscribeUrl}" style="color:#1E56D6;text-decoration:underline;font-weight:600;">Unsubscribe</a> from announcement emails.
+        </p>
+      </div>`;
+
     try {
       const result = await resend.emails.send({
         from: `The Local Post <${fromAddress}>`,
-        to: email,
+        to: recipient.email,
         subject,
-        html: htmlContent,
+        html: footerHtml,
       });
       if (result.error) {
         failed++;
-        errors.push(`${email}: ${result.error.message}`);
+        errors.push(`${recipient.email}: ${result.error.message}`);
       } else {
         sent++;
       }
     } catch (err) {
       failed++;
-      errors.push(`${email}: ${err instanceof Error ? err.message : "Unknown error"}`);
+      errors.push(`${recipient.email}: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   }
 

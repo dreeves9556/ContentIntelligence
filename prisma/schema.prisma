@@ -18,6 +18,7 @@ model User {
   role          UserRole       @default(USER)
   plan          UserPlan       @default(CALENDAR_ONLY)
   tokenVersion  Int            @default(0)  // Incremented on password reset to invalidate existing JWTs
+  emailUnsubscribed Boolean     @default(false) // User opted out of broadcast emails
   authorDisplayName  String?  // Public byline name shown on articles
   authorImage        String?  // URL to headshot
   authorOrganization String?  // Optional org/title shown under name
