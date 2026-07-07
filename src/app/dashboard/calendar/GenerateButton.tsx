@@ -7,11 +7,14 @@ import { Sparkles, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 const statusSteps = [
-  { label: "Analyzing your questionnaire...", progress: 15 },
-  { label: "Building your content strategy...", progress: 35 },
-  { label: "Generating your content calendar...", progress: 60 },
-  { label: "Writing captions and hooks...", progress: 80 },
-  { label: "Saving to your dashboard...", progress: 95 },
+  { label: "Analyzing your questionnaire...", progress: 8 },
+  { label: "Reviewing your brand voice and surveys...", progress: 18 },
+  { label: "Checking your recent content for freshness...", progress: 30 },
+  { label: "Building your content strategy...", progress: 42 },
+  { label: "Generating your content calendar...", progress: 55 },
+  { label: "Writing captions and hooks...", progress: 68 },
+  { label: "Polishing post directions and CTAs...", progress: 78 },
+  { label: "Finalizing your calendar...", progress: 85 },
 ];
 
 interface GenerateButtonProps {
@@ -39,7 +42,7 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
       currentStep = Math.min(currentStep + 1, statusSteps.length - 1);
       setProgress(statusSteps[currentStep].progress);
       setStatusLabel(statusSteps[currentStep].label);
-    }, 2500);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -51,6 +54,8 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
 
     try {
       const result = await generateWeeklyCalendar(getTimezoneOffsetHours());
+      setProgress(100);
+      setStatusLabel("Saving to your dashboard...");
       if (!result.success) {
         setError(result.error || "Failed to generate calendar");
       } else {
