@@ -74,7 +74,7 @@ export default async function CalendarPage() {
             Your AI-powered weekly content strategy
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+        <div className="flex flex-col items-center sm:flex-row sm:items-start gap-3">
           <div className="flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-background-card rounded-lg border border-border-primary">
             <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
             <span className="text-sm sm:text-base text-text-primary font-medium">
