@@ -112,6 +112,81 @@ Return ONLY the HTML. No explanation, no markdown, no backticks.`;
   }
 }
 
+export async function suggestSubject(plainText: string): Promise<{ success: boolean; subject?: string; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (!plainText.trim()) {
+    return { success: false, error: "Please write some content first." };
+  }
+
+  const apiKey = await getAnthropicApiKey();
+  if (!apiKey) {
+    return { success: false, error: "AI service not configured." };
+  }
+
+  const model = await getAnthropicModel();
+
+  const systemPrompt = `You are an expert email marketing copywriter for "The Local Post" — a premium content intelligence platform for real estate agents and local business owners.
+
+Your job: write ONE compelling email subject line based on the admin's announcement body text.
+
+RULES:
+- Maximum 60 characters (most email clients truncate after that).
+- Make it punchy, intriguing, and action-oriented. Think like a marketing pro.
+- Use curiosity, urgency, or benefit-driven language — but never clickbait.
+- Do NOT use ALL CAPS, excessive punctuation, or spammy words like "FREE" or "ACT NOW".
+- Do NOT include quotes around the subject line.
+- Do NOT include any explanation — return ONLY the subject line text.
+- Match the tone of the announcement. If it's exciting, be exciting. If it's informative, be clear and authoritative.
+- Consider patterns like: questions, bold statements, teasers, benefit promises, or time-sensitive framing.
+
+Good examples:
+- "We're taking things to the next level"
+- "Your front page is about to get a lot smarter"
+- "What if your content could write itself?"
+- "A new way to reach your audience"
+
+Return ONLY the subject line. No quotes, no explanation, no markdown.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 100,
+        system: systemPrompt,
+        messages: [{ role: "user", content: `Here is the announcement body. Write a compelling subject line for it:\n\n---\n${plainText}\n---` }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[AI SUBJECT] Anthropic error:", errorText);
+      return { success: false, error: `AI service error (${response.status})` };
+    }
+
+    const data = await response.json();
+    const subject = data.content?.[0]?.text?.trim() || "";
+
+    if (!subject) {
+      return { success: false, error: "AI returned empty response." };
+    }
+
+    return { success: true, subject };
+  } catch (err) {
+    console.error("[AI SUBJECT] Failed:", err);
+    return { success: false, error: "Failed to generate subject line." };
+  }
+}
+
 export async function sendBroadcast(
   subject: string,
   htmlContent: string,
