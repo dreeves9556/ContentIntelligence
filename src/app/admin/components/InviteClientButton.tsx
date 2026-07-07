@@ -87,7 +87,7 @@ export function InviteClientButton() {
                     Invite New Client
                   </h3>
                   <p className="text-sm text-text-muted">
-                    Create a client account with a randomly generated password. Share the credentials with your client so they can log in.
+                    Create a client account. They&apos;ll receive a welcome email with a link to set their own password.
                   </p>
                 </div>
 

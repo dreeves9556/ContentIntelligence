@@ -9,7 +9,6 @@ import {
   Check,
   X,
   Trash2,
-  Copy,
   AlertCircle,
   ChevronDown,
   Clock,
@@ -110,7 +109,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             Send Invitations
           </h3>
           <p className="text-sm text-text-muted mt-1">
-            Paste email addresses separated by commas, spaces, or new lines. Accounts will be created with randomly generated passwords — copy the credentials to share with your clients.
+            Paste email addresses separated by commas, spaces, or new lines. Each client will receive a welcome email with a link to set their own password.
           </p>
         </div>
 
@@ -169,12 +168,12 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Creating Accounts…
+                Sending Invites…
               </>
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                Create Accounts
+                Send Invites
               </>
             )}
           </button>
@@ -186,7 +185,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 flex items-center gap-1.5">
                 <Check className="h-4 w-4" />
-                {successCount} created
+                {successCount} invited
               </span>
               {failCount > 0 && (
                 <span className="text-red-400 flex items-center gap-1.5">
@@ -210,20 +209,15 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                     {r.email}
                   </span>
                   {r.error && (
-                    <span className="text-xs text-amber-400 truncate max-w-[200px]">
+                    <span className="text-xs text-amber-400 truncate max-w-[280px]">
                       {r.error}
                     </span>
                   )}
-                  {r.password && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`Email: ${r.email}\nPassword: ${r.password!}`);
-                      }}
-                      className="text-text-muted hover:text-accent-primary transition-colors shrink-0"
-                      title="Copy credentials"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
+                  {r.success && !r.error && (
+                    <span className="text-xs text-emerald-400 flex items-center gap-1 shrink-0">
+                      <Mail className="h-3 w-3" />
+                      Email sent
+                    </span>
                   )}
                 </div>
               ))}
