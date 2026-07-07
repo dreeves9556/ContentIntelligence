@@ -563,7 +563,7 @@ Days must be one of: ${targetDays.join(", ")}.
       },
       body: JSON.stringify({
         model,
-        max_tokens: 4000,
+        max_tokens: 8000,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
       }),
@@ -577,12 +577,16 @@ Days must be one of: ${targetDays.join(", ")}.
 
     const data = await response.json();
     const responseText = data.content?.[0]?.text || "";
+    const stopReason = data.stop_reason;
 
     let calendarData: WeeklyCalendar;
     try {
       calendarData = JSON.parse(responseText);
     } catch (parseError) {
       console.error("Failed to parse Claude response:", responseText);
+      if (stopReason === "max_tokens") {
+        return { success: false, error: "The AI response was too long and got cut off. Please try again." };
+      }
       return { success: false, error: "Failed to parse AI response. Please try again." };
     }
 
