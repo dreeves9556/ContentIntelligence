@@ -60,7 +60,7 @@ export default function DashboardLayout({
   const navItems = getNavItems(plan);
 
   const handleLogout = () => {
-    signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: `${window.location.origin}/login` });
   };
 
   return (

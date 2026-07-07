@@ -826,7 +826,7 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
         {/* Sign out */}
         <div className="mt-5 pt-5 border-t border-border-primary">
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
             className="flex items-center gap-2 text-sm text-red-400/70 hover:text-red-400 transition-colors"
           >
             <LogOut className="h-4 w-4" />
