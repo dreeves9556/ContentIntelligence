@@ -60,22 +60,27 @@ export async function requestPasswordReset(
       to: normalizedEmail,
       subject: "Reset your The Local Post password",
       html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#111111;color:#e8e8e8;border-radius:12px;overflow:hidden;">
-          <div style="background:#0a0a0a;padding:32px 32px 24px;border-bottom:1px solid #1a1a1a;">
-            <p style="margin:0;font-size:22px;font-weight:700;color:#e8e8e8;">The Local Post</p>
-            <p style="margin:4px 0 0;font-size:11px;font-weight:600;color:#c8952a;letter-spacing:0.1em;text-transform:uppercase;">Password Reset</p>
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;background:#FFFFFF;color:#101418;border-radius:12px;overflow:hidden;border:1px solid #E2E8F0;">
+          <div style="background:#F7F9FC;padding:32px 32px 24px;border-bottom:1px solid #E2E8F0;text-align:center;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#101418;letter-spacing:-0.02em;">The Local Post</p>
+            <p style="margin:6px 0 0;font-size:11px;font-weight:600;color:#1E56D6;letter-spacing:0.12em;text-transform:uppercase;">Password Reset</p>
           </div>
           <div style="padding:32px;">
-            <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#e8e8e8;">Reset Your Password</h1>
-            <p style="margin:0 0 24px;font-size:14px;color:#787878;line-height:1.6;">
+            <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:#101418;">Reset Your Password</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#5B6472;line-height:1.6;">
               We received a request to reset your password. Click the button below to choose a new password.
             </p>
-            <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#c8952a;color:#0a0a0a;font-weight:600;font-size:14px;text-decoration:none;border-radius:8px;">
+            <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#1E56D6;color:#FFFFFF;font-weight:600;font-size:14px;text-decoration:none;border-radius:6px;">
               Reset Password
             </a>
-            <p style="margin:24px 0 0;font-size:12px;color:#3a3a3a;line-height:1.6;">
+            <p style="margin:24px 0 0;font-size:12px;color:#5B6472;line-height:1.6;">
               This link expires in 1 hour.<br/>
               If you didn&apos;t request a password reset, you can safely ignore this email.
+            </p>
+          </div>
+          <div style="background:#F7F9FC;padding:20px 32px;border-top:1px solid #E2E8F0;">
+            <p style="margin:0;font-size:11px;color:#5B6472;text-align:center;line-height:1.6;">
+              The Local Post — Be the local authority.
             </p>
           </div>
         </div>
