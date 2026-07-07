@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (data.name) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { name: data.name },
+      });
+    }
+
     // Build initial AI memories from questionnaire answers (background, non-blocking)
     buildMemoriesFromQuestionnaire(userId, data as never).catch((err) =>
       console.error("Memory creation from questionnaire failed:", err)

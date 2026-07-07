@@ -48,6 +48,13 @@ export async function updateQuestionnaire(
     },
   });
 
+  if (validatedData.name) {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { name: validatedData.name },
+    });
+  }
+
   revalidatePath("/dashboard/settings");
 
   return { success: true };

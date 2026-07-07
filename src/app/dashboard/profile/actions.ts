@@ -101,6 +101,13 @@ export async function updateOnboarding(
     },
   });
 
+  if (validatedData.name) {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { name: validatedData.name },
+    });
+  }
+
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard/settings");
   return { success: true };
