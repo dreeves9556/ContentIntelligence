@@ -23,7 +23,7 @@ export default async function AdminMemoriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h1 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
           Creator Memories
         </h1>
         <p className="text-text-muted text-sm mt-1">

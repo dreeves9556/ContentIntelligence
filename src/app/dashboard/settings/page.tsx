@@ -114,7 +114,7 @@ export default async function SettingsPage() {
         <div>
           <h1
             className="text-3xl font-bold text-text-primary"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Brand Settings
           </h1>
@@ -128,7 +128,7 @@ export default async function SettingsPage() {
           <div className="space-y-2">
             <h2
               className="text-2xl font-bold text-text-primary"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              style={{ fontFamily: "var(--font-serif)" }}
             >
               No Brand Profile Yet
             </h2>
@@ -139,8 +139,7 @@ export default async function SettingsPage() {
           </div>
           <Link
             href="/onboarding"
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-            style={{ background: "#c8952a", color: "#0a0a0a" }}
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
           >
             <ClipboardList className="h-4 w-4" />
             Complete Onboarding
@@ -167,7 +166,7 @@ export default async function SettingsPage() {
         <div>
           <h1
             className="text-3xl font-bold text-text-primary"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Brand Settings
           </h1>
@@ -175,7 +174,7 @@ export default async function SettingsPage() {
             Update your brand parameters — changes take effect immediately.
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-background-secondary shrink-0">
+        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-border-primary shrink-0">
           <Settings className="h-4 w-4 text-accent-primary" />
           <span className="text-xs text-text-muted">Last saved:</span>
           <span className="text-xs text-text-primary font-medium">{lastUpdated}</span>

@@ -88,7 +88,7 @@ function BugReportCard({ report }: { report: BugReportData }) {
   };
 
   return (
-    <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] overflow-hidden">
+    <div className="bg-background-card rounded-lg border border-border-primary overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition-colors"
@@ -101,29 +101,29 @@ function BugReportCard({ report }: { report: BugReportData }) {
             <span className={`text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
               {cfg.label}
             </span>
-            <span className="text-sm font-medium text-[#e8e8e8] truncate">
+            <span className="text-sm font-medium text-text-primary truncate">
               {report.name}
             </span>
           </div>
-          <p className="text-xs text-[#787878] mt-1 truncate">
+          <p className="text-xs text-text-muted mt-1 truncate">
             {report.description.slice(0, 80)}
             {report.description.length > 80 && "…"}
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="hidden sm:inline text-xs text-[#787878]">
+          <span className="hidden sm:inline text-xs text-text-muted">
             {formatDate(report.createdAt)}
           </span>
           {expanded ? (
-            <ChevronUp className="h-4 w-4 text-[#787878]" />
+            <ChevronUp className="h-4 w-4 text-text-muted" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-[#787878]" />
+            <ChevronDown className="h-4 w-4 text-text-muted" />
           )}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-[#1a1a1a] p-4 space-y-4">
+        <div className="border-t border-border-primary p-4 space-y-4">
           {status === "success" && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -138,15 +138,15 @@ function BugReportCard({ report }: { report: BugReportData }) {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 text-sm text-[#787878]">
+            <div className="flex items-center gap-2 text-sm text-text-muted">
               <User className="h-4 w-4 shrink-0" />
               <span className="truncate">{report.name}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-[#787878]">
+            <div className="flex items-center gap-2 text-sm text-text-muted">
               <Mail className="h-4 w-4 shrink-0" />
               <span className="truncate">{report.email}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-[#787878]">
+            <div className="flex items-center gap-2 text-sm text-text-muted">
               {report.deviceInfo === "mobile" ? (
                 <Smartphone className="h-4 w-4 shrink-0" />
               ) : (
@@ -154,23 +154,23 @@ function BugReportCard({ report }: { report: BugReportData }) {
               )}
               <span className="capitalize">{report.deviceInfo}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-[#787878]">
+            <div className="flex items-center gap-2 text-sm text-text-muted">
               <span className="text-xs">Reported:</span>
               <span>{formatDate(report.createdAt)}</span>
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-medium text-[#787878] uppercase tracking-wider mb-1.5">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1.5">
               Description
             </p>
-            <p className="text-sm text-[#e8e8e8] leading-relaxed bg-[#0a0a0a] rounded-lg px-3 py-2.5 border border-white/5 whitespace-pre-wrap">
+            <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2.5 border border-border-primary whitespace-pre-wrap">
               {report.description}
             </p>
           </div>
 
           <div>
-            <p className="text-xs font-medium text-[#787878] uppercase tracking-wider mb-1.5">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1.5">
               Status
             </p>
             <div className="flex gap-2">
@@ -194,7 +194,7 @@ function BugReportCard({ report }: { report: BugReportData }) {
           </div>
 
           <div>
-            <p className="text-xs font-medium text-[#787878] uppercase tracking-wider mb-1.5">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1.5">
               Admin Notes
             </p>
             <textarea
@@ -202,12 +202,12 @@ function BugReportCard({ report }: { report: BugReportData }) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Internal notes about this bug…"
-              className="w-full px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg text-sm text-[#e8e8e8] placeholder:text-[#555] focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 resize-none"
+              className="w-full px-3 py-2 bg-background-secondary border border-border-primary rounded-lg text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 resize-none"
             />
             <button
               onClick={handleSaveNotes}
               disabled={isPending}
-              className="flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#c8952a] text-[#0a0a0a] disabled:opacity-60 hover:opacity-90 transition-opacity"
+              className="flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-accent-primary text-white disabled:opacity-60 hover:opacity-90 transition-opacity"
             >
               <Save className="h-3 w-3" />
               {isPending ? "Saving…" : "Save Notes"}
@@ -247,8 +247,8 @@ export default function BugsAdminClient({
             onClick={() => setFilter(tab.key)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
               filter === tab.key
-                ? "bg-[#c8952a]/10 text-[#c8952a] border-[#c8952a]/30"
-                : "text-[#787878] border-[#1a1a1a] hover:text-[#e8e8e8] hover:bg-[#111111]"
+                ? "bg-accent-primary/10 text-accent-primary border-[#c8952a]/30"
+                : "text-text-muted border-border-primary hover:text-text-primary hover:bg-background-card"
             }`}
           >
             {tab.label} <span className="text-xs opacity-60">({tab.count})</span>
@@ -259,7 +259,7 @@ export default function BugsAdminClient({
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <Bug className="h-10 w-10 text-[#333] mx-auto mb-3" />
-          <p className="text-[#787878] text-sm">No bug reports{filter !== "ALL" ? ` with status "${filter.toLowerCase()}"` : ""}.</p>
+          <p className="text-text-muted text-sm">No bug reports{filter !== "ALL" ? ` with status "${filter.toLowerCase()}"` : ""}.</p>
         </div>
       ) : (
         <div className="space-y-3">

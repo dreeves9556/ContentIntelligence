@@ -57,8 +57,8 @@ function ToolbarButton({
       title={title}
       className={`p-1.5 rounded text-sm transition-colors ${
         active
-          ? "bg-[#c8952a]/20 text-[#c8952a]"
-          : "text-[#787878] hover:text-[#e8e8e8] hover:bg-[#1a1a1a]"
+          ? "bg-accent-primary/20 text-accent-primary"
+          : "text-text-muted hover:text-text-primary hover:bg-background-secondary"
       } disabled:opacity-30 disabled:cursor-not-allowed`}
     >
       {children}
@@ -67,7 +67,7 @@ function ToolbarButton({
 }
 
 function Divider() {
-  return <span className="w-px h-5 bg-[#2a2a2a] mx-1 self-center" />;
+  return <span className="w-px h-5 bg-border-secondary mx-1 self-center" />;
 }
 
 export default function TiptapEditor({ content, onChange, placeholder }: TiptapEditorProps) {
@@ -78,7 +78,7 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder: placeholder ?? "Start writing…" }),
-      Link.configure({ openOnClick: false, HTMLAttributes: { class: "text-[#c8952a] underline" } }),
+      Link.configure({ openOnClick: false, HTMLAttributes: { class: "text-accent-primary underline" } }),
     ],
     content,
     onUpdate({ editor }) {
@@ -106,9 +106,9 @@ export default function TiptapEditor({ content, onChange, placeholder }: TiptapE
   if (!editor) return null;
 
   return (
-    <div className="border border-[#2a2a2a] rounded-lg overflow-hidden bg-[#0a0a0a]">
+    <div className="border border-border-primary rounded-lg overflow-hidden bg-background-secondary">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-[#2a2a2a] bg-[#111111]">
+      <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-border-primary bg-background-card">
         <ToolbarButton
           onAction={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive("bold")}

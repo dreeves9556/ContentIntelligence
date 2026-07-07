@@ -1,29 +1,67 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ───────────────────────────────────────────────
+   The Local Post — Light Editorial Palette (default)
+   ─────────────────────────────────────────────── */
 @theme {
-  --color-background-primary: #0a0a0a;
-  --color-background-secondary: #111111;
-  --color-background-card: #1a1a1a;
-  --color-accent-primary: #c8952a;
-  --color-text-primary: #e8e8e8;
-  --color-text-muted: #787878;
-  --color-brand-personal: #e8415a;
-  --color-brand-expert: #f5a623;
-  --color-brand-local: #0fcfe3;
+  --font-sans: var(--font-dm-sans), "DM Sans", sans-serif;
+  --font-serif: var(--font-playfair), "Playfair Display", serif;
+
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: #F7F9FC;
+  --color-background-card: #FFFFFF;
+  --color-accent-primary: #1E56D6;
+  --color-text-primary: #101418;
+  --color-text-muted: #5B6472;
+  --color-brand-personal: #C23E54;
+  --color-brand-expert: #B97300;
+  --color-brand-local: #0E7C7B;
+
+  --color-border-primary: #CBD5E1;
+  --color-border-secondary: #94A3B8;
+}
+
+/* ───────────────────────────────────────────────
+   Night Edition — Dark Mode Overrides
+   Premium editorial dark: deep charcoal, soft gray,
+   brighter blue for legibility against dark canvas.
+   ─────────────────────────────────────────────── */
+.dark {
+  --color-background-primary: #101418;
+  --color-background-secondary: #1A1F26;
+  --color-background-card: #222831;
+  --color-accent-primary: #2E5BFF;
+  --color-text-primary: #F7F9FC;
+  --color-text-muted: #8B95A5;
+  --color-brand-personal: #E85670;
+  --color-brand-expert: #F5A623;
+  --color-brand-local: #14B8C6;
+
+  --color-border-primary: #2A313C;
+  --color-border-secondary: #3A4250;
 }
 
 body {
   background: var(--color-background-primary);
   color: var(--color-text-primary);
+  font-family: var(--font-sans);
 }
 
-/* Rich text content — used in TiptapEditor and ResourcesTab article rendering */
+/* Editorial typography: all headings use Playfair Display serif */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+}
+
+/* ───────────────────────────────────────────────
+   Rich text content — TiptapEditor & ResourcesTab
+   Uses semantic tokens so it adapts to both themes.
+   ─────────────────────────────────────────────── */
 .tiptap-content h1,
 .tiptap-content h2,
 .tiptap-content h3,
 .tiptap-content h4 {
-  color: #e8e8e8;
+  color: var(--color-text-primary);
   font-weight: 700;
   line-height: 1.3;
   margin-top: 1.25em;
@@ -34,12 +72,12 @@ body {
 .tiptap-content h3 { font-size: 1.1rem; }
 
 .tiptap-content p {
-  color: #787878;
+  color: var(--color-text-muted);
   line-height: 1.75;
   margin-bottom: 0.75em;
 }
 
-.tiptap-content strong { color: #e8e8e8; font-weight: 700; }
+.tiptap-content strong { color: var(--color-text-primary); font-weight: 700; }
 .tiptap-content em { font-style: italic; }
 .tiptap-content s { text-decoration: line-through; }
 
@@ -47,43 +85,44 @@ body {
 .tiptap-content ol {
   padding-left: 1.5rem;
   margin-bottom: 0.75em;
-  color: #787878;
+  color: var(--color-text-muted);
 }
 .tiptap-content ul { list-style-type: disc; }
 .tiptap-content ol { list-style-type: decimal; }
 .tiptap-content li { margin-bottom: 0.25em; line-height: 1.7; }
-.tiptap-content li::marker { color: #c8952a; }
+.tiptap-content li::marker { color: var(--color-accent-primary); }
 
 .tiptap-content blockquote {
-  border-left: 3px solid #c8952a;
+  border-left: 3px solid var(--color-accent-primary);
   padding-left: 1rem;
   margin: 1rem 0;
-  color: #787878;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
 .tiptap-content hr {
   border: none;
-  border-top: 1px solid #1a1a1a;
+  border-top: 1px solid var(--color-border-primary);
   margin: 1.5rem 0;
 }
 
 .tiptap-content a {
-  color: #c8952a;
+  color: var(--color-accent-primary);
   text-decoration: underline;
 }
 
 .tiptap-content code {
-  background: #1a1a1a;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-border-primary);
   border-radius: 4px;
   padding: 0.1em 0.35em;
   font-size: 0.875em;
-  color: #e8e8e8;
+  color: var(--color-text-primary);
 }
 
 .tiptap-content pre {
-  background: #111111;
-  border: 1px solid #2a2a2a;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-border-primary);
   border-radius: 8px;
   padding: 1rem;
   overflow-x: auto;
@@ -92,12 +131,42 @@ body {
 .tiptap-content pre code {
   background: transparent;
   padding: 0;
+  border: none;
+}
+
+/* ───────────────────────────────────────────────
+   Entrance animations — subtle, purposeful, no bounce.
+   Per brand guide: 150–400ms, ease-in-out.
+   ─────────────────────────────────────────────── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-in-out both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-in-out both;
 }
 
 /* Tiptap placeholder */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #3a3a3a;
+  color: var(--color-text-muted);
+  opacity: 0.5;
   pointer-events: none;
   float: left;
   height: 0;

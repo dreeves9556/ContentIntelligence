@@ -21,32 +21,32 @@ export default async function AdminBugsPage() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1
-            className="text-3xl font-bold text-[#e8e8e8]"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            className="text-3xl font-bold text-text-primary"
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Bug Reports
           </h1>
-          <p className="text-[#787878] mt-1">
+          <p className="text-text-muted mt-1">
             Review user-submitted bug reports and update their status
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-lg border border-[#1a1a1a] self-start">
-          <Bug className="h-4 w-4 text-[#c8952a]" />
-          <span className="text-sm text-[#e8e8e8] font-medium">{reports.length} total</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-border-primary self-start">
+          <Bug className="h-4 w-4 text-accent-primary" />
+          <span className="text-sm text-text-primary font-medium">{reports.length} total</span>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] p-4">
-          <p className="text-xs text-[#787878] uppercase tracking-wider font-bold">Open</p>
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Open</p>
           <p className="text-2xl font-bold text-red-400 mt-1">{openCount}</p>
         </div>
-        <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] p-4">
-          <p className="text-xs text-[#787878] uppercase tracking-wider font-bold">Investigated</p>
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Investigated</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">{investigatedCount}</p>
         </div>
-        <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] p-4">
-          <p className="text-xs text-[#787878] uppercase tracking-wider font-bold">Solved</p>
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Solved</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">{solvedCount}</p>
         </div>
       </div>

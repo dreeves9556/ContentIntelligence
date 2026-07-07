@@ -39,12 +39,12 @@ export default function ChangePasswordForm() {
   }
 
   return (
-    <div className="rounded-xl border border-white/7 bg-background-card p-5">
+    <div className="rounded-xl border border-border-primary bg-background-card p-5">
       <div className="flex items-center gap-2 mb-4">
         <Lock className="h-4 w-4 text-accent-primary" />
         <h3
           className="text-lg font-semibold text-text-primary"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Change Password
         </h3>
@@ -98,8 +98,7 @@ export default function ChangePasswordForm() {
         <button
           type="submit"
           disabled={isPending || !currentPassword || !newPassword || !confirmPassword}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-          style={{ background: "#c8952a", color: "#0a0a0a" }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-accent-primary text-white transition-all hover:bg-accent-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isPending ? (
             <>
@@ -148,7 +147,7 @@ function PasswordField({
           disabled={disabled}
           autoComplete={autoComplete}
           required
-          className="w-full pr-10 px-3 py-2.5 bg-[#0a0a0a] border border-white/10 rounded-lg text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-primary/50 transition-colors text-sm"
+          className="w-full pr-10 px-3 py-2.5 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-primary/50 transition-colors text-sm"
         />
         <button
           type="button"

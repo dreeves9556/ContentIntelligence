@@ -28,9 +28,9 @@ import { format, isPast } from "date-fns";
 const PLANS: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
 
 const PLAN_STYLES: Record<UserPlan, string> = {
-  CALENDAR_ONLY: "text-[#787878] bg-[#1a1a1a] border-[#2a2a2a]",
+  CALENDAR_ONLY: "text-text-muted bg-background-secondary border-border-primary",
   CREATOR: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  PRO: "text-[#c8952a] bg-[#c8952a]/10 border-[#c8952a]/30",
+  PRO: "text-accent-primary bg-accent-primary/10 border-[#c8952a]/30",
 };
 
 interface InvitesClientProps {
@@ -90,50 +90,50 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
       {/* Header */}
       <div>
         <h1
-          className="text-3xl font-bold text-[#e8e8e8]"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          className="text-3xl font-bold text-text-primary"
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Bulk Invites
         </h1>
-        <p className="text-[#787878] mt-1">
+        <p className="text-text-muted mt-1">
           Send invitations to multiple clients at once and manage their subscription tiers
         </p>
       </div>
 
       {/* Bulk Invite Form */}
-      <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] overflow-hidden">
-        <div className="p-6 border-b border-[#1a1a1a]">
+      <div className="bg-background-card rounded-lg border border-border-primary overflow-hidden">
+        <div className="p-6 border-b border-border-primary">
           <h3
-            className="text-lg font-semibold text-[#e8e8e8]"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            className="text-lg font-semibold text-text-primary"
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Send Invitations
           </h3>
-          <p className="text-sm text-[#787878] mt-1">
+          <p className="text-sm text-text-muted mt-1">
             Paste email addresses separated by commas, spaces, or new lines. Accounts will be created with randomly generated passwords — copy the credentials to share with your clients.
           </p>
         </div>
 
         <form onSubmit={handleBulkInvite} className="p-6 space-y-5">
           <div>
-            <label className="block text-xs font-medium text-[#787878] uppercase tracking-wider mb-2">
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
               Email Addresses
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3.5 h-4 w-4 text-[#787878]" />
+              <Mail className="absolute left-3 top-3.5 h-4 w-4 text-text-muted" />
               <textarea
                 required
                 value={emails}
                 onChange={(e) => setEmails(e.target.value)}
                 placeholder="alice@example.com, bob@example.com, carol@example.com"
                 rows={4}
-                className="w-full pl-10 pr-4 py-3 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-[#e8e8e8] placeholder-[#3a3a3a] focus:outline-none focus:border-[#c8952a]/50 transition-colors text-sm resize-y"
+                className="w-full pl-10 pr-4 py-3 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-primary/50 transition-colors text-sm resize-y"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#787878] uppercase tracking-wider mb-2">
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
               Subscription Tier
             </label>
             <div className="flex flex-wrap gap-2">
@@ -145,7 +145,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                   className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
                     selectedPlan === p
                       ? PLAN_STYLES[p] + " ring-1 ring-[#c8952a]/30"
-                      : "text-[#787878] bg-[#0a0a0a] border-[#2a2a2a] hover:border-[#3a3a3a]"
+                      : "text-text-muted bg-background-secondary border-border-primary hover:border-accent-primary/40"
                   }`}
                 >
                   {PLAN_LABELS[p]}
@@ -164,7 +164,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
           <button
             type="submit"
             disabled={isPending || !emails.trim()}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#c8952a] hover:bg-[#c8952a]/90 disabled:opacity-60 disabled:cursor-not-allowed text-[#0a0a0a] font-medium rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
             {isPending ? (
               <>
@@ -196,7 +196,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
               )}
             </div>
 
-            <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg divide-y divide-[#1a1a1a]">
+            <div className="bg-background-secondary border border-border-primary rounded-lg divide-y divide-border-primary">
               {results.map((r, idx) => (
                 <div key={idx} className="flex items-center gap-3 p-3">
                   <div className="shrink-0">
@@ -206,7 +206,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                       <X className="h-4 w-4 text-red-400" />
                     )}
                   </div>
-                  <span className="text-sm text-[#e8e8e8] truncate flex-1">
+                  <span className="text-sm text-text-primary truncate flex-1">
                     {r.email}
                   </span>
                   {r.error && (
@@ -219,7 +219,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                       onClick={() => {
                         navigator.clipboard.writeText(`Email: ${r.email}\nPassword: ${r.password!}`);
                       }}
-                      className="text-[#787878] hover:text-[#c8952a] transition-colors shrink-0"
+                      className="text-text-muted hover:text-accent-primary transition-colors shrink-0"
                       title="Copy credentials"
                     >
                       <Copy className="h-3.5 w-3.5" />
@@ -233,15 +233,15 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
       </div>
 
       {/* Pending Invites — Tier Assignment */}
-      <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] overflow-hidden">
-        <div className="p-6 border-b border-[#1a1a1a]">
+      <div className="bg-background-card rounded-lg border border-border-primary overflow-hidden">
+        <div className="p-6 border-b border-border-primary">
           <h3
-            className="text-lg font-semibold text-[#e8e8e8]"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            className="text-lg font-semibold text-text-primary"
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Pending Invitations
           </h3>
-          <p className="text-sm text-[#787878] mt-1">
+          <p className="text-sm text-text-muted mt-1">
             Assign subscription tiers to invited clients before they register. Once they create an account, they&apos;ll appear in the Client Roster.
           </p>
         </div>
@@ -249,25 +249,25 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
         {invites.length === 0 ? (
           <div className="p-12 text-center">
             <Mail className="h-12 w-12 text-[#2a2a2a] mx-auto mb-4" />
-            <p className="text-[#787878]">No pending invitations</p>
-            <p className="text-xs text-[#3a3a3a] mt-1">
+            <p className="text-text-muted">No pending invitations</p>
+            <p className="text-xs text-text-muted/60 mt-1">
               Sent invites will appear here until the recipient registers
             </p>
           </div>
         ) : (
           <>
             {/* Mobile cards */}
-            <div className="sm:hidden divide-y divide-[#1a1a1a]">
+            <div className="sm:hidden divide-y divide-border-primary">
               {invites.map((invite) => {
                 const expired = isPast(new Date(invite.expiresAt));
                 return (
                   <div key={invite.id} className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium text-[#e8e8e8] truncate">
+                        <p className="font-medium text-text-primary truncate">
                           {invite.email}
                         </p>
-                        <p className="text-xs text-[#787878] flex items-center gap-1 mt-0.5">
+                        <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
                           <Clock className="h-3 w-3" />
                           {expired ? "Expired " : "Expires "}
                           {format(new Date(invite.expiresAt), "MMM d, yyyy")}
@@ -276,7 +276,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                       <button
                         onClick={() => handleDelete(invite.id)}
                         disabled={isPending}
-                        className="text-[#787878] hover:text-red-400 transition-colors shrink-0"
+                        className="text-text-muted hover:text-red-400 transition-colors shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -296,34 +296,34 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[#1a1a1a]">
-                    <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                  <tr className="border-b border-border-primary">
+                    <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                    <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                       Subscription Tier
                     </th>
-                    <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                    <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                    <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                       Expires
                     </th>
-                    <th className="text-right py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                    <th className="text-right py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1a1a1a]">
+                <tbody className="divide-y divide-border-primary">
                   {invites.map((invite) => {
                     const expired = isPast(new Date(invite.expiresAt));
                     return (
                       <tr
                         key={invite.id}
-                        className="hover:bg-[#1a1a1a]/50 transition-colors"
+                        className="hover:bg-background-secondary/50 transition-colors"
                       >
                         <td className="py-4 px-6">
-                          <span className="text-sm text-[#e8e8e8]">
+                          <span className="text-sm text-text-primary">
                             {invite.email}
                           </span>
                         </td>
@@ -352,7 +352,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                           </span>
                         </td>
                         <td className="py-4 px-6">
-                          <span className="text-sm text-[#787878]">
+                          <span className="text-sm text-text-muted">
                             {format(new Date(invite.expiresAt), "MMM d, yyyy")}
                           </span>
                         </td>
@@ -360,7 +360,7 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
                           <button
                             onClick={() => handleDelete(invite.id)}
                             disabled={isPending}
-                            className="inline-flex items-center gap-1.5 text-xs text-[#787878] hover:text-red-400 transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-red-400 transition-colors disabled:opacity-50"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             Revoke
@@ -423,7 +423,7 @@ function InvitePlanDropdown({
             onClick={() => setOpen(false)}
           />
           <div
-            className="fixed z-[9999] w-44 bg-[#111111] border border-[#2a2a2a] rounded-lg shadow-xl overflow-hidden"
+            className="fixed z-[9999] w-44 bg-background-card border border-border-primary rounded-lg shadow-xl overflow-hidden"
             style={{ top: dropdownPos.top, left: dropdownPos.left }}
           >
             {PLANS.map((p) => (
@@ -433,8 +433,8 @@ function InvitePlanDropdown({
                   setOpen(false);
                   if (p !== currentPlan) onChange(inviteId, p);
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-[#1a1a1a] ${
-                  p === currentPlan ? "text-[#e8e8e8]" : "text-[#787878]"
+                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-background-secondary ${
+                  p === currentPlan ? "text-text-primary" : "text-text-muted"
                 }`}
               >
                 <span
@@ -443,7 +443,7 @@ function InvitePlanDropdown({
                   {PLAN_LABELS[p]}
                 </span>
                 {p === currentPlan && (
-                  <Check className="w-3 h-3 text-[#c8952a]" />
+                  <Check className="w-3 h-3 text-accent-primary" />
                 )}
               </button>
             ))}

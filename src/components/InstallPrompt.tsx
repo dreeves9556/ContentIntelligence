@@ -110,7 +110,7 @@ export function InstallPrompt() {
             </p>
           ) : (
             <p className="text-xs text-text-muted truncate">
-              Install CoreOS for quick access from your home screen
+              Install The Local Post for quick access from your home screen
             </p>
           )}
         </div>

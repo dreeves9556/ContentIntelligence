@@ -13,8 +13,8 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 const ROLE_STYLES: Record<Role, string> = {
-  USER: "text-[#787878] bg-[#1a1a1a] border-[#2a2a2a]",
-  ADMIN: "text-[#c8952a] bg-[#c8952a]/10 border-[#c8952a]/20",
+  USER: "text-text-muted bg-background-secondary border-border-primary",
+  ADMIN: "text-accent-primary bg-accent-primary/10 border-[#c8952a]/20",
 };
 
 const ROLE_ICONS: Record<Role, React.ReactNode> = {
@@ -86,22 +86,22 @@ export default function RoleSwitcher({ userId, currentRole }: RoleSwitcherProps)
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div
-            className="fixed z-[9999] w-36 bg-[#111111] border border-[#2a2a2a] rounded-lg shadow-xl overflow-hidden"
+            className="fixed z-[9999] w-36 bg-background-card border border-border-primary rounded-lg shadow-xl overflow-hidden"
             style={{ top: dropdownPos.top, left: dropdownPos.left }}
           >
             {ROLES.map((r) => (
               <button
                 key={r}
                 onClick={() => handleSelect(r)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-[#1a1a1a] ${
-                  r === role ? "text-[#e8e8e8]" : "text-[#787878]"
+                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-background-secondary ${
+                  r === role ? "text-text-primary" : "text-text-muted"
                 }`}
               >
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${ROLE_STYLES[r]}`}>
                   {ROLE_ICONS[r]}
                   {ROLE_LABELS[r]}
                 </span>
-                {r === role && <Check className="w-3 h-3 text-[#c8952a]" />}
+                {r === role && <Check className="w-3 h-3 text-accent-primary" />}
               </button>
             ))}
           </div>

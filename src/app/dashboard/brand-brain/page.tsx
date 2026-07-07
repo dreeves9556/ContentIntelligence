@@ -26,7 +26,7 @@ export default async function BrandBrainPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h1 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
           Brand Brain
         </h1>
         <p className="text-text-muted text-sm mt-1">
@@ -35,15 +35,15 @@ export default async function BrandBrainPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="bg-background-secondary rounded-lg p-4 border border-background-primary">
+        <div className="bg-background-card rounded-lg p-4 border border-border-primary">
           <p className="text-2xl font-bold text-accent-primary">{totalCount}</p>
           <p className="text-xs text-text-muted mt-1">Total Memories</p>
         </div>
-        <div className="bg-background-secondary rounded-lg p-4 border border-background-primary">
+        <div className="bg-background-card rounded-lg p-4 border border-border-primary">
           <p className="text-2xl font-bold text-accent-primary">{pinnedCount}</p>
           <p className="text-xs text-text-muted mt-1">Pinned</p>
         </div>
-        <div className="bg-background-secondary rounded-lg p-4 border border-background-primary">
+        <div className="bg-background-card rounded-lg p-4 border border-border-primary">
           <p className="text-2xl font-bold text-accent-primary">{highConfidenceCount}</p>
           <p className="text-xs text-text-muted mt-1">High Confidence</p>
         </div>

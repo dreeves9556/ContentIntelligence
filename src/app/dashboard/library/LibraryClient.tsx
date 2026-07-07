@@ -20,7 +20,7 @@ function FormatBadge({ format }: { format: string }) {
     Carousel: { icon: Images, color: "text-blue-400 bg-blue-400/10 border-blue-400/30" },
     Static: { icon: FileText, color: "text-green-400 bg-green-400/10 border-green-400/30" },
   };
-  const entry = map[format] ?? { icon: FileText, color: "text-text-muted bg-background-secondary border-background-secondary" };
+  const entry = map[format] ?? { icon: FileText, color: "text-text-muted bg-background-secondary border-border-primary" };
   const Icon = entry.icon;
   return (
     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold ${entry.color}`}>
@@ -36,7 +36,7 @@ function BucketBadge({ bucket }: { bucket: string }) {
     Expert: { icon: GraduationCap, color: "text-brand-expert bg-brand-expert/10 border-brand-expert/30" },
     Local: { icon: MapPin, color: "text-brand-local bg-brand-local/10 border-brand-local/30" },
   };
-  const entry = map[bucket] ?? { icon: FileText, color: "text-text-muted bg-background-secondary border-background-secondary" };
+  const entry = map[bucket] ?? { icon: FileText, color: "text-text-muted bg-background-secondary border-border-primary" };
   const Icon = entry.icon;
   return (
     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold ${entry.color}`}>
@@ -48,9 +48,9 @@ function BucketBadge({ bucket }: { bucket: string }) {
 
 function DayDetail({ day }: { day: CalendarDay }) {
   return (
-    <div className="bg-background-card rounded-xl border border-background-secondary overflow-hidden">
+    <div className="bg-background-card rounded-xl border border-border-primary overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-background-secondary bg-gradient-to-r from-background-secondary/50 to-transparent">
+      <div className="p-4 border-b border-border-primary bg-gradient-to-r from-background-secondary/50 to-transparent">
         <div className="flex items-start justify-between gap-2 mb-3">
           <span className="text-xs font-bold tracking-wider text-text-muted uppercase">{day.day}</span>
           <div className="flex flex-wrap items-center gap-2 justify-end">
@@ -58,7 +58,7 @@ function DayDetail({ day }: { day: CalendarDay }) {
             <BucketBadge bucket={day.bucket} />
           </div>
         </div>
-        <h3 className="text-lg font-bold text-text-primary leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-lg font-bold text-text-primary leading-tight" style={{ fontFamily: "var(--font-serif)" }}>
           {day.title}
         </h3>
       </div>
@@ -89,7 +89,7 @@ function DayDetail({ day }: { day: CalendarDay }) {
       </div>
 
       {/* Footer */}
-      <div className="p-4 bg-background-secondary/30 border-t border-background-secondary space-y-3">
+      <div className="p-4 bg-background-secondary/30 border-t border-border-primary space-y-3">
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2 text-text-muted">
             <div className="flex items-center gap-2">
@@ -101,7 +101,7 @@ function DayDetail({ day }: { day: CalendarDay }) {
           <p className="text-xs text-text-muted leading-relaxed">{day.caption}</p>
         </div>
         {(day.musicSuggestion || day.duration) && (
-          <div className="flex flex-wrap gap-3 pt-2 border-t border-background-secondary/50">
+          <div className="flex flex-wrap gap-3 pt-2 border-t border-border-primary/50">
             {day.musicSuggestion && (
               <div className="flex items-center gap-1.5 text-xs text-text-muted">
                 <Music className="h-3.5 w-3.5 text-accent-primary" />
@@ -148,7 +148,7 @@ function WeekCard({ calendar }: { calendar: SavedCalendar }) {
   const staticCount = calendar.days.filter((d) => d.format === "Static").length;
 
   return (
-    <div className="bg-background-card rounded-xl border border-background-secondary overflow-hidden transition-all duration-300 hover:border-accent-primary/20">
+    <div className="bg-background-card rounded-xl border border-border-primary overflow-hidden transition-all duration-300 hover:border-accent-primary/20">
       {/* Week header — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -161,7 +161,7 @@ function WeekCard({ calendar }: { calendar: SavedCalendar }) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-bold text-text-primary" style={{ fontFamily: "var(--font-playfair)" }}>
+                <span className="text-base font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
                   Week {calendar.weekNumber}
                 </span>
                 <span className="text-xs text-text-muted bg-background-secondary px-2 py-0.5 rounded-full">
@@ -196,7 +196,7 @@ function WeekCard({ calendar }: { calendar: SavedCalendar }) {
 
       {/* Expanded week view */}
       {expanded && (
-        <div className="border-t border-background-secondary p-5 space-y-5">
+        <div className="border-t border-border-primary p-5 space-y-5">
           {/* Filters */}
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-1.5">
@@ -298,7 +298,7 @@ export default function LibraryClient({ calendars }: { calendars: SavedCalendar[
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by title, hook, bucket, or format…"
-          className="w-full pl-10 pr-4 py-2.5 bg-background-card border border-background-secondary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 text-sm"
+          className="w-full pl-10 pr-4 py-2.5 bg-background-card border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 text-sm"
         />
       </div>
 

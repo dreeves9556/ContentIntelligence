@@ -114,8 +114,8 @@ export function PushNotificationManager() {
 
   if (!isSupported) {
     return (
-      <div className="bg-background-card rounded-xl p-6 border border-background-secondary">
-        <h3 className="text-lg font-semibold text-white mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+      <div className="bg-background-card rounded-xl p-6 border border-border-primary">
+        <h3 className="text-lg font-semibold text-text-primary mb-2" style={{ fontFamily: "var(--font-serif)" }}>
           Push Notifications
         </h3>
         <p className="text-text-muted text-sm">
@@ -128,9 +128,9 @@ export function PushNotificationManager() {
   const isSubscribed = !!subscription || dbSubscribed;
 
   return (
-    <div className="bg-background-card rounded-xl p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-6 border border-border-primary">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
           Push Notifications
         </h3>
         {isSubscribed ? (
@@ -160,7 +160,7 @@ export function PushNotificationManager() {
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
               placeholder="Enter test message"
-              className="flex-1 px-4 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+              className="flex-1 px-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
             />
             <Button
               onClick={sendTestNotification}

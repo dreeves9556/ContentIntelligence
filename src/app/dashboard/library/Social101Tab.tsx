@@ -470,7 +470,7 @@ const CADENCE_REFERENCE = [
 
 function PlatformCard({ platform }: { platform: (typeof PLATFORMS)[number] }) {
   return (
-    <div className="bg-background-card rounded-2xl border border-background-secondary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 group flex flex-col">
+    <div className="bg-background-card rounded-2xl border border-border-primary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 group flex flex-col">
       {/* Top accent bar */}
       <div className={`h-1 w-full bg-gradient-to-r ${platform.gradient}`} />
 
@@ -520,7 +520,7 @@ function PlatformCard({ platform }: { platform: (typeof PLATFORMS)[number] }) {
         </div>
 
         {/* Pro tip */}
-        <div className="mt-auto pt-4 border-t border-background-secondary">
+        <div className="mt-auto pt-4 border-t border-border-primary">
           <p className="text-xs text-text-muted italic">
             <span className="not-italic font-semibold text-text-primary">Pro tip: </span>
             {platform.tip}
@@ -553,7 +553,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
             {platform.logo}
           </div>
           <div className="text-white">
-            <h3 className="text-2xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h3 className="text-2xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
               {platform.name}
             </h3>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm mt-1">
@@ -568,7 +568,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
         {platform.keyStats.map((stat, i) => (
           <div
             key={i}
-            className="bg-background-card rounded-xl border border-background-secondary p-4 text-center hover:border-accent-primary/30 transition-colors"
+            className="bg-background-card rounded-xl border border-border-primary p-4 text-center hover:border-accent-primary/30 transition-colors"
           >
             <p className="text-xl sm:text-2xl font-bold text-text-primary">
               {stat.value}
@@ -580,7 +580,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
 
       {/* Cadence + Content Mix */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="bg-background-card rounded-xl border border-background-secondary p-4 flex items-center gap-3">
+        <div className="bg-background-card rounded-xl border border-border-primary p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-background-secondary flex items-center justify-center shrink-0">
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2" style={{ color: platform.color }}>
               <circle cx="12" cy="12" r="10" />
@@ -592,7 +592,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
             <p className="text-sm text-text-primary font-semibold">{platform.cadence}</p>
           </div>
         </div>
-        <div className="bg-background-card rounded-xl border border-background-secondary p-4 flex items-center gap-3">
+        <div className="bg-background-card rounded-xl border border-border-primary p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-background-secondary flex items-center justify-center shrink-0">
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2" style={{ color: platform.color }}>
               <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -617,7 +617,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
             return (
               <div
                 key={i}
-                className="bg-background-card rounded-xl border border-background-secondary p-4 hover:border-accent-primary/30 transition-all duration-200"
+                className="bg-background-card rounded-xl border border-border-primary p-4 hover:border-accent-primary/30 transition-all duration-200"
               >
                 <div className="flex items-start gap-3">
                   <span className="text-xl font-bold text-text-muted/30 shrink-0 leading-none">
@@ -637,7 +637,7 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
       </div>
 
       {/* Pro tip callout */}
-      <div className="bg-background-card rounded-2xl border border-background-secondary px-6 py-5">
+      <div className="bg-background-card rounded-2xl border border-border-primary px-6 py-5">
         <div className="flex items-start gap-3">
           <span className="text-2xl shrink-0">💡</span>
           <div>
@@ -652,15 +652,15 @@ function PlatformDetail({ platform }: { platform: (typeof PLATFORMS)[number] }) 
 
 function FormatCard({ format }: { format: (typeof FORMATS)[number] }) {
   return (
-    <div className="bg-background-card rounded-2xl border border-background-secondary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 flex flex-col">
+    <div className="bg-background-card rounded-2xl border border-border-primary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 flex flex-col">
       {/* Header */}
-      <div className="p-6 pb-4 border-b border-background-secondary">
+      <div className="p-6 pb-4 border-b border-border-primary">
         <div className="flex items-center gap-3 mb-1">
           <span className="text-3xl" role="img" aria-label={format.name}>
             {format.emoji}
           </span>
           <div>
-            <h3 className="text-xl font-bold text-text-primary" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h3 className="text-xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
               {format.name}
             </h3>
             <p className="text-xs text-text-muted">{format.tagline}</p>
@@ -706,7 +706,7 @@ function FormatCard({ format }: { format: (typeof FORMATS)[number] }) {
 
 function AutoDmCard({ workflow }: { workflow: (typeof AUTO_DM_WORKFLOWS)[number] }) {
   return (
-    <div className="bg-background-card rounded-2xl border border-background-secondary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 group flex flex-col">
+    <div className="bg-background-card rounded-2xl border border-border-primary overflow-hidden hover:border-accent-primary/30 transition-all duration-300 group flex flex-col">
       <div className={`h-1 w-full bg-gradient-to-r ${workflow.gradient}`} />
       <div className="p-6 flex flex-col flex-1 gap-5">
         <div className="flex items-center gap-3">
@@ -737,7 +737,7 @@ function AutoDmCard({ workflow }: { workflow: (typeof AUTO_DM_WORKFLOWS)[number]
             ))}
           </ul>
         </div>
-        <div className="mt-auto pt-4 border-t border-background-secondary">
+        <div className="mt-auto pt-4 border-t border-border-primary">
           <p className="text-xs text-text-muted italic">
             <span className="not-italic font-semibold text-text-primary">Fallback: </span>
             {workflow.fallback}
@@ -768,7 +768,7 @@ export default function Social101Tab() {
           </div>
           <h2
             className="text-2xl font-bold text-text-primary mb-1"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Master the platforms. Own the algorithm.
           </h2>
@@ -828,7 +828,7 @@ export default function Social101Tab() {
           <div>
             <h3
               className="text-xl font-bold text-text-primary"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              style={{ fontFamily: "var(--font-serif)" }}
             >
               Growth Fundamentals
             </h3>
@@ -842,7 +842,7 @@ export default function Social101Tab() {
             {GROWTH_PRINCIPLES.map((p, i) => (
               <div
                 key={i}
-                className="bg-background-card rounded-2xl border border-background-secondary p-6 hover:border-accent-primary/30 transition-all duration-300"
+                className="bg-background-card rounded-2xl border border-border-primary p-6 hover:border-accent-primary/30 transition-all duration-300"
               >
                 <div className="flex items-start gap-3">
                   <span className="text-2xl shrink-0" role="img" aria-label={p.title}>
@@ -858,11 +858,11 @@ export default function Social101Tab() {
           </div>
 
           {/* Cadence reference table */}
-          <div className="bg-background-card rounded-2xl border border-background-secondary overflow-hidden">
-            <div className="p-6 pb-4 border-b border-background-secondary">
+          <div className="bg-background-card rounded-2xl border border-border-primary overflow-hidden">
+            <div className="p-6 pb-4 border-b border-border-primary">
               <h4
                 className="text-lg font-bold text-text-primary"
-                style={{ fontFamily: "var(--font-playfair)" }}
+                style={{ fontFamily: "var(--font-serif)" }}
               >
                 Posting Cadence Reference
               </h4>
@@ -873,7 +873,7 @@ export default function Social101Tab() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-background-secondary">
+                  <tr className="border-b border-border-primary">
                     <th className="text-left font-bold text-[10px] uppercase tracking-widest text-text-muted px-6 py-3">Platform</th>
                     <th className="text-left font-bold text-[10px] uppercase tracking-widest text-text-muted px-6 py-3">Cadence</th>
                     <th className="text-left font-bold text-[10px] uppercase tracking-widest text-text-muted px-6 py-3">Best Times</th>
@@ -883,7 +883,7 @@ export default function Social101Tab() {
                   {CADENCE_REFERENCE.map((row, i) => (
                     <tr
                       key={i}
-                      className="border-b border-background-secondary last:border-0 hover:bg-background-secondary/30 transition-colors"
+                      className="border-b border-border-primary last:border-0 hover:bg-background-secondary/30 transition-colors"
                     >
                       <td className="px-6 py-3 font-semibold text-text-primary">{row.platform}</td>
                       <td className="px-6 py-3 text-text-muted">{row.cadence}</td>
@@ -911,7 +911,7 @@ export default function Social101Tab() {
                   className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
                     isActive
                       ? "bg-background-card text-text-primary border-2"
-                      : "bg-background-card text-text-muted hover:text-text-primary border border-background-secondary"
+                      : "bg-background-card text-text-muted hover:text-text-primary border border-border-primary"
                   }`}
                   style={isActive ? { borderColor: p.color } : undefined}
                 >
@@ -939,7 +939,7 @@ export default function Social101Tab() {
           <div>
             <h3
               className="text-xl font-bold text-text-primary"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              style={{ fontFamily: "var(--font-serif)" }}
             >
               Format Masterclasses
             </h3>
@@ -960,7 +960,7 @@ export default function Social101Tab() {
           <div>
             <h3
               className="text-xl font-bold text-text-primary"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              style={{ fontFamily: "var(--font-serif)" }}
             >
               Auto DM Workflows
             </h3>

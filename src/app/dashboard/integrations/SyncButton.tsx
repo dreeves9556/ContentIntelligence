@@ -33,8 +33,7 @@ export default function SyncButton() {
       <button
         onClick={handleSync}
         disabled={status === "loading"}
-        className="flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-        style={{ background: "#c8952a", color: "#0a0a0a" }}
+        className="flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 bg-accent-primary text-white hover:bg-accent-primary/90"
       >
         <RefreshCw className={`h-4 w-4 ${status === "loading" ? "animate-spin" : ""}`} />
         <span className="hidden sm:inline">{status === "loading" ? "Syncing…" : "Sync Analytics"}</span>

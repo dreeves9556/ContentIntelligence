@@ -282,13 +282,13 @@ export async function adminResetPassword(
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const result = await resend.emails.send({
-      from: `Core OS <${fromAddress}>`,
+      from: `The Local Post <${fromAddress}>`,
       to: email,
-      subject: "Reset your Core OS password",
+      subject: "Reset your The Local Post password",
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#111111;color:#e8e8e8;border-radius:12px;overflow:hidden;">
           <div style="background:#0a0a0a;padding:32px 32px 24px;border-bottom:1px solid #1a1a1a;">
-            <p style="margin:0;font-size:22px;font-weight:700;color:#e8e8e8;">Core OS</p>
+            <p style="margin:0;font-size:22px;font-weight:700;color:#e8e8e8;">The Local Post</p>
             <p style="margin:4px 0 0;font-size:11px;font-weight:600;color:#c8952a;letter-spacing:0.1em;text-transform:uppercase;">Password Reset</p>
           </div>
           <div style="padding:32px;">

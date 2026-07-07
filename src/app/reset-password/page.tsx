@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Lock, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { resetPassword } from "@/app/login/password-reset-actions";
+import { RotatingTagline } from "@/components/RotatingTagline";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -49,21 +50,22 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background-primary px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background-secondary px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <Sparkles className="h-8 w-8 text-accent-primary" />
             <h1
-              className="text-3xl font-bold tracking-tight text-white"
-              style={{ fontFamily: "var(--font-playfair), 'Playfair Display', serif" }}
+              className="text-3xl font-bold tracking-tight text-text-primary"
+              style={{ fontFamily: "var(--font-serif)" }}
             >
-              Content Intelligence
+              The Local Post
             </h1>
           </div>
+          <RotatingTagline />
         </div>
 
-        <div className="bg-background-card rounded-lg p-8 border border-background-secondary">
+        <div className="bg-background-card rounded-lg p-8 border border-border-primary">
           {success ? (
             <div className="space-y-6">
               <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm">
@@ -82,8 +84,8 @@ function ResetPasswordForm() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <h2
-                  className="text-xl font-semibold text-white"
-                  style={{ fontFamily: "var(--font-playfair), 'Playfair Display', serif" }}
+                  className="text-xl font-semibold text-text-primary"
+                  style={{ fontFamily: "var(--font-serif), 'Playfair Display', serif" }}
                 >
                   Set New Password
                 </h2>
@@ -116,7 +118,7 @@ function ResetPasswordForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Min 8 chars, 1 letter & 1 number"
-                    className="w-full pl-10 pr-10 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all disabled:opacity-50"
+                    className="w-full pl-10 pr-10 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all disabled:opacity-50"
                     style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
                   />
                   <button
@@ -145,7 +147,7 @@ function ResetPasswordForm() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter your password"
-                    className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all disabled:opacity-50"
+                    className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all disabled:opacity-50"
                     style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
                   />
                 </div>

@@ -34,7 +34,7 @@ export default function LockedTabOverlay({
           </div>
           <h2
             className="text-xl font-bold text-text-primary mb-2"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             {featureName} Locked
           </h2>
@@ -50,8 +50,7 @@ export default function LockedTabOverlay({
             onClick={() => {
               /* TODO: wire to subscription upgrade flow */
             }}
-            className="w-full py-3 px-6 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-            style={{ background: "#c8952a", color: "#0a0a0a" }}
+            className="w-full py-3 px-6 rounded-xl text-sm font-bold transition-all hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
           >
             Upgrade Your Plan
           </button>

@@ -22,18 +22,18 @@ export default async function AdminResourcesPage() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1
-            className="text-3xl font-bold text-[#e8e8e8]"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            className="text-3xl font-bold text-text-primary"
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Resource Library
           </h1>
-          <p className="text-[#787878] mt-1">
+          <p className="text-text-muted mt-1">
             Publish articles, tools, and insights for your clients
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-lg border border-[#1a1a1a] self-start">
-          <BookOpen className="h-4 w-4 text-[#c8952a]" />
-          <span className="text-sm text-[#e8e8e8] font-medium">
+        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-border-primary self-start">
+          <BookOpen className="h-4 w-4 text-accent-primary" />
+          <span className="text-sm text-text-primary font-medium">
             {posts.filter((p) => p.published).length} published
           </span>
         </div>
@@ -45,7 +45,7 @@ export default async function AdminResourcesPage() {
       {/* Article management */}
       <div>
         <h2
-          className="text-xs font-bold tracking-wider text-[#787878] uppercase mb-4"
+          className="text-xs font-bold tracking-wider text-text-muted uppercase mb-4"
         >
           Articles
         </h2>

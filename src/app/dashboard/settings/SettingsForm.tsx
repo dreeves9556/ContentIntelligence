@@ -93,7 +93,7 @@ const INDUSTRY_QUESTIONS: Record<string, { key: string; label: string; placehold
 };
 
 const inputClass =
-  "w-full px-4 py-3 bg-background-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm";
+  "w-full px-4 py-3 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm";
 
 const textareaClass = inputClass + " resize-none";
 
@@ -128,7 +128,7 @@ function MultiSelect({
           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
             selected.includes(opt)
               ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
-              : "border-white/10 bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
+              : "border-border-primary bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
           }`}
         >
           {opt}
@@ -157,7 +157,7 @@ function RadioGroup({
           className={`px-5 py-2.5 rounded-lg text-sm font-medium border transition-all ${
             value === opt
               ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
-              : "border-white/10 bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
+              : "border-border-primary bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
           }`}
         >
           {opt}
@@ -176,8 +176,7 @@ function DaysSlider({ value, onChange }: { value: number; onChange: (v: number) 
         max={7}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full cursor-pointer"
-        style={{ accentColor: "#c8952a" }}
+        className="w-full accent-accent-primary cursor-pointer"
       />
       <div className="flex justify-between">
         {Array.from({ length: 7 }, (_, i) => (
@@ -211,19 +210,14 @@ function SectionHeading({
   return (
     <div className="flex items-start gap-3 mb-6">
       <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-        style={{
-          background: "rgba(200,149,42,0.15)",
-          color: "#c8952a",
-          border: "1px solid rgba(200,149,42,0.3)",
-        }}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold bg-accent-primary/15 text-accent-primary border border-accent-primary/30"
       >
         {letter}
       </span>
       <div>
         <h2
           className="text-lg font-bold text-text-primary"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           {title}
         </h2>
@@ -236,8 +230,7 @@ function SectionHeading({
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="rounded-2xl border p-6 sm:p-8 space-y-5"
-      style={{ background: "#111111", borderColor: "rgba(255,255,255,0.07)" }}
+      className="rounded-2xl border border-border-primary bg-background-card p-6 sm:p-8 space-y-5"
     >
       {children}
     </div>
@@ -412,7 +405,7 @@ export default function SettingsForm({
           }
         />
         {industryQuestions.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-text-muted text-sm rounded-xl border border-dashed border-white/10">
+          <div className="flex items-center justify-center py-10 text-text-muted text-sm rounded-xl border border-dashed border-border-primary">
             No industry selected — update Section A first.
           </div>
         ) : (
@@ -727,8 +720,7 @@ export default function SettingsForm({
           type="button"
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-60 hover:opacity-90"
-          style={{ background: "#c8952a", color: "#0a0a0a" }}
+          className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-60 hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
         >
           <Save className="h-4 w-4" />
           {isPending ? "Saving…" : "Save Changes"}

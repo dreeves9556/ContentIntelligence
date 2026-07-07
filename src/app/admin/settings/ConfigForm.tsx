@@ -189,12 +189,12 @@ export default function ConfigForm({
       )}
 
       {/* Zernio Section */}
-      <section className="bg-[#111111] rounded-lg p-6 border border-[#1a1a1a] space-y-5">
+      <section className="bg-background-card rounded-lg p-6 border border-border-primary space-y-5">
         <div>
-          <h2 className="text-lg font-semibold text-[#e8e8e8] mb-1">
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             Zernio Social Analytics
           </h2>
-          <p className="text-sm text-[#787878]">
+          <p className="text-sm text-text-muted">
             Configure the Zernio API key and which social platforms users can
             connect.
           </p>
@@ -202,7 +202,7 @@ export default function ConfigForm({
 
         {/* Zernio API Key */}
         <div>
-          <label className="block text-sm font-medium text-[#e8e8e8] mb-1.5">
+          <label className="block text-sm font-medium text-text-primary mb-1.5">
             Zernio API Key
           </label>
           <div className="flex items-center gap-2">
@@ -211,19 +211,19 @@ export default function ConfigForm({
               value={zernioApiKey}
               onChange={(e) => setZernioApiKey(e.target.value)}
               placeholder={envZernioKey ? "Using ZERNIO_API_KEY from env" : "Enter API key…"}
-              className="flex-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e8e8e8] placeholder:text-[#555] focus:border-[#c8952a] focus:outline-none"
+              className="flex-1 bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-accent-primary focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setShowZernioKey(!showZernioKey)}
-              className="px-3 py-2 text-xs font-medium text-[#787878] hover:text-[#e8e8e8] bg-[#1a1a1a] rounded-md border border-[#2a2a2a]"
+              className="px-3 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-background-secondary rounded-md border border-border-primary"
             >
               {showZernioKey ? "Hide" : "Show"}
             </button>
           </div>
           {envZernioKey && (
-            <p className="text-xs text-[#555] mt-1.5">
-              Env variable <code className="text-[#c8952a]">ZERNIO_API_KEY</code>{" "}
+            <p className="text-xs text-text-muted/60 mt-1.5">
+              Env variable <code className="text-accent-primary">ZERNIO_API_KEY</code>{" "}
               is set — this field overrides it if filled.
             </p>
           )}
@@ -231,7 +231,7 @@ export default function ConfigForm({
 
         {/* Enabled Platforms */}
         <div>
-          <label className="block text-sm font-medium text-[#e8e8e8] mb-2">
+          <label className="block text-sm font-medium text-text-primary mb-2">
             Enabled Platforms
           </label>
           <div className="flex flex-wrap gap-2">
@@ -242,22 +242,22 @@ export default function ConfigForm({
                 onClick={() => togglePlatform(p.value)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                   enabledPlatforms.includes(p.value)
-                    ? "bg-[#c8952a]/10 border-[#c8952a]/40 text-[#c8952a]"
-                    : "bg-[#0a0a0a] border-[#2a2a2a] text-[#787878] hover:border-[#3a3a3a]"
+                    ? "bg-accent-primary/10 border-[#c8952a]/40 text-accent-primary"
+                    : "bg-background-secondary border-border-primary text-text-muted hover:border-accent-primary/40"
                 }`}
               >
                 {p.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-[#555] mt-2">
+          <p className="text-xs text-text-muted/60 mt-2">
             Only enabled platforms will appear on the Integrations page.
           </p>
         </div>
 
         {/* Sync Frequency */}
         <div>
-          <label className="block text-sm font-medium text-[#e8e8e8] mb-1.5">
+          <label className="block text-sm font-medium text-text-primary mb-1.5">
             Analytics Sync Frequency (minutes)
           </label>
           <input
@@ -265,17 +265,17 @@ export default function ConfigForm({
             min={1}
             value={syncMinutes}
             onChange={(e) => setSyncMinutes(e.target.value)}
-            className="w-32 bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e8e8e8] focus:border-[#c8952a] focus:outline-none"
+            className="w-32 bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none"
           />
-          <p className="text-xs text-[#555] mt-1.5">
+          <p className="text-xs text-text-muted/60 mt-1.5">
             Minimum time between automatic analytics syncs per user. Users can
             still manually sync anytime.
           </p>
         </div>
 
         {/* Connected accounts info */}
-        <div className="flex items-center gap-2 text-xs text-[#555]">
-          <span className="px-2 py-1 bg-[#1a1a1a] rounded-md">
+        <div className="flex items-center gap-2 text-xs text-text-muted/60">
+          <span className="px-2 py-1 bg-background-secondary rounded-md">
             {connectedAccounts} connected account
             {connectedAccounts !== 1 ? "s" : ""} across all users
           </span>
@@ -283,12 +283,12 @@ export default function ConfigForm({
       </section>
 
       {/* AI Provider Section */}
-      <section className="bg-[#111111] rounded-lg p-6 border border-[#1a1a1a] space-y-5">
+      <section className="bg-background-card rounded-lg p-6 border border-border-primary space-y-5">
         <div>
-          <h2 className="text-lg font-semibold text-[#e8e8e8] mb-1">
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             AI Provider (Anthropic)
           </h2>
-          <p className="text-sm text-[#787878]">
+          <p className="text-sm text-text-muted">
             Configure the Anthropic model, API key, and prompt templates used
             for calendar generation and analytics insights.
           </p>
@@ -296,7 +296,7 @@ export default function ConfigForm({
 
         {/* Anthropic Model */}
         <div>
-          <label className="block text-sm font-medium text-[#e8e8e8] mb-1.5">
+          <label className="block text-sm font-medium text-text-primary mb-1.5">
             Model Name
           </label>
           <input
@@ -304,13 +304,13 @@ export default function ConfigForm({
             value={anthropicModel}
             onChange={(e) => setAnthropicModel(e.target.value)}
             placeholder="claude-opus-4-8"
-            className="w-full max-w-md bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e8e8e8] placeholder:text-[#555] focus:border-[#c8952a] focus:outline-none"
+            className="w-full max-w-md bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-accent-primary focus:outline-none"
           />
         </div>
 
         {/* Anthropic API Key */}
         <div>
-          <label className="block text-sm font-medium text-[#e8e8e8] mb-1.5">
+          <label className="block text-sm font-medium text-text-primary mb-1.5">
             Anthropic API Key
           </label>
           <div className="flex items-center gap-2">
@@ -323,20 +323,20 @@ export default function ConfigForm({
                   ? "Using ANTHROPIC_API_KEY from env"
                   : "Enter API key…"
               }
-              className="flex-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e8e8e8] placeholder:text-[#555] focus:border-[#c8952a] focus:outline-none"
+              className="flex-1 bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-accent-primary focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setShowAnthropicKey(!showAnthropicKey)}
-              className="px-3 py-2 text-xs font-medium text-[#787878] hover:text-[#e8e8e8] bg-[#1a1a1a] rounded-md border border-[#2a2a2a]"
+              className="px-3 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-background-secondary rounded-md border border-border-primary"
             >
               {showAnthropicKey ? "Hide" : "Show"}
             </button>
           </div>
           {envAnthropicKey && (
-            <p className="text-xs text-[#555] mt-1.5">
+            <p className="text-xs text-text-muted/60 mt-1.5">
               Env variable{" "}
-              <code className="text-[#c8952a]">ANTHROPIC_API_KEY</code> is set —
+              <code className="text-accent-primary">ANTHROPIC_API_KEY</code> is set —
               this field overrides it if filled.
             </p>
           )}
@@ -345,9 +345,9 @@ export default function ConfigForm({
         {/* Insight Prompt Template (locked) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[#e8e8e8] flex items-center gap-1.5">
+            <label className="text-sm font-medium text-text-primary flex items-center gap-1.5">
               Insight Prompt Template
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#787878] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-muted bg-background-secondary border border-border-primary rounded px-1.5 py-0.5">
                 <Lock className="h-3 w-3" /> Locked
               </span>
             </label>
@@ -356,25 +356,25 @@ export default function ConfigForm({
             value={initial.insightPromptTemplate ?? DEFAULT_INSIGHT_PROMPT}
             readOnly
             rows={8}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#787878] focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
+            className="w-full bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-xs text-text-muted focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
           />
-          <p className="text-xs text-[#555] mt-1.5">
+          <p className="text-xs text-text-muted/60 mt-1.5">
             Template for AI insights shown on the Analytics dashboard. Placeholders:{" "}
-            <code className="text-[#c8952a]">{"{{totalPosts}}"}</code>,{" "}
-            <code className="text-[#c8952a]">{"{{totalViews}}"}</code>,{" "}
-            <code className="text-[#c8952a]">{"{{avgEngagement}}"}</code>,{" "}
-            <code className="text-[#c8952a]">{"{{viewsTrend}}"}</code>,{" "}
-            <code className="text-[#c8952a]">{"{{formatSummary}}"}</code>,{" "}
-            <code className="text-[#c8952a]">{"{{topPosts}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=CoreOS%20Prompt%20Suggestion%3A%20Insight" className="text-[#c8952a] hover:underline">Suggest changes to the developer</a>.
+            <code className="text-accent-primary">{"{{totalPosts}}"}</code>,{" "}
+            <code className="text-accent-primary">{"{{totalViews}}"}</code>,{" "}
+            <code className="text-accent-primary">{"{{avgEngagement}}"}</code>,{" "}
+            <code className="text-accent-primary">{"{{viewsTrend}}"}</code>,{" "}
+            <code className="text-accent-primary">{"{{formatSummary}}"}</code>,{" "}
+            <code className="text-accent-primary">{"{{topPosts}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=The%20Local%20Post%20Prompt%20Suggestion%3A%20Insight" className="text-accent-primary hover:underline">Suggest changes to the developer</a>.
           </p>
         </div>
 
         {/* Calendar Prompt Template (locked) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[#e8e8e8] flex items-center gap-1.5">
+            <label className="text-sm font-medium text-text-primary flex items-center gap-1.5">
               Calendar Prompt Template
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#787878] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-muted bg-background-secondary border border-border-primary rounded px-1.5 py-0.5">
                 <Lock className="h-3 w-3" /> Locked
               </span>
             </label>
@@ -383,37 +383,37 @@ export default function ConfigForm({
             value={initial.calendarPromptTemplate ?? DEFAULT_CALENDAR_PROMPT}
             readOnly
             rows={12}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#787878] focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
+            className="w-full bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-xs text-text-muted focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
           />
-          <p className="text-xs text-[#555] mt-1.5">
+          <p className="text-xs text-text-muted/60 mt-1.5">
             Template for weekly calendar generation. Placeholders:{" "}
-            <code className="text-[#c8952a]">{"{{questionnaireAnswers}}"}</code>,
-            <code className="text-[#c8952a]">{"{{usedTitlesBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{deepDiveBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{goalBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{guardrailBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{voiceBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{offerBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{audienceBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{boundariesBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{personalContextBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{formattingBlock}}"}</code>,
-            <code className="text-[#c8952a]">{"{{daysToPost}}"}</code>,
-            <code className="text-[#c8952a]">{"{{currentDay}}"}</code>,
-            <code className="text-[#c8952a]">{"{{targetDays}}"}</code>,
-            <code className="text-[#c8952a]">{"{{formatMix}}"}</code>,
-            <code className="text-[#c8952a]">{"{{bucketDistribution}}"}</code>,
-            <code className="text-[#c8952a]">{"{{weekStarting}}"}</code>,
-            <code className="text-[#c8952a]">{"{{firstDay}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=CoreOS%20Prompt%20Suggestion%3A%20Calendar" className="text-[#c8952a] hover:underline">Suggest changes to the developer</a>.
+            <code className="text-accent-primary">{"{{questionnaireAnswers}}"}</code>,
+            <code className="text-accent-primary">{"{{usedTitlesBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{deepDiveBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{goalBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{guardrailBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{voiceBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{offerBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{audienceBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{boundariesBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{personalContextBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{formattingBlock}}"}</code>,
+            <code className="text-accent-primary">{"{{daysToPost}}"}</code>,
+            <code className="text-accent-primary">{"{{currentDay}}"}</code>,
+            <code className="text-accent-primary">{"{{targetDays}}"}</code>,
+            <code className="text-accent-primary">{"{{formatMix}}"}</code>,
+            <code className="text-accent-primary">{"{{bucketDistribution}}"}</code>,
+            <code className="text-accent-primary">{"{{weekStarting}}"}</code>,
+            <code className="text-accent-primary">{"{{firstDay}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=The%20Local%20Post%20Prompt%20Suggestion%3A%20Calendar" className="text-accent-primary hover:underline">Suggest changes to the developer</a>.
           </p>
         </div>
 
         {/* Calendar Strategy Prompt Template (locked) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[#e8e8e8] flex items-center gap-1.5">
+            <label className="text-sm font-medium text-text-primary flex items-center gap-1.5">
               Calendar Strategy Prompt Template
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#787878] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-muted bg-background-secondary border border-border-primary rounded px-1.5 py-0.5">
                 <Lock className="h-3 w-3" /> Locked
               </span>
             </label>
@@ -422,17 +422,17 @@ export default function ConfigForm({
             value={initial.calendarStrategyPromptTemplate ?? DEFAULT_CALENDAR_STRATEGY_PROMPT}
             readOnly
             rows={12}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-xs text-[#787878] focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
+            className="w-full bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-xs text-text-muted focus:outline-none font-mono resize-y cursor-not-allowed opacity-70"
           />
-          <p className="text-xs text-[#555] mt-1.5">
+          <p className="text-xs text-text-muted/60 mt-1.5">
             Template for the AI Strategy Note shown on the Content Calendar page.
             Placeholders:{" "}
-            <code className="text-[#c8952a]">{"{{weekStarting}}"}</code>,
-            <code className="text-[#c8952a]">{"{{formatMix}}"}</code>,
-            <code className="text-[#c8952a]">{"{{bucketMix}}"}</code>,
-            <code className="text-[#c8952a]">{"{{daySummary}}"}</code>,
-            <code className="text-[#c8952a]">{"{{primaryGoal}}"}</code>,
-            <code className="text-[#c8952a]">{"{{antiBrandWords}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=CoreOS%20Prompt%20Suggestion%3A%20Calendar%20Strategy" className="text-[#c8952a] hover:underline">Suggest changes to the developer</a>.
+            <code className="text-accent-primary">{"{{weekStarting}}"}</code>,
+            <code className="text-accent-primary">{"{{formatMix}}"}</code>,
+            <code className="text-accent-primary">{"{{bucketMix}}"}</code>,
+            <code className="text-accent-primary">{"{{daySummary}}"}</code>,
+            <code className="text-accent-primary">{"{{primaryGoal}}"}</code>,
+            <code className="text-accent-primary">{"{{antiBrandWords}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=The%20Local%20Post%20Prompt%20Suggestion%3A%20Calendar%20Strategy" className="text-accent-primary hover:underline">Suggest changes to the developer</a>.
           </p>
         </div>
       </section>

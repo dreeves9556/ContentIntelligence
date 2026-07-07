@@ -3,6 +3,7 @@ import { Playfair_Display, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { Analytics } from "@vercel/analytics/next";
 
 const playfair = Playfair_Display({
@@ -18,18 +19,18 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Content Intelligence Platform",
-  description: "Premium content strategy and analytics platform",
+  title: "The Local Post",
+  description: "Your town's front page for content strategy and social media intelligence.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "CoreOS",
+    statusBarStyle: "default",
+    title: "The Local Post",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#FFFFFF",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -43,13 +44,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${playfair.variable} ${dmSans.variable} h-full antialiased dark`}
+      className={`${playfair.variable} ${dmSans.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background-primary text-text-primary" suppressHydrationWarning>
-        <SessionProvider>
-          <ServiceWorkerRegister />
-          {children}
-        </SessionProvider>
+      <body className="min-h-full flex flex-col bg-background-primary text-text-primary">
+        <ThemeProvider>
+          <SessionProvider>
+            <ServiceWorkerRegister />
+            {children}
+          </SessionProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

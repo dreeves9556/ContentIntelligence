@@ -18,12 +18,12 @@ export default async function AdminSettingsPage() {
     <div className="space-y-8">
       <div>
         <h1
-          className="text-3xl font-bold text-[#e8e8e8]"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          className="text-3xl font-bold text-text-primary"
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Settings
         </h1>
-        <p className="text-[#787878] mt-1">
+        <p className="text-text-muted mt-1">
           Configure platform integrations and AI provider settings
         </p>
       </div>

@@ -57,7 +57,7 @@ export default function ZernioCard({
   };
 
   return (
-    <div className="bg-background-card rounded-xl border border-background-secondary p-6 hover:border-accent-primary/30 transition-colors">
+    <div className="bg-background-card rounded-xl border border-border-primary p-6 hover:border-accent-primary/30 transition-colors">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-xl ${iconBg}`}>{icon}</div>
@@ -75,7 +75,7 @@ export default function ZernioCard({
         )}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-background-secondary">
+      <div className="mt-6 pt-4 border-t border-border-primary">
         {isConnected ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -125,8 +125,7 @@ export default function ZernioCard({
           <button
             onClick={handleConnect}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ background: "#c8952a", color: "#0a0a0a" }}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 bg-accent-primary text-white hover:bg-accent-primary/90"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

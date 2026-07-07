@@ -29,6 +29,31 @@ const FETCH_TIMEOUT_MS = 4000;
 const MAX_ENTRIES_PER_FEED = 3;
 const MAX_TOTAL_HEADLINES = 10;
 
+const INDUSTRY_FEEDS: Record<string, RssFeedConfig[]> = {
+  "Real Estate": [
+    { name: "Inman News", url: "https://www.inman.com/feed/", category: "business" },
+    { name: "HousingWire", url: "https://www.housingwire.com/feed/", category: "business" },
+    { name: "Realtor Magazine", url: "https://magazine.realtor/feed", category: "content_marketing" },
+  ],
+  "Fitness / Personal Training": [
+    { name: "ACE Fitness Blog", url: "https://www.acefitness.org/blog/feed/", category: "content_marketing" },
+    { name: "Mindbody Green", url: "https://www.mindbodygreen.com/rss/feed", category: "creator_coaching" },
+  ],
+  "Financial Services": [
+    { name: "Financial Advisor Magazine", url: "https://www.fa-mag.com/rss.xml", category: "business" },
+    { name: "NerdWallet", url: "https://www.nerdwallet.com/blog/feed/", category: "content_marketing" },
+  ],
+  "Coaching / Consulting": [
+    { name: "Marie Forleo", url: "https://marieforleo.com/blog/feed/", category: "creator_coaching" },
+    { name: "Forbes Coaching Council", url: "https://www.forbes.com/sites/forbescoachescouncil/feed/", category: "creator_coaching" },
+  ],
+};
+
+export function getIndustryFeeds(industry: string | undefined): RssFeedConfig[] {
+  if (!industry) return [];
+  return INDUSTRY_FEEDS[industry] ?? [];
+}
+
 function extractItemTitles(xml: string, maxItems: number): string[] {
   const titles: string[] = [];
   const itemRegex = /<item[\s>][\s\S]*?<\/item>/gi;
@@ -60,7 +85,7 @@ async function fetchFeedHeadlines(feed: RssFeedConfig): Promise<TrendHeadline[]>
 
     const res = await fetch(feed.url, {
       signal: controller.signal,
-      headers: { "User-Agent": "CoreOS/1.0 RSS Reader", "Accept": "application/rss+xml, application/xml, text/xml" },
+      headers: { "User-Agent": "TheLocalPost/1.0 RSS Reader", "Accept": "application/rss+xml, application/xml, text/xml" },
       next: { revalidate: 3600 },
     });
 
@@ -77,8 +102,11 @@ async function fetchFeedHeadlines(feed: RssFeedConfig): Promise<TrendHeadline[]>
   }
 }
 
-export async function fetchTrendingHeadlines(): Promise<TrendHeadline[]> {
-  const results = await Promise.allSettled(TIER_1_FEEDS.map(fetchFeedHeadlines));
+export async function fetchTrendingHeadlines(industry?: string): Promise<TrendHeadline[]> {
+  const industryFeeds = getIndustryFeeds(industry);
+  const allFeeds = [...TIER_1_FEEDS, ...industryFeeds];
+
+  const results = await Promise.allSettled(allFeeds.map(fetchFeedHeadlines));
 
   const all: TrendHeadline[] = [];
   for (const result of results) {

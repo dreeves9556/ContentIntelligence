@@ -36,7 +36,7 @@ export default function ResetPasswordButton({ userId, userEmail }: ResetPassword
         onClick={handleClick}
         disabled={isPending || !userEmail}
         title={userEmail ? "Send password reset email" : "User has no email"}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-[#2a2a2a] bg-[#1a1a1a] text-[#787878] hover:text-[#e8e8e8] hover:border-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border-primary bg-background-secondary text-text-muted hover:text-text-primary hover:border-accent-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isPending ? (
           <Loader2 className="w-3 h-3 animate-spin" />

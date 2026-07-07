@@ -44,14 +44,14 @@ export default async function LibraryPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
             Content Library
           </h1>
           <p className="text-text-muted mt-1">
             Your post archive and coaching resources — all in one place
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-background-secondary self-start">
+        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-border-primary self-start">
           <BookOpen className="h-4 w-4 text-accent-primary" />
           <span className="text-sm text-text-primary font-medium">
             {calendars.length} week{calendars.length !== 1 ? "s" : ""} · {resourcePosts.length} article{resourcePosts.length !== 1 ? "s" : ""}

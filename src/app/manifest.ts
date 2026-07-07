@@ -2,13 +2,13 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Content Intelligence",
-    short_name: "CoreOS",
-    description: "Premium content strategy, analytics, and coaching platform",
+    name: "The Local Post",
+    short_name: "The Local Post",
+    description: "Your town's front page for content strategy and social media intelligence.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#0a0a0a",
-    theme_color: "#0a0a0a",
+    background_color: "#FFFFFF",
+    theme_color: "#FFFFFF",
     orientation: "portrait",
     scope: "/",
     icons: [

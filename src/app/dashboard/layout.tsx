@@ -24,6 +24,7 @@ import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/
 import { cn } from "@/lib/utils";
 import BugReportButton from "./bug-report/BugReportButton";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const ALL_NAV_ITEMS = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
@@ -63,7 +64,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="h-screen bg-background-primary overflow-hidden flex flex-col">
+    <div className="h-screen bg-background-secondary overflow-hidden flex flex-col">
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div
@@ -82,8 +83,8 @@ export default function DashboardLayout({
         <div className="flex items-center justify-between p-4 border-b border-background-primary">
           <div className="flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-accent-primary" />
-            <span className="font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
-              CIP
+            <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
+              The Local Post
             </span>
           </div>
           <button
@@ -144,12 +145,13 @@ export default function DashboardLayout({
             </Link>
           )}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-2">
-          <div className="px-3 py-2 flex items-center justify-between">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-3">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-text-muted">Plan</p>
               <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
             </div>
+            <ThemeToggle />
           </div>
           <BugReportButton />
           <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
@@ -162,11 +164,11 @@ export default function DashboardLayout({
       {/* Desktop layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-64 flex-col bg-background-secondary border-r border-background-primary shrink-0 overflow-y-auto">
-          <div className="flex items-center gap-2 p-6 border-b border-background-primary">
+        <aside className="hidden lg:flex w-64 flex-col bg-background-card border-r border-border-primary shrink-0 overflow-y-auto">
+          <div className="flex items-center gap-2 p-6 border-b border-border-primary">
             <Sparkles className="h-6 w-6 text-accent-primary" />
-            <span className="font-bold text-lg" style={{ fontFamily: "var(--font-playfair)" }}>
-              Content Intelligence
+            <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
+              The Local Post
             </span>
           </div>
           <nav className="flex-1 p-4 space-y-1">
@@ -219,10 +221,13 @@ export default function DashboardLayout({
               </Link>
             )}
           </nav>
-          <div className="p-4 border-t border-background-primary space-y-2">
-            <div className="px-3 py-2">
-              <p className="text-xs text-text-muted">Plan</p>
-              <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
+          <div className="p-4 border-t border-background-primary space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="px-1">
+                <p className="text-xs text-text-muted">Plan</p>
+                <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
+              </div>
+              <ThemeToggle />
             </div>
             <BugReportButton />
             <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
@@ -233,13 +238,13 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden overflow-y-auto">
+        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden overflow-y-auto bg-background-secondary">
           {/* Mobile header */}
-          <header className="lg:hidden flex items-center justify-between p-4 border-b border-background-secondary bg-background-primary/95 backdrop-blur">
+          <header className="lg:hidden flex items-center justify-between p-4 border-b border-border-primary bg-background-card/95 backdrop-blur">
             <div className="flex items-center gap-2">
               <Sparkles className="h-6 w-6 text-accent-primary" />
-              <span className="font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
-                Content Intelligence
+              <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
+                The Local Post
               </span>
             </div>
             <div className="flex items-center gap-2">

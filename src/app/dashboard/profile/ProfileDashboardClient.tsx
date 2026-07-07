@@ -19,6 +19,9 @@ import {
   BookOpen,
   Users,
   ClipboardList,
+  CalendarDays,
+  CalendarRange,
+  RefreshCw,
 } from "lucide-react";
 import { saveProfileSurvey, deleteProfileSurvey, updateOnboarding } from "./actions";
 import ChangePasswordForm from "./ChangePasswordForm";
@@ -46,6 +49,7 @@ interface ProfileSurveyRecord {
   id: string;
   surveyType: string;
   answersJson: Record<string, string>;
+  updatedAt?: string;
 }
 
 interface Props {
@@ -92,7 +96,7 @@ const CORE_FOUNDATION_DEF = {
   title: "Core Foundation",
   subtitle: "Your original onboarding answers — the backbone of your brand voice.",
   icon: ClipboardList,
-  color: "#c8952a",
+  color: "#1E56D6",
 };
 
 const DEEP_DIVE_SURVEYS: SurveyDef[] = [
@@ -159,10 +163,147 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
   },
 ];
 
+// ─── Time-based context surveys (weekly & monthly) ────────────────────────────
+
+interface TimedSurveyDef extends SurveyDef {
+  resetLabel: string;
+  isExpired: (updatedAt: string | undefined) => boolean;
+}
+
+function getLastSunday(date: Date = new Date()): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+function getFirstOfMonth(date: Date = new Date()): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  return d;
+}
+
+const WEEKLY_CONTEXT_DEF: TimedSurveyDef = {
+  type: "WEEKLY_CONTEXT",
+  title: "Weekly Context",
+  subtitle: "What's happening THIS week — refreshes every Sunday.",
+  icon: CalendarDays,
+  color: "#f59e0b",
+  resetLabel: "Resets every Sunday",
+  isExpired: (updatedAt) => {
+    if (!updatedAt) return true;
+    return new Date(updatedAt) < getLastSunday();
+  },
+  fields: [
+    { key: "personalHighlights", label: "What's happening personally this week?", placeholder: "Family stuff, social plans, things you're excited about outside of work..." },
+    { key: "professionalUpdates", label: "What's happening professionally this week?", placeholder: "Deals in motion, client meetings, projects, launches, deadlines..." },
+    { key: "newSpots", label: "Any new restaurants, hangouts, or spots you've discovered?", placeholder: "Tried a new coffee shop? Found a hidden trail? A new lunch spot?" },
+    { key: "winsMoments", label: "Any wins, stories, or moments worth sharing this week?", placeholder: "A client win, a funny moment, something that surprised you..." },
+    { key: "onYourMind", label: "What's on your mind this week that could spark content?", placeholder: "An opinion forming, a question you keep getting asked, a trend you're noticing..." },
+  ],
+};
+
+const MONTHLY_CONTEXT_BASE_FIELDS: SurveyField[] = [
+  { key: "monthlyTheme", label: "What's the big theme or focus for this month?", placeholder: "e.g., 'client success stories', 'behind-the-scenes month', 'myth-busting March'..." },
+  { key: "majorMilestones", label: "Any major milestones, launches, or events this month?", placeholder: "Anniversaries, product launches, big meetings, conferences, personal milestones..." },
+  { key: "newGoals", label: "New goals or priorities you're focused on this month?", placeholder: "What are you pushing toward that's different from last month?" },
+  { key: "businessChanges", label: "What's changing in your business this month?", placeholder: "New offerings, new team members, process changes, market shifts you're responding to..." },
+  { key: "travelPlans", label: "Any travel or personal plans this month that could inspire content?", placeholder: "Trips, events, seasonal activities, family plans..." },
+];
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// US holiday-specific fields by month (0-indexed)
+const HOLIDAY_FIELDS_BY_MONTH: Record<number, SurveyField[]> = {
+  0: [ // January — New Year's Day
+    { key: "newYearsPlans", label: "Any plans for New Year's Day?", placeholder: "Brunch, football, recovery, fresh starts..." },
+    { key: "newYearsTraditions", label: "How do you typically ring in the new year?", placeholder: "Annual traditions, resolutions, reflection rituals..." },
+    { key: "newYearsContent", label: "Any New Year's content ideas?", placeholder: "Goal-setting, fresh starts, year-in-review, predictions for the year ahead..." },
+  ],
+  1: [ // February — Valentine's Day, Presidents' Day
+    { key: "valentinesPlans", label: "Any Valentine's Day plans?", placeholder: "Date nights, gifts, Galentine's celebrations..." },
+    { key: "valentinesContent", label: "Any Valentine's Day content ideas?", placeholder: "Love, relationships, appreciation, anti-Valentine's takes..." },
+  ],
+  2: [ // March — St. Patrick's Day
+    { key: "stPatricksPlans", label: "Any St. Patrick's Day plans?", placeholder: "Parades, pub crawls, Irish food, family traditions..." },
+    { key: "stPatricksContent", label: "Any St. Patrick's Day content ideas?", placeholder: "Local events, Irish heritage, fun angles for your brand..." },
+  ],
+  3: [ // April — Easter
+    { key: "easterPlans", label: "Any Easter plans?", placeholder: "Family gatherings, egg hunts, brunch, church..." },
+    { key: "easterContent", label: "Any Easter content ideas?", placeholder: "Spring themes, renewal, family traditions, local Easter events..." },
+  ],
+  4: [ // May — Mother's Day, Memorial Day
+    { key: "mothersDayPlans", label: "Any Mother's Day plans?", placeholder: "Brunch, gifts, family time, honoring mom..." },
+    { key: "mothersDayContent", label: "Any Mother's Day content ideas?", placeholder: "Appreciation posts, mom stories, gift guides..." },
+    { key: "memorialDayPlans", label: "Any Memorial Day plans?", placeholder: "BBQs, beach, camping, the unofficial start of summer..." },
+    { key: "memorialDayContent", label: "Any Memorial Day content ideas?", placeholder: "Summer kickoff, gratitude, local events, remembrance..." },
+  ],
+  5: [ // June — Father's Day, Juneteenth
+    { key: "fathersDayPlans", label: "Any Father's Day plans?", placeholder: "BBQ, gifts, family time, honoring dad..." },
+    { key: "fathersDayContent", label: "Any Father's Day content ideas?", placeholder: "Dad stories, appreciation, gift guides..." },
+    { key: "juneteenthContent", label: "Any Juneteenth content ideas?", placeholder: "Reflection, education, celebration, community events..." },
+  ],
+  6: [ // July — Independence Day
+    { key: "july4Plans", label: "Any plans for Independence Day (July 4th)?", placeholder: "BBQs, fireworks, beach days, parades, family gatherings..." },
+    { key: "july4Traditions", label: "How do you typically celebrate the 4th?", placeholder: "Annual traditions, favorite fireworks spots, go-to BBQ recipes, host or attend..." },
+    { key: "july4Content", label: "Any July 4th content ideas?", placeholder: "Patriotic angles, local events, holiday-themed posts, what freedom means to you..." },
+  ],
+  7: [ // August — no major federal holidays, back-to-school season
+    { key: "backToSchool", label: "Any back-to-school season content ideas?", placeholder: "Fall prep, new routines, seasonal transitions, school-related angles for your brand..." },
+  ],
+  8: [ // September — Labor Day
+    { key: "laborDayPlans", label: "Any Labor Day plans?", placeholder: "Last summer hurrah, BBQ, beach, weekend trip..." },
+    { key: "laborDayContent", label: "Any Labor Day content ideas?", placeholder: "Summer wrap-up, fall transition, work ethic reflections, gratitude..." },
+  ],
+  9: [ // October — Halloween
+    { key: "halloweenPlans", label: "Any Halloween plans?", placeholder: "Costumes, parties, trick-or-treating, haunted houses..." },
+    { key: "halloweenContent", label: "Any Halloween content ideas?", placeholder: "Spooky themes, costumes, local events, scary stories, fun holiday angles..." },
+  ],
+  10: [ // November — Veterans Day, Thanksgiving
+    { key: "veteransDayContent", label: "Any Veterans Day content ideas?", placeholder: "Gratitude, service, reflection, honoring veterans..." },
+    { key: "thanksgivingPlans", label: "Any Thanksgiving plans?", placeholder: "Family gatherings, turkey, Friendsgiving, travel..." },
+    { key: "thanksgivingTraditions", label: "What are your Thanksgiving traditions?", placeholder: "The turkey fry, the gratitude circle, the football game, the leftovers..." },
+    { key: "thanksgivingContent", label: "Any Thanksgiving content ideas?", placeholder: "Gratitude posts, food content, family stories, what you're thankful for in business and life..." },
+  ],
+  11: [ // December — Christmas, Hanukkah, New Year's Eve
+    { key: "christmasPlans", label: "Any Christmas plans?", placeholder: "Family gatherings, gift exchanges, travel, traditions..." },
+    { key: "christmasTraditions", label: "What are your Christmas traditions?", placeholder: "Tree cutting, cookie baking, Christmas Eve dinner, morning rituals..." },
+    { key: "christmasContent", label: "Any Christmas content ideas?", placeholder: "Holiday themes, gift guides, year-in-review, seasonal tips, festive behind-the-scenes..." },
+    { key: "newYearsEvePlans", label: "Any New Year's Eve plans?", placeholder: "Parties, fireworks, quiet night in, reflections on the year..." },
+  ],
+};
+
+function getMonthlyContextDef(date: Date = new Date()): TimedSurveyDef {
+  const month = date.getMonth();
+  const monthName = MONTH_NAMES[month];
+  const holidayFields = HOLIDAY_FIELDS_BY_MONTH[month] ?? [];
+  return {
+    type: "MONTHLY_CONTEXT",
+    title: "Monthly Context",
+    subtitle: `Broad strokes for ${monthName} — refreshes on the 1st.`,
+    icon: CalendarRange,
+    color: "#8b5cf6",
+    resetLabel: "Resets on the 1st of each month",
+    isExpired: (updatedAt) => {
+      if (!updatedAt) return true;
+      return new Date(updatedAt) < getFirstOfMonth(date);
+    },
+    fields: [...MONTHLY_CONTEXT_BASE_FIELDS, ...holidayFields],
+  };
+}
+
+function getTimedSurveys(date: Date = new Date()): TimedSurveyDef[] {
+  return [WEEKLY_CONTEXT_DEF, getMonthlyContextDef(date)];
+}
+
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
 
 const inputClass =
-  "w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm resize-none";
+  "w-full px-4 py-3 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm resize-none";
 
 function StatusBanner({ status, error }: { status: "success" | "error" | null; error?: string }) {
   if (!status) return null;
@@ -237,7 +378,7 @@ function CoreFoundationPanel({ questionnaire }: { questionnaire: Props["question
             return (
               <div key={key} className={`space-y-1 ${(key === "personalStory" || key === "whatYouDo" || key === "antiBrandWords") ? "sm:col-span-2" : ""}`}>
                 <p className="text-xs font-medium text-text-muted">{label}</p>
-                <p className="text-sm text-text-primary leading-relaxed bg-[#0a0a0a] rounded-lg px-3 py-2 border border-white/5">
+                <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
                   {String(val)}
                 </p>
               </div>
@@ -246,13 +387,13 @@ function CoreFoundationPanel({ questionnaire }: { questionnaire: Props["question
           {c.primaryGoal && (
             <div className="space-y-1">
               <p className="text-xs font-medium text-text-muted">Primary Marketing Goal</p>
-              <p className="text-sm text-text-primary leading-relaxed bg-[#0a0a0a] rounded-lg px-3 py-2 border border-white/5">{String(c.primaryGoal)}</p>
+              <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">{String(c.primaryGoal)}</p>
             </div>
           )}
         </div>
         <button
           onClick={() => setIsEditing(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-white/15 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-border-primary text-text-muted hover:text-text-primary hover:border-border-secondary transition-colors"
         >
           <Pencil className="h-3.5 w-3.5" />
           Edit answers
@@ -289,15 +430,14 @@ function CoreFoundationPanel({ questionnaire }: { questionnaire: Props["question
       </div>
       <div className="flex flex-wrap gap-3 pt-1">
         {questionnaire && (
-          <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-white/10 hover:bg-white/5 transition-colors">
+          <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-border-primary hover:bg-background-secondary transition-colors">
             Cancel
           </button>
         )}
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold disabled:opacity-60 hover:opacity-90 transition-opacity"
-          style={{ background: "#c8952a", color: "#0a0a0a" }}
+          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold bg-accent-primary text-white disabled:opacity-60 hover:bg-accent-primary/90 transition-colors"
         >
           <Save className="h-3.5 w-3.5" />
           {isPending ? "Saving…" : "Save"}
@@ -367,7 +507,7 @@ function DeepDivePanel({
             return (
               <div key={field.key} className="space-y-1">
                 <p className="text-xs font-medium text-text-muted">{field.label}</p>
-                <p className="text-sm text-text-primary leading-relaxed bg-[#0a0a0a] rounded-lg px-3 py-2 border border-white/5">
+                <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
                   {answer}
                 </p>
               </div>
@@ -377,7 +517,7 @@ function DeepDivePanel({
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-white/15 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-border-primary text-text-muted hover:text-text-primary hover:border-border-secondary transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
             Edit answers
@@ -412,18 +552,120 @@ function DeepDivePanel({
       ))}
       <div className="flex flex-wrap gap-3 pt-1">
         {existing && (
-          <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-white/10 hover:bg-white/5 transition-colors">
+          <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-border-primary hover:bg-background-secondary transition-colors">
             Cancel
           </button>
         )}
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold disabled:opacity-60 hover:opacity-90 transition-opacity"
-          style={{ background: "#c8952a", color: "#0a0a0a" }}
+          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold bg-accent-primary text-white disabled:opacity-60 hover:bg-accent-primary/90 transition-colors"
         >
           <Save className="h-3.5 w-3.5" />
           {isPending ? "Saving…" : "Save Survey"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Timed survey inline panel (weekly/monthly context) ──────────────────────
+
+function TimedSurveyPanel({
+  survey,
+  existing,
+}: {
+  survey: TimedSurveyDef;
+  existing: ProfileSurveyRecord | undefined;
+}) {
+  const expired = survey.isExpired(existing?.updatedAt);
+  const [isEditing, setIsEditing] = useState(!existing || expired);
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    existing && !expired ? existing.answersJson : {},
+  );
+  const [isPending, startTransition] = useTransition();
+  const [status, setStatus] = useState<"success" | "error" | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSave = () => {
+    startTransition(async () => {
+      const result = await saveProfileSurvey(survey.type, answers);
+      if (result.success) {
+        setStatus("success");
+        setIsEditing(false);
+        setTimeout(() => setStatus(null), 3000);
+      } else {
+        setStatus("error");
+        setErrorMsg(result.error ?? "Unknown error");
+      }
+    });
+  };
+
+  if (!isEditing && existing && !expired) {
+    return (
+      <div className="pt-4 space-y-4">
+        <StatusBanner status={status} error={errorMsg} />
+        <div className="space-y-3">
+          {survey.fields.map((field) => {
+            const answer = answers[field.key] ?? existing.answersJson[field.key];
+            if (!answer) return null;
+            return (
+              <div key={field.key} className="space-y-1">
+                <p className="text-xs font-medium text-text-muted">{field.label}</p>
+                <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
+                  {answer}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-border-primary text-text-muted hover:text-text-primary hover:border-border-secondary transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Update answers
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-4 space-y-4">
+      <StatusBanner status={status} error={errorMsg} />
+      {expired && existing && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm">
+          <RefreshCw className="h-4 w-4 shrink-0" />
+          Your previous answers have expired ({survey.resetLabel}). Update them with what&apos;s happening now.
+        </div>
+      )}
+      {survey.fields.map((field) => (
+        <div key={field.key}>
+          <label className="block text-xs font-medium text-text-muted mb-1.5">{field.label}</label>
+          <textarea
+            rows={3}
+            placeholder={field.placeholder}
+            value={answers[field.key] ?? ""}
+            onChange={(e) => setAnswers((p) => ({ ...p, [field.key]: e.target.value }))}
+            className={inputClass}
+          />
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-3 pt-1">
+        {existing && !expired && (
+          <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-sm text-text-muted border border-border-primary hover:bg-background-secondary transition-colors">
+            Cancel
+          </button>
+        )}
+        <button
+          onClick={handleSave}
+          disabled={isPending}
+          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold bg-accent-primary text-white disabled:opacity-60 hover:bg-accent-primary/90 transition-colors"
+        >
+          <Save className="h-3.5 w-3.5" />
+          {isPending ? "Saving…" : "Save"}
         </button>
       </div>
     </div>
@@ -438,6 +680,7 @@ function AccordionRow({
   subtitle,
   color,
   isCompleted,
+  badge,
   children,
 }: {
   icon: React.ElementType;
@@ -445,38 +688,48 @@ function AccordionRow({
   subtitle: string;
   color: string;
   isCompleted: boolean;
+  badge?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-white/7 bg-[#111111] overflow-hidden">
+    <div className="rounded-2xl border border-border-primary bg-background-card overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left hover:bg-background-secondary/50 transition-colors"
       >
         <div className="shrink-0 p-2 sm:p-2.5 rounded-xl" style={{ background: `${color}20` }}>
           <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color }} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white text-sm" style={{ fontFamily: "var(--font-playfair)" }}>{title}</p>
+          <p className="font-semibold text-text-primary text-sm" style={{ fontFamily: "var(--font-serif)" }}>{title}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {badge && (
+            <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-background-secondary text-text-muted border border-border-primary sm:inline-flex">
+              {badge}
+            </span>
+          )}
           {isCompleted ? (
             <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/20 sm:inline-flex">
-              Completed
+              {badge ? "Current" : "Completed"}
+            </span>
+          ) : badge ? (
+            <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20 sm:inline-flex">
+              Expired
             </span>
           ) : (
-            <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-text-muted border border-white/10 sm:inline-flex">
+            <span className="hidden xs:inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-background-secondary text-text-muted border border-border-primary sm:inline-flex">
               Not started
             </span>
           )}
           {isCompleted ? (
             <CheckCircle2 className="h-4 w-4 text-green-400 sm:hidden" />
           ) : (
-            <div className="h-4 w-4 rounded-full border border-white/20 sm:hidden" />
+            <div className="h-4 w-4 rounded-full border border-border-secondary sm:hidden" />
           )}
           {open ? (
             <ChevronUp className="h-4 w-4 text-text-muted" />
@@ -487,7 +740,7 @@ function AccordionRow({
       </button>
 
       {open && (
-        <div className="border-t border-white/7 px-4 sm:px-5 pb-4 sm:pb-5">
+        <div className="border-t border-border-primary px-4 sm:px-5 pb-4 sm:pb-5">
           {children}
         </div>
       )}
@@ -510,7 +763,7 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
   return (
     <div className="max-w-2xl mx-auto lg:max-w-none lg:mx-0 space-y-4 sm:space-y-6">
       {/* ── Personal Info Header ── */}
-      <div className="rounded-2xl border border-white/7 bg-[#111111] p-4 sm:p-6">
+      <div className="rounded-2xl border border-border-primary bg-background-card p-4 sm:p-6">
         <div className="flex items-center gap-4 mb-5">
           {/* Avatar */}
           {session?.user?.image ? (
@@ -521,7 +774,7 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-white truncate" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h1 className="text-xl font-bold text-text-primary truncate" style={{ fontFamily: "var(--font-serif)" }}>
               {session?.user?.name ?? "Your Profile"}
             </h1>
             <p className="text-sm text-text-muted">{session?.user?.email}</p>
@@ -559,19 +812,19 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
           <div className="h-1.5 w-full rounded-full bg-background-secondary overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${Math.round((completedCount / totalCount) * 100)}%`, background: "#c8952a" }}
+              style={{ width: `${Math.round((completedCount / totalCount) * 100)}%`, background: "var(--color-accent-primary)" }}
             />
           </div>
           <p className="text-xs text-text-muted">The more you fill in below, the more bespoke your social posts become.</p>
         </div>
 
         {/* Change password */}
-        <div className="mt-5 pt-5 border-t border-white/7">
+        <div className="mt-5 pt-5 border-t border-border-primary">
           <ChangePasswordForm />
         </div>
 
         {/* Sign out */}
-        <div className="mt-5 pt-5 border-t border-white/7">
+        <div className="mt-5 pt-5 border-t border-border-primary">
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="flex items-center gap-2 text-sm text-red-400/70 hover:text-red-400 transition-colors"
@@ -616,6 +869,26 @@ export default function ProfileDashboardClient({ questionnaire, profileSurveys }
               isCompleted={!!existing}
             >
               <DeepDivePanel survey={survey} existing={existing} industry={industry} />
+            </AccordionRow>
+          );
+        })}
+
+        {/* Timed context surveys (weekly + monthly) */}
+        {getTimedSurveys().map((survey) => {
+          const existing = profileSurveys.find((s) => s.surveyType === survey.type);
+          const expired = survey.isExpired(existing?.updatedAt);
+          const isCurrent = !!existing && !expired;
+          return (
+            <AccordionRow
+              key={survey.type}
+              icon={survey.icon}
+              title={survey.title}
+              subtitle={survey.subtitle}
+              color={survey.color}
+              isCompleted={isCurrent}
+              badge={survey.resetLabel}
+            >
+              <TimedSurveyPanel survey={survey} existing={existing} />
             </AccordionRow>
           );
         })}

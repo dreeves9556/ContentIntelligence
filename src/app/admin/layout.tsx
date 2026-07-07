@@ -43,7 +43,7 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="h-screen bg-[#0a0a0a] overflow-hidden flex flex-col">
+    <div className="h-screen bg-background-secondary overflow-hidden flex flex-col">
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div
@@ -55,20 +55,20 @@ export default function AdminLayout({
       {/* Mobile navigation drawer */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-[#111111] transform transition-transform duration-200 ease-in-out lg:hidden border-r border-[#0a0a0a]",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-background-card transform transition-transform duration-200 ease-in-out lg:hidden border-r border-border-primary",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between p-4 border-b border-[#0a0a0a]">
+        <div className="flex items-center justify-between p-4 border-b border-border-primary">
           <div className="flex items-center gap-2">
-            <Crown className="h-6 w-6 text-[#c8952a]" />
-            <span className="font-bold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
-              Core OS
+            <Crown className="h-6 w-6 text-accent-primary" />
+            <span className="font-bold text-text-primary text-lg" style={{ fontFamily: "var(--font-serif)" }}>
+              The Local Post
             </span>
           </div>
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="p-2 rounded-md text-[#787878] hover:text-[#e8e8e8]"
+            className="p-2 rounded-md text-text-muted hover:text-text-primary"
           >
             <X className="h-5 w-5" />
           </button>
@@ -85,8 +85,8 @@ export default function AdminLayout({
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-[#c8952a]/10 text-[#c8952a]"
-                    : "text-[#787878] hover:text-[#e8e8e8] hover:bg-[#1a1a1a]"
+                    ? "bg-accent-primary/10 text-accent-primary"
+                    : "text-text-muted hover:text-text-primary hover:bg-background-secondary"
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -95,8 +95,8 @@ export default function AdminLayout({
             );
           })}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#0a0a0a]">
-          <Button variant="ghost" className="w-full justify-start text-[#787878] hover:text-[#e8e8e8]" onClick={handleLogout}>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border-primary">
+          <Button variant="ghost" className="w-full justify-start text-text-muted hover:text-text-primary" onClick={handleLogout}>
             <LogOut className="h-5 w-5 mr-2" />
             Sign Out
           </Button>
@@ -106,14 +106,14 @@ export default function AdminLayout({
       {/* Desktop layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-64 flex-col bg-[#111111] border-r border-[#0a0a0a] shrink-0 overflow-y-auto">
-          <div className="flex items-center gap-2 p-6 border-b border-[#0a0a0a]">
-            <Crown className="h-6 w-6 text-[#c8952a]" />
+        <aside className="hidden lg:flex w-64 flex-col bg-background-card border-r border-border-primary shrink-0 overflow-y-auto">
+          <div className="flex items-center gap-2 p-6 border-b border-border-primary">
+            <Crown className="h-6 w-6 text-accent-primary" />
             <div className="flex flex-col">
-              <span className="font-bold text-lg text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
-                Core OS
+              <span className="font-bold text-lg text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+                The Local Post
               </span>
-              <span className="text-xs text-[#c8952a] font-medium tracking-wider uppercase">Admin</span>
+              <span className="text-xs text-accent-primary font-medium tracking-wider uppercase">Admin</span>
             </div>
           </div>
           <nav className="flex-1 p-4 space-y-1">
@@ -127,8 +127,8 @@ export default function AdminLayout({
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-[#c8952a]/10 text-[#c8952a]"
-                      : "text-[#787878] hover:text-[#e8e8e8] hover:bg-[#1a1a1a]"
+                      ? "bg-accent-primary/10 text-accent-primary"
+                      : "text-text-muted hover:text-text-primary hover:bg-background-secondary"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -137,12 +137,12 @@ export default function AdminLayout({
               );
             })}
           </nav>
-          <div className="p-4 border-t border-[#0a0a0a]">
+          <div className="p-4 border-t border-border-primary">
             <div className="px-3 py-2 mb-2">
-              <p className="text-xs text-[#787878]">Signed in as</p>
-              <p className="text-sm font-medium text-[#e8e8e8]">{session?.user?.name || session?.user?.email || "Admin"}</p>
+              <p className="text-xs text-text-muted">Signed in as</p>
+              <p className="text-sm font-medium text-text-primary">{session?.user?.name || session?.user?.email || "Admin"}</p>
             </div>
-            <Button variant="ghost" className="w-full justify-start text-[#787878] hover:text-[#e8e8e8]" onClick={handleLogout}>
+            <Button variant="ghost" className="w-full justify-start text-text-muted hover:text-text-primary" onClick={handleLogout}>
               <LogOut className="h-5 w-5 mr-2" />
               Sign Out
             </Button>
@@ -150,21 +150,21 @@ export default function AdminLayout({
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 flex flex-col overflow-y-auto bg-background-secondary">
           {/* Mobile header */}
-          <header className="lg:hidden flex items-center justify-between p-4 border-b border-[#111111] bg-[#0a0a0a]/95 backdrop-blur">
+          <header className="lg:hidden flex items-center justify-between p-4 border-b border-border-primary bg-background-card/95 backdrop-blur">
             <div className="flex items-center gap-2">
-              <Crown className="h-6 w-6 text-[#c8952a]" />
+              <Crown className="h-6 w-6 text-accent-primary" />
               <div className="flex flex-col">
-                <span className="font-bold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
-                  Core OS
+                <span className="font-bold text-text-primary text-lg" style={{ fontFamily: "var(--font-serif)" }}>
+                  The Local Post
                 </span>
-                <span className="text-[10px] text-[#c8952a] font-medium tracking-wider uppercase">Admin</span>
+                <span className="text-[10px] text-accent-primary font-medium tracking-wider uppercase">Admin</span>
               </div>
             </div>
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="p-2 rounded-md text-[#787878] hover:text-[#e8e8e8]"
+              className="p-2 rounded-md text-text-muted hover:text-text-primary"
             >
               <Menu className="h-6 w-6" />
             </button>

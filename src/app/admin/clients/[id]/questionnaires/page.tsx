@@ -34,16 +34,16 @@ function formatLabel(key: string): string {
 
 function renderValue(value: any): React.ReactNode {
   if (value === null || value === undefined) {
-    return <span className="text-[#787878] italic">Not answered</span>;
+    return <span className="text-text-muted italic">Not answered</span>;
   }
   if (Array.isArray(value)) {
-    if (value.length === 0) return <span className="text-[#787878] italic">None selected</span>;
+    if (value.length === 0) return <span className="text-text-muted italic">None selected</span>;
     return (
       <ul className="space-y-1">
         {value.map((item, idx) => (
           <li key={idx} className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-[#c8952a] rounded-full" />
-            <span className="text-[#e8e8e8]">{String(item)}</span>
+            <span className="w-1.5 h-1.5 bg-accent-primary rounded-full" />
+            <span className="text-text-primary">{String(item)}</span>
           </li>
         ))}
       </ul>
@@ -58,24 +58,24 @@ function renderValue(value: any): React.ReactNode {
   }
   if (typeof value === "object") {
     return (
-      <div className="space-y-3 pl-4 border-l-2 border-[#2a2a2a]">
+      <div className="space-y-3 pl-4 border-l-2 border-border-primary">
         {Object.entries(value).map(([subKey, subValue]) => (
           <div key={subKey}>
-            <span className="text-xs text-[#787878] uppercase tracking-wider">{formatLabel(subKey)}</span>
+            <span className="text-xs text-text-muted uppercase tracking-wider">{formatLabel(subKey)}</span>
             <div className="mt-1">{renderValue(subValue)}</div>
           </div>
         ))}
       </div>
     );
   }
-  return <span className="text-[#e8e8e8]">{String(value)}</span>;
+  return <span className="text-text-primary">{String(value)}</span>;
 }
 
 function QuestionnaireAnswers({ content }: { content: any }) {
   if (!content || typeof content !== "object") {
     return (
-      <div className="bg-[#0a0a0a] rounded-lg p-4 border border-[#1a1a1a]">
-        <pre className="text-sm text-[#e8e8e8] overflow-x-auto whitespace-pre-wrap">
+      <div className="bg-background-secondary rounded-lg p-4 border border-border-primary">
+        <pre className="text-sm text-text-primary overflow-x-auto whitespace-pre-wrap">
           {JSON.stringify(content, null, 2)}
         </pre>
       </div>
@@ -87,8 +87,8 @@ function QuestionnaireAnswers({ content }: { content: any }) {
   return (
     <div className="space-y-4">
       {entries.map(([key, value]) => (
-        <div key={key} className="bg-[#0a0a0a] rounded-lg p-4 border border-[#1a1a1a]">
-          <h5 className="text-xs font-medium text-[#c8952a] uppercase tracking-wider mb-2">
+        <div key={key} className="bg-background-secondary rounded-lg p-4 border border-border-primary">
+          <h5 className="text-xs font-medium text-accent-primary uppercase tracking-wider mb-2">
             {formatLabel(key)}
           </h5>
           <div className="mt-1">{renderValue(value)}</div>
@@ -105,18 +105,18 @@ function QuestionnaireCard({ questionnaire }: { questionnaire: any }) {
     : questionnaire.content;
 
   return (
-    <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] overflow-hidden">
-      <div className="p-6 border-b border-[#1a1a1a]">
+    <div className="bg-background-card rounded-lg border border-border-primary overflow-hidden">
+      <div className="p-6 border-b border-border-primary">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             {questionnaire.title}
           </h3>
-          <span className="text-xs text-[#787878]">
+          <span className="text-xs text-text-muted">
             {format(new Date(questionnaire.createdAt), "MMM d, yyyy 'at' h:mm a")}
           </span>
         </div>
         {questionnaire.description && (
-          <p className="text-sm text-[#787878] mt-1">{questionnaire.description}</p>
+          <p className="text-sm text-text-muted mt-1">{questionnaire.description}</p>
         )}
         <div className="flex items-center gap-2 mt-3">
           <span
@@ -132,7 +132,7 @@ function QuestionnaireCard({ questionnaire }: { questionnaire: any }) {
       </div>
 
       <div className="p-6">
-        <h4 className="text-sm font-medium text-[#c8952a] mb-4 uppercase tracking-wider">
+        <h4 className="text-sm font-medium text-accent-primary mb-4 uppercase tracking-wider">
           Questionnaire Answers
         </h4>
         <QuestionnaireAnswers content={content} />
@@ -154,7 +154,7 @@ export default async function ClientQuestionnairesPage({ params }: PageProps) {
       {/* Back Link */}
       <Link
         href="/admin"
-        className="inline-flex items-center gap-2 text-[#787878] hover:text-[#e8e8e8] transition-colors"
+        className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Client Roster
@@ -162,14 +162,14 @@ export default async function ClientQuestionnairesPage({ params }: PageProps) {
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-        <div className="h-16 w-16 bg-[#c8952a]/10 rounded-full flex items-center justify-center text-[#c8952a] text-xl font-medium">
+        <div className="h-16 w-16 bg-accent-primary/10 rounded-full flex items-center justify-center text-accent-primary text-xl font-medium">
           {user.name?.split(" ").map((n) => n[0]).join("") || user.email?.[0]?.toUpperCase() || "?"}
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h1 className="text-3xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             {user.name || "Unnamed User"}
           </h1>
-          <div className="flex items-center gap-4 mt-1 text-sm text-[#787878]">
+          <div className="flex items-center gap-4 mt-1 text-sm text-text-muted">
             <span className="flex items-center gap-1.5">
               <User className="h-4 w-4" />
               {user.email}
@@ -185,19 +185,19 @@ export default async function ClientQuestionnairesPage({ params }: PageProps) {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#111111] rounded-lg p-4 border border-[#1a1a1a]">
-          <p className="text-sm text-[#787878]">Total Questionnaires</p>
-          <p className="text-2xl font-bold text-[#e8e8e8] mt-1">{user.questionnaires.length}</p>
+        <div className="bg-background-card rounded-lg p-4 border border-border-primary">
+          <p className="text-sm text-text-muted">Total Questionnaires</p>
+          <p className="text-2xl font-bold text-text-primary mt-1">{user.questionnaires.length}</p>
         </div>
-        <div className="bg-[#111111] rounded-lg p-4 border border-[#1a1a1a]">
-          <p className="text-sm text-[#787878]">Published</p>
-          <p className="text-2xl font-bold text-[#e8e8e8] mt-1">
+        <div className="bg-background-card rounded-lg p-4 border border-border-primary">
+          <p className="text-sm text-text-muted">Published</p>
+          <p className="text-2xl font-bold text-text-primary mt-1">
             {user.questionnaires.filter((q) => q.isPublished).length}
           </p>
         </div>
-        <div className="bg-[#111111] rounded-lg p-4 border border-[#1a1a1a]">
-          <p className="text-sm text-[#787878]">Drafts</p>
-          <p className="text-2xl font-bold text-[#e8e8e8] mt-1">
+        <div className="bg-background-card rounded-lg p-4 border border-border-primary">
+          <p className="text-sm text-text-muted">Drafts</p>
+          <p className="text-2xl font-bold text-text-primary mt-1">
             {user.questionnaires.filter((q) => !q.isPublished).length}
           </p>
         </div>
@@ -205,14 +205,14 @@ export default async function ClientQuestionnairesPage({ params }: PageProps) {
 
       {/* Questionnaires List */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h2 className="text-xl font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
           Questionnaires
         </h2>
 
         {user.questionnaires.length === 0 ? (
-          <div className="bg-[#111111] rounded-lg p-12 border border-[#1a1a1a] text-center">
+          <div className="bg-background-card rounded-lg p-12 border border-border-primary text-center">
             <FileText className="h-12 w-12 text-[#2a2a2a] mx-auto mb-4" />
-            <p className="text-[#787878]">No questionnaires found for this user</p>
+            <p className="text-text-muted">No questionnaires found for this user</p>
           </div>
         ) : (
           <div className="space-y-6">

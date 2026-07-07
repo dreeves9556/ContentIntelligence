@@ -36,6 +36,21 @@ import {
 import { getRelevantMemories, touchMemories } from "@/lib/memory/memory-service";
 import { summarizeMemoriesForPrompt } from "@/lib/memory/memory-summarizer";
 import { runLearningPipeline, learnFromFeedback } from "@/lib/memory/memory-builder";
+import {
+  buildUsedHooksBlock,
+  buildArchetypeHistoryBlock,
+  buildThemesExploredBlock,
+  buildCreativeConstraintsBlock,
+  buildVariationDirectiveBlock,
+  buildAnecdoteCooldownBlock,
+  buildContentGapBlock,
+  buildTemporalContextBlock,
+  buildAudienceFatigueBlock,
+  buildArcDirectiveBlock,
+  type ArchivePostForFreshness,
+  type QuestionnaireMaterial,
+  type AnalyticsRowForFatigue,
+} from "@/lib/freshness";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -102,7 +117,7 @@ ${lines.join("\n")}
 </best_posting_times>`;
 }
 
-export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
+export async function getWeeklyCalendar(): Promise<(WeeklyCalendar & { updatedAt: string }) | null> {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -119,7 +134,7 @@ export async function getWeeklyCalendar(): Promise<WeeklyCalendar | null> {
   }
 
   const content = calendar.contentJson as unknown as WeeklyCalendar;
-  return content;
+  return { ...content, updatedAt: calendar.updatedAt.toISOString() };
 }
 
 export async function generateCalendarStrategy(
@@ -295,16 +310,26 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     select: { surveyType: true, answersJson: true },
   });
 
+  // #1: Expanded lookback for power users — scale with generation count
+  // First, count total archived posts to determine lookback window
+  const totalArchivedCount = await prisma.contentArchive.count({
+    where: { userId: session.user.id },
+  });
+  const archiveTake = Math.min(Math.max(50, Math.ceil(totalArchivedCount / 100) * 50), 200);
+
   const recentArchived = await prisma.contentArchive.findMany({
     where: { userId: session.user.id },
     orderBy: { archivedAt: "desc" },
-    take: 50,
-    select: { title: true, format: true, bucket: true, caption: true, hook: true },
+    take: archiveTake,
+    select: { title: true, format: true, bucket: true, caption: true, hook: true, weekStarting: true },
   });
+
+  // Count distinct weeks to estimate generation count
+  const generationCount = new Set(recentArchived.map((p) => p.weekStarting)).size;
 
   const [config, trendHeadlines] = await Promise.all([
     getPlatformConfig(),
-    fetchTrendingHeadlines(),
+    fetchTrendingHeadlines(answers.industry),
   ]);
   const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
   if (!apiKey) {
@@ -316,6 +341,56 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 
   const usedTitlesXml = buildUsedTitlesBlock(recentArchived.map((p: { title: string }) => p.title));
   const trendingTopicsBlock = buildTrendingTopicsBlock(trendHeadlines);
+
+  // Freshness blocks — combat staleness on repeated calendar generations
+  const freshnessPosts: ArchivePostForFreshness[] = recentArchived.map((p) => ({
+    title: p.title,
+    hook: p.hook,
+    bucket: p.bucket,
+    format: p.format,
+    weekStarting: p.weekStarting,
+  }));
+  const usedHooksBlock = buildUsedHooksBlock(freshnessPosts);
+  const archetypeHistoryBlock = buildArchetypeHistoryBlock(freshnessPosts);
+  const themesExploredBlock = buildThemesExploredBlock(freshnessPosts);
+  const creativeConstraintsBlock = buildCreativeConstraintsBlock();
+  const variationDirectiveBlock = buildVariationDirectiveBlock(generationCount);
+
+  // #2: Anecdote cooldown — extract questionnaire/survey material and check usage
+  const questionnaireMaterial: QuestionnaireMaterial[] = [
+    { label: "Personal Story", value: answers.personalStory },
+    { label: "Recent Win", value: answers.recentWin },
+    { label: "Hot Takes", value: answers.hotTakes },
+    { label: "Morning Routine", value: answers.morningRoutine },
+    { label: "FAQ Top 3", value: answers.faqTop3 },
+    { label: "Numbers That Impress", value: answers.numbersThatImpress },
+    { label: "Seasonal Rhythm", value: answers.seasonalRhythm },
+    { label: "Upcoming Events", value: answers.upcomingEvents },
+    { label: "Family Context", value: answers.familyContext },
+    { label: "Content Boundaries", value: answers.contentBoundaries },
+  ];
+  // Add industry-branched answers
+  if (answers.industryAnswers) {
+    for (const [key, value] of Object.entries(answers.industryAnswers)) {
+      if (typeof value === "string" && value.trim().length > 10) {
+        questionnaireMaterial.push({ label: `Industry: ${key}`, value });
+      }
+    }
+  }
+  const anecdoteCooldownBlock = buildAnecdoteCooldownBlock(questionnaireMaterial, freshnessPosts);
+
+  // #3: Content gap analysis — find untapped questionnaire material
+  const contentGapBlock = buildContentGapBlock(questionnaireMaterial, freshnessPosts);
+
+  // #6: Temporal context — current date, season, upcoming holidays
+  const temporalContextBlock = buildTemporalContextBlock();
+
+  // #5 + #7: Weekly/monthly context surveys are now fetched from ProfileSurvey and
+  // injected via buildUserProfileXml → buildDeepDiveSurveysBlock as <weekly_context> and <monthly_context> tags.
+  // The monthly theme also drives the arc directive.
+  const monthlyContextSurvey = profileSurveys.find((s) => s.surveyType === "MONTHLY_CONTEXT");
+  const monthlyContextAnswers = (monthlyContextSurvey?.answersJson ?? {}) as Record<string, string>;
+  const arcDirectiveBlock = buildArcDirectiveBlock(monthlyContextAnswers.monthlyTheme ?? "");
 
   const userProfileXml = buildUserProfileXml({
     answers,
@@ -363,7 +438,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const [analyticsRows, followerRows, cadenceRows, feedbackRows] = await Promise.all([
     prisma.postAnalytics.findMany({
       where: { userId: session.user.id, publishedAt: { gte: ninetyDaysAgo } },
-      select: { title: true, format: true, views: true, likes: true, comments: true },
+      select: { title: true, format: true, views: true, likes: true, comments: true, publishedAt: true },
     }),
     prisma.followerStats.findMany({
       where: { userId: session.user.id, date: { gte: thirtyDaysAgo } },
@@ -382,6 +457,16 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   ]);
 
   const performanceBlock = buildPerformanceSignalsBlock(analyticsRows);
+
+  // #8: Audience fatigue signal — compare recent vs previous engagement
+  const fatigueRows: AnalyticsRowForFatigue[] = analyticsRows.map((r) => ({
+    title: r.title,
+    views: r.views,
+    likes: r.likes,
+    comments: r.comments,
+    publishedAt: r.publishedAt,
+  }));
+  const audienceFatigueBlock = buildAudienceFatigueBlock(fatigueRows);
 
   const matches = matchArchiveToAnalytics(recentArchived, analyticsRows);
   const contentPerformanceBlock = buildContentPerformanceBlock(matches);
@@ -413,6 +498,16 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 
   const defaultUserPrompt = `${memoryBlock ? `${memoryBlock}\n\n` : ""}${userProfileXml}
 ${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
+${usedHooksBlock ? `\n${usedHooksBlock}` : ""}
+${archetypeHistoryBlock ? `\n${archetypeHistoryBlock}` : ""}
+${themesExploredBlock ? `\n${themesExploredBlock}` : ""}
+${anecdoteCooldownBlock ? `\n${anecdoteCooldownBlock}` : ""}
+${contentGapBlock ? `\n${contentGapBlock}` : ""}
+${variationDirectiveBlock ? `\n${variationDirectiveBlock}` : ""}
+${creativeConstraintsBlock ? `\n${creativeConstraintsBlock}` : ""}
+${temporalContextBlock ? `\n${temporalContextBlock}` : ""}
+${arcDirectiveBlock ? `\n${arcDirectiveBlock}` : ""}
+${audienceFatigueBlock ? `\n${audienceFatigueBlock}` : ""}
 ${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
 ${demographicsBlock ? `\n${demographicsBlock}` : ""}
 ${performanceBlock ? `\n${performanceBlock}` : ""}
@@ -570,7 +665,18 @@ export async function addToArchive(
         dayIndex,
       },
     },
-    update: {},
+    update: {
+      day: day.day,
+      format: day.format,
+      bucket: day.bucket,
+      title: day.title,
+      hook: day.hook,
+      body: day.body,
+      cta: day.cta,
+      caption: day.caption,
+      musicSuggestion: day.musicSuggestion,
+      duration: day.duration,
+    },
     create: {
       userId: session.user.id,
       weekStarting,

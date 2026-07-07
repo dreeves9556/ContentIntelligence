@@ -9,9 +9,9 @@ import type { UserPlan } from "@/lib/tiers";
 const PLANS: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
 
 const PLAN_STYLES: Record<UserPlan, string> = {
-  CALENDAR_ONLY: "text-[#787878] bg-[#1a1a1a] border-[#2a2a2a]",
+  CALENDAR_ONLY: "text-text-muted bg-background-secondary border-border-primary",
   CREATOR: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  PRO: "text-[#c8952a] bg-[#c8952a]/10 border-[#c8952a]/30",
+  PRO: "text-accent-primary bg-accent-primary/10 border-[#c8952a]/30",
 };
 
 interface PlanSwitcherProps {
@@ -77,21 +77,21 @@ export default function PlanSwitcher({ userId, currentPlan }: PlanSwitcherProps)
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div
-            className="fixed z-[9999] w-44 bg-[#111111] border border-[#2a2a2a] rounded-lg shadow-xl overflow-hidden"
+            className="fixed z-[9999] w-44 bg-background-card border border-border-primary rounded-lg shadow-xl overflow-hidden"
             style={{ top: dropdownPos.top, left: dropdownPos.left }}
           >
             {PLANS.map((p) => (
               <button
                 key={p}
                 onClick={() => handleSelect(p)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-[#1a1a1a] ${
-                  p === plan ? "text-[#e8e8e8]" : "text-[#787878]"
+                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors hover:bg-background-secondary ${
+                  p === plan ? "text-text-primary" : "text-text-muted"
                 }`}
               >
                 <span className={`px-2 py-0.5 rounded-md border ${PLAN_STYLES[p]}`}>
                   {PLAN_LABELS[p]}
                 </span>
-                {p === plan && <Check className="w-3 h-3 text-[#c8952a]" />}
+                {p === plan && <Check className="w-3 h-3 text-accent-primary" />}
               </button>
             ))}
           </div>

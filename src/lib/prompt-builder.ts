@@ -26,12 +26,61 @@ const SURVEY_LABELS: Record<string, Record<string, string>> = {
     clientDreamOutcome: "Client's dream outcome in their own words",
     beforeAfterStory: "A real client before → after story",
   },
+  WEEKLY_CONTEXT: {
+    personalHighlights: "Personal highlights this week",
+    professionalUpdates: "Professional updates this week",
+    newSpots: "New restaurants, hangouts, or spots discovered",
+    winsMoments: "Wins, stories, or moments worth sharing",
+    onYourMind: "What's on their mind this week",
+  },
+  MONTHLY_CONTEXT: {
+    monthlyTheme: "Monthly theme or focus",
+    majorMilestones: "Major milestones or events this month",
+    newGoals: "New goals or priorities this month",
+    businessChanges: "What's changing in their business this month",
+    travelPlans: "Travel or personal plans this month",
+    // Holiday-specific fields (only present for the relevant month)
+    newYearsPlans: "New Year's Day plans",
+    newYearsTraditions: "New Year's traditions",
+    newYearsContent: "New Year's content ideas",
+    valentinesPlans: "Valentine's Day plans",
+    valentinesContent: "Valentine's Day content ideas",
+    stPatricksPlans: "St. Patrick's Day plans",
+    stPatricksContent: "St. Patrick's Day content ideas",
+    easterPlans: "Easter plans",
+    easterContent: "Easter content ideas",
+    mothersDayPlans: "Mother's Day plans",
+    mothersDayContent: "Mother's Day content ideas",
+    memorialDayPlans: "Memorial Day plans",
+    memorialDayContent: "Memorial Day content ideas",
+    fathersDayPlans: "Father's Day plans",
+    fathersDayContent: "Father's Day content ideas",
+    juneteenthContent: "Juneteenth content ideas",
+    july4Plans: "Independence Day plans",
+    july4Traditions: "July 4th traditions",
+    july4Content: "July 4th content ideas",
+    backToSchool: "Back-to-school season content ideas",
+    laborDayPlans: "Labor Day plans",
+    laborDayContent: "Labor Day content ideas",
+    halloweenPlans: "Halloween plans",
+    halloweenContent: "Halloween content ideas",
+    veteransDayContent: "Veterans Day content ideas",
+    thanksgivingPlans: "Thanksgiving plans",
+    thanksgivingTraditions: "Thanksgiving traditions",
+    thanksgivingContent: "Thanksgiving content ideas",
+    christmasPlans: "Christmas plans",
+    christmasTraditions: "Christmas traditions",
+    christmasContent: "Christmas content ideas",
+    newYearsEvePlans: "New Year's Eve plans",
+  },
 };
 
 const SURVEY_XML_TAG: Record<string, string> = {
   TRENCH_WARFARE: "trench_warfare",
   ORIGIN_STORY: "origin_story",
   CLIENT_AVATAR: "client_avatar",
+  WEEKLY_CONTEXT: "weekly_context",
+  MONTHLY_CONTEXT: "monthly_context",
 };
 
 const LOCAL_MAYOR_LABELS: Record<string, string> = {
@@ -209,7 +258,13 @@ function buildDeepDiveSurveysBlock(profileSurveys: ProfileSurveyRow[]): string {
       }
     }
     if (lines.length > 0) {
-      blocks.push(`<${tag}>\n${lines.join("\n")}\n</${tag}>`);
+      const intro =
+        survey.surveyType === "WEEKLY_CONTEXT"
+          ? "This is what the creator is doing THIS WEEK — fresh, current input. Prioritize this over older questionnaire material where there's overlap."
+          : survey.surveyType === "MONTHLY_CONTEXT"
+            ? "Broad strokes for this month — use as a strategic backdrop for the week's content."
+            : null;
+      blocks.push(`<${tag}>\n${intro ? `${intro}\n` : ""}${lines.join("\n")}\n</${tag}>`);
     }
   }
   return blocks.join("\n\n");
@@ -388,7 +443,16 @@ The JSON schema must be:
 HASHTAG RULE: Do NOT include hashtags in captions, bodies, hooks, CTAs, or any other field. This is a hard rule — no exceptions.
 
 Formats must be: Reel, Carousel, Static.
-Buckets must be: Personal, Expert, Local.`;
+Buckets must be: Personal, Expert, Local.
+
+WEEK-OVER-WEEK VARIETY — critical for long-term freshness:
+- This creator may have been using this system for many weeks. The prompt includes blocks showing what hooks, archetypes, and themes have already been used. Treat these as exhaustion signals — they tell you what NOT to do again.
+- Vary your hook styles across posts within this week AND across weeks. If you opened with questions recently, try bold statements, stories, or contrarian hooks.
+- Rotate content archetypes (listicle, story, myth-bust, contrarian, behind-the-scenes, how-to, direct address, comparison). Don't let any single archetype dominate week after week.
+- When the prompt includes <creative_constraints>, follow them — they are randomized each week to force fresh approaches.
+- The questionnaire and survey data is the creator's FOUNDATION, not a script to recite. Use it as raw material to generate NEW angles, not to repeat the same stories, hot takes, or proof points in different packaging.
+- If a theme, anecdote, or angle has been used in recent posts, let it rest. There are always new ways to approach a topic.
+- The same topic can appear again only if the ANGLE is genuinely different — not just reworded. When in doubt, choose the less obvious approach.`;
 
 export const CALENDAR_STRATEGY_SYSTEM_PROMPT = `You are an elite personal brand content strategist. Write concise "AI Strategy Notes" (2-3 sentences max) for a creator's upcoming content calendar. It should read like a weekly strategy brief.
 

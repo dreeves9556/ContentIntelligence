@@ -33,7 +33,7 @@ export function CopyButton({ text, label }: CopyButtonProps) {
         ${
           copied
             ? "text-green-400 bg-green-400/10 border border-green-400/30"
-            : "text-text-muted/60 hover:text-text-primary hover:bg-background-secondary border border-transparent hover:border-background-secondary"
+            : "text-text-muted/60 hover:text-text-primary hover:bg-background-secondary border border-transparent hover:border-border-primary"
         }
       `}
       aria-label={copied ? "Copied" : `Copy ${displayLabel.toLowerCase()}`}

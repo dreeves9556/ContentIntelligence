@@ -234,27 +234,40 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
   const hasRealData = realTimeSlots.length > 0;
   const fallbackSlots = bestTimesByFormatAndDay[day.format][day.day as DayOfWeek];
 
+  const dateForDay = new Date(weekStarting);
+  dateForDay.setDate(dateForDay.getDate() + dayIndex);
+  const dateline = dateForDay.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
   return (
-    <div className={`group bg-background-card rounded-xl border border-white/10 overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/5 ${isPosted ? "opacity-60 hover:border-accent-primary/30" : "hover:border-accent-primary/30"}`}>
-      {/* Header */}
-      <div className="p-5 sm:p-6 border-b border-white/10 bg-gradient-to-r from-background-secondary/50 to-transparent">
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <span className="text-sm font-bold tracking-wider text-text-muted uppercase shrink-0">
-            {day.day}
+    <div className={`group bg-background-card rounded-xl border border-border-primary overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/5 ${isPosted ? "opacity-60 hover:border-accent-primary/30" : "hover:border-accent-primary/30"}`}>
+      {/* Masthead — newspaper style */}
+      <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-3 border-b-2 border-text-primary">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-bold tracking-[0.15em] text-text-muted uppercase shrink-0">
+            {dateline}
           </span>
           <div className="flex flex-wrap items-center gap-2 justify-end">
             <FormatBadge format={day.format} />
             <BucketBadge bucket={day.bucket} />
           </div>
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-text-primary leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h2 className="text-2xl sm:text-3xl font-bold text-text-primary leading-[1.15] mt-3 mb-1" style={{ fontFamily: "var(--font-serif)" }}>
           {day.title}
         </h2>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-xs font-semibold tracking-wider text-accent-primary uppercase">{day.day} Edition</span>
+          <span className="h-px flex-1 bg-border-primary" />
+        </div>
       </div>
 
       {/* Directions — how to film / perform */}
       {hasDirections && (
-        <div className="p-5 sm:p-6 border-t border-white/10 bg-brand-expert/5">
+        <div className="p-5 sm:p-6 border-b border-border-primary bg-brand-expert/5">
           <div className="flex items-center gap-2 text-brand-expert mb-4">
             <Lightbulb className="h-4 w-4 shrink-0" />
             <span className="text-sm font-bold tracking-wider uppercase">How to Make This</span>
@@ -267,7 +280,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       )}
 
       {/* Script / Post Content */}
-      <div className="p-5 sm:p-6 border-t border-white/10 space-y-5">
+      <div className="p-5 sm:p-6 border-b border-border-primary space-y-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-accent-primary">
             {day.format === "Reel" ? (
@@ -322,7 +335,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       </div>
 
       {/* Caption — distinct copy-paste card */}
-      <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10">
+      <div className="p-5 sm:p-6 bg-background-secondary/30 border-b border-border-primary">
         <div className="flex items-center gap-2 text-text-muted mb-4">
           <MessageCircle className="h-4 w-4 shrink-0" />
           <span className="text-sm font-bold tracking-wider uppercase">Caption to Paste</span>
@@ -339,7 +352,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       </div>
 
       {/* Production Notes */}
-      <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10 space-y-4">
+      <div className="p-5 sm:p-6 bg-background-secondary/30 border-b border-border-primary space-y-4">
         <div className="flex items-center gap-2 text-accent-primary">
           <Clock className="h-4 w-4 shrink-0" />
           <span className="text-sm font-bold tracking-wider uppercase">Production Notes</span>
@@ -361,7 +374,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       </div>
 
       {/* Best Time to Post */}
-      <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10 space-y-4">
+      <div className="p-5 sm:p-6 bg-background-secondary/30 border-b border-border-primary space-y-4">
         <div className="flex items-center gap-2 text-accent-primary">
           <Clock className="h-4 w-4 shrink-0" />
           <span className="text-sm font-bold tracking-wider uppercase">Best Time to Post</span>
@@ -398,7 +411,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
         );
         if (eligiblePlatforms.length === 0) return null;
         return (
-          <div className="p-5 sm:p-6 bg-background-secondary/30 border-t border-white/10">
+          <div className="p-5 sm:p-6 bg-background-secondary/30 border-b border-border-primary">
             <div className="flex items-center gap-2 text-accent-primary mb-4">
               <ExternalLink className="h-4 w-4 shrink-0" />
               <span className="text-sm font-bold tracking-wider uppercase">Post To</span>
@@ -425,7 +438,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       })()}
 
       {/* Feedback (thumbs up/down) */}
-      <div className="p-5 sm:p-6 border-t border-white/10">
+      <div className="p-5 sm:p-6 border-b border-border-primary">
         <div className="flex items-center gap-2 text-text-muted mb-3">
           <span className="text-sm font-bold tracking-wider uppercase">Was this suggestion helpful?</span>
         </div>
@@ -439,7 +452,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
               ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
               ${feedback === "up"
                 ? "bg-green-500/20 text-green-400 border border-green-500/40"
-                : "bg-background-secondary/50 text-text-muted border border-white/10 hover:text-green-400 hover:border-green-500/20"
+                : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-green-400 hover:border-green-500/20"
               }
             `}
           >
@@ -455,7 +468,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
               ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
               ${feedback === "down"
                 ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                : "bg-background-secondary/50 text-text-muted border border-white/10 hover:text-red-400 hover:border-red-500/20"
+                : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-red-400 hover:border-red-500/20"
               }
             `}
           >
@@ -466,7 +479,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       </div>
 
       {/* Posted toggle */}
-      <div className="p-5 sm:p-6 border-t border-white/10">
+      <div className="p-5 sm:p-6">
         <button
           onClick={onTogglePosted}
           disabled={isPending}
@@ -476,7 +489,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
             ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
             ${isPosted
               ? "bg-accent-primary/15 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20"
-              : "bg-background-secondary/50 text-text-muted border border-white/10 hover:text-text-primary hover:border-accent-primary/20 hover:bg-background-secondary/80"
+              : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-text-primary hover:border-accent-primary/20 hover:bg-background-secondary/80"
             }
           `}
         >
@@ -604,11 +617,11 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
       {/* Regeneration prompt modal */}
       {showRegenModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-background-card rounded-2xl border border-white/10 p-8 max-w-md w-full text-center space-y-5">
+          <div className="bg-background-card rounded-2xl border border-border-primary p-8 max-w-md w-full text-center space-y-5">
             <div className="p-4 bg-accent-primary/10 rounded-full w-fit mx-auto">
               <AlertCircle className="h-8 w-8 text-accent-primary" />
             </div>
-            <h2 className="text-xl font-bold text-text-primary" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h2 className="text-xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
               Your Calendar Has Expired
             </h2>
             <p className="text-text-muted text-sm">
@@ -624,6 +637,20 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
           </div>
         </div>
       )}
+
+      {/* Today's Edition masthead */}
+      <div className="text-center mb-2">
+        <h2 className="text-2xl sm:text-3xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+          Today&apos;s Edition
+        </h2>
+        <div className="flex items-center gap-3 mt-1">
+          <span className="h-px flex-1 bg-border-primary" />
+          <span className="text-xs font-semibold tracking-[0.15em] text-text-muted uppercase">
+            {new Date(weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+          </span>
+          <span className="h-px flex-1 bg-border-primary" />
+        </div>
+      </div>
 
       {/* Tab Navigation */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
@@ -645,8 +672,8 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
                 transition-all duration-200 ease-out whitespace-nowrap text-center
                 ${
                   isActive
-                    ? "bg-[#c8952a] text-[#1a1a1a] shadow-lg shadow-[#c8952a]/20"
-                    : "bg-[#2a2a2a] text-text-muted hover:text-text-primary hover:bg-[#333333]"
+                    ? "bg-accent-primary text-white shadow-lg shadow-accent-primary/20"
+                    : "bg-background-secondary text-text-muted hover:text-text-primary hover:bg-background-card border border-border-primary"
                 }
                 ${isPosted ? "line-through opacity-50" : ""}
               `}

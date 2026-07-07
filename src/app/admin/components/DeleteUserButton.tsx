@@ -28,7 +28,7 @@ export default function DeleteUserButton({
       <button
         disabled
         title="You cannot delete your own account"
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-[#2a2a2a] bg-[#1a1a1a] text-[#3a3a3a] cursor-not-allowed"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border-primary bg-background-secondary text-text-muted/60 cursor-not-allowed"
       >
         <Trash2 className="w-3 h-3" />
         Delete
@@ -164,21 +164,21 @@ function DeleteConfirmModal({
         if (e.target === e.currentTarget && !isPending) onClose();
       }}
     >
-      <div className="w-full max-w-md bg-[#111111] border border-[#2a2a2a] rounded-xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-background-card border border-border-primary rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#1a1a1a]">
+        <div className="flex items-center justify-between p-5 border-b border-border-primary">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-red-500/10 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-red-400" />
             </div>
-            <h2 className="text-lg font-semibold text-[#e8e8e8]">
+            <h2 className="text-lg font-semibold text-text-primary">
               Delete User Account
             </h2>
           </div>
           {!isPending && (
             <button
               onClick={onClose}
-              className="text-[#787878] hover:text-[#e8e8e8] transition-colors"
+              className="text-text-muted hover:text-text-primary transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -192,14 +192,14 @@ function DeleteConfirmModal({
             cannot be undone. All associated data will be removed, including:
           </p>
 
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-4 space-y-1.5">
-            <p className="text-sm font-medium text-[#e8e8e8]">
+          <div className="bg-background-secondary border border-border-primary rounded-lg p-4 space-y-1.5">
+            <p className="text-sm font-medium text-text-primary">
               {userName || "Unnamed User"}
             </p>
-            <p className="text-xs text-[#787878]">{userEmail ?? "—"}</p>
+            <p className="text-xs text-text-muted">{userEmail ?? "—"}</p>
           </div>
 
-          <ul className="text-xs text-[#787878] space-y-1 ml-4 list-disc">
+          <ul className="text-xs text-text-muted space-y-1 ml-4 list-disc">
             <li>Questionnaires &amp; onboarding data</li>
             <li>Content calendars &amp; archives</li>
             <li>Social media connections &amp; analytics</li>
@@ -215,20 +215,20 @@ function DeleteConfirmModal({
 
           {/* Slide to confirm */}
           <div className="pt-2">
-            <p className="text-xs text-[#787878] mb-2.5 text-center">
+            <p className="text-xs text-text-muted mb-2.5 text-center">
               {completed
                 ? "Deleting…"
                 : "Slide to confirm deletion →"}
             </p>
             <div
               ref={trackRef}
-              className="relative h-12 bg-[#0a0a0a] border border-[#2a2a2a] rounded-full overflow-hidden select-none"
+              className="relative h-12 bg-background-secondary border border-border-primary rounded-full overflow-hidden select-none"
               style={{ touchAction: "none" }}
             >
               {/* Track label */}
               {!isSliding && sliderProgress === 0 && !completed && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="text-xs font-medium text-[#3a3a3a] tracking-wide">
+                  <span className="text-xs font-medium text-text-muted/60 tracking-wide">
                     Slide to delete
                   </span>
                 </div>

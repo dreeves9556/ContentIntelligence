@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { Sparkles, Mail, Lock, AlertCircle, Eye, EyeOff, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Newspaper, Mail, Lock, AlertCircle, Eye, EyeOff, CheckCircle2, ArrowLeft, Calendar, BarChart3, Brain } from "lucide-react";
 import { requestPasswordReset } from "./password-reset-actions";
+import { RotatingTagline } from "@/components/RotatingTagline";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +17,17 @@ export default function LoginPage() {
   const [resetPending, setResetPending] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [today, setToday] = useState("");
+
+  useEffect(() => {
+    setToday(
+      new Date().toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })
+    );
+  }, []);
 
   async function handleResetRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -62,28 +75,193 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background-primary px-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <Sparkles className="h-8 w-8 text-accent-primary" />
-            <h1 
-              className="text-3xl font-bold tracking-tight text-white" 
-              style={{ fontFamily: "var(--font-playfair), 'Playfair Display', serif" }}
+    <div className="h-screen flex bg-background-secondary overflow-hidden">
+      {/* ── Left Panel: Editorial Hero (desktop only) ── */}
+      <div className="hidden lg:flex flex-col justify-between w-[60%] bg-background-primary px-10 py-6 overflow-hidden">
+        {/* Top: Masthead */}
+        <div className="relative animate-fade-in-up" style={{ animationDelay: "0ms" }}>
+          {/* Double rules — newspaper masthead convention */}
+          <div className="border-t-2 border-border-secondary mb-1" />
+          <div className="border-t border-border-secondary mb-3" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Newspaper className="h-7 w-7 text-accent-primary shrink-0" />
+              <h1
+                className="text-2xl font-bold tracking-tight text-text-primary"
+                style={{ fontFamily: "var(--font-serif)" }}
+              >
+                The Local Post
+              </h1>
+            </div>
+            <span
+              className="text-xs uppercase tracking-wider text-text-muted"
+              style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
             >
-              Content Intelligence
-            </h1>
+              Est. 2026
+            </span>
           </div>
-          <p className="text-text-muted text-lg" style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
-            Premium content strategy platform
+          <div className="border-t border-border-secondary mb-1" />
+          <div className="border-t-2 border-border-secondary mb-5" />
+
+          {/* Dateline */}
+          <p
+            className="text-xs uppercase tracking-wider text-text-muted mb-4"
+            style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+          >
+            {today || "Today"} &middot; Vol. I, No. 1
+          </p>
+
+          {/* Hero headline */}
+          <h2
+            className="text-[2.25rem] leading-[1.1] font-bold text-text-primary mb-2"
+            style={{ fontFamily: "var(--font-serif)" }}
+          >
+            Your town&apos;s front page, ready to fill.
+          </h2>
+
+          {/* Subheadline */}
+          <p
+            className="text-sm text-text-muted leading-relaxed max-w-md"
+            style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+          >
+            The content platform for local experts.
+            Plan, write, and publish like a newsroom.
           </p>
         </div>
 
+        {/* Middle: Feature cards — newspaper article previews */}
+        <div className="relative flex-1 flex flex-col gap-3 my-6 min-h-0">
+          {[
+            { icon: Calendar, label: "The Editorial Desk", title: "Plan your week", body: "AI-generated content calendars tailored to your market.", delay: "100ms" },
+            { icon: BarChart3, label: "The Analytics Desk", title: "Track your reach", body: "See what resonates across every platform you publish to.", delay: "200ms" },
+            { icon: Brain, label: "The Newsroom", title: "Your AI editor", body: "A brand brain that learns your voice and sharpens every post.", delay: "300ms" },
+          ].map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <div
+                key={feature.label}
+                className="animate-fade-in-up flex-1 bg-background-secondary border border-border-primary rounded-lg p-5 transition-colors hover:border-border-secondary flex flex-col justify-center"
+                style={{ animationDelay: feature.delay }}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex items-center justify-center h-11 w-11 rounded-md bg-accent-primary/10 shrink-0">
+                    <Icon className="h-5 w-5 text-accent-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-xs uppercase tracking-wider text-text-muted mb-1"
+                      style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+                    >
+                      {feature.label}
+                    </p>
+                    <h3
+                      className="text-lg font-semibold text-text-primary mb-1"
+                      style={{ fontFamily: "var(--font-serif)" }}
+                    >
+                      {feature.title}
+                    </h3>
+                    <p
+                      className="text-sm text-text-muted leading-relaxed"
+                      style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+                    >
+                      {feature.body}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom: Tagline + Content pillar labels */}
+        <div className="relative space-y-3 animate-fade-in-up" style={{ animationDelay: "400ms" }}>
+          <RotatingTagline />
+          <div className="border-t border-border-primary" />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-brand-personal" />
+              <span
+                className="text-xs uppercase tracking-wider text-text-muted"
+                style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+              >
+                Personal
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-brand-expert" />
+              <span
+                className="text-xs uppercase tracking-wider text-text-muted"
+                style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+              >
+                Expert
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-brand-local" />
+              <span
+                className="text-xs uppercase tracking-wider text-text-muted"
+                style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+              >
+                Local
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Divider: Newspaper double-rule ── */}
+      <div className="hidden lg:flex shrink-0">
+        <div className="w-px bg-border-secondary" />
+        <div className="w-[3px] bg-background-primary" />
+        <div className="w-px bg-border-secondary" />
+      </div>
+
+      {/* ── Right Panel: Auth Form ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 relative">
+        {/* Theme toggle — top right corner */}
+        <div className="absolute top-6 right-6">
+          <ThemeToggle />
+        </div>
+
+        <div className="w-full max-w-md space-y-6">
+          {/* Mobile/compact masthead (shown when left panel hidden) */}
+          <div className="text-center space-y-3 lg:hidden">
+            <div className="border-t border-border-secondary mb-4" />
+            <div className="flex items-center justify-center gap-2">
+              <Newspaper className="h-7 w-7 text-accent-primary shrink-0" />
+              <h1
+                className="text-2xl font-bold tracking-tight text-text-primary"
+                style={{ fontFamily: "var(--font-serif)" }}
+              >
+                The Local Post
+              </h1>
+            </div>
+            <div className="border-t border-border-secondary mb-2" />
+            <RotatingTagline />
+          </div>
+
+          {/* Desktop welcome heading */}
+          <div className="hidden lg:block space-y-2 animate-fade-in-up" style={{ animationDelay: "150ms" }}>
+            <p
+              className="text-xs uppercase tracking-wider text-text-muted"
+              style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
+            >
+              Welcome Back
+            </p>
+            <h2
+              className="text-2xl font-bold text-text-primary"
+              style={{ fontFamily: "var(--font-serif)" }}
+            >
+              Sign in to your edition
+            </h2>
+            <div className="border-t border-border-primary pt-4" />
+          </div>
+
         {showForgot ? (
-          <div className="bg-background-card rounded-lg p-8 border border-background-secondary">
+          <div className="bg-background-card rounded-lg p-6 border border-border-primary animate-fade-in-up" style={{ animationDelay: "250ms" }}>
             {resetSuccess ? (
               <div className="space-y-6">
-                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm">
+                <div className="flex items-center gap-2 p-3 bg-brand-local/10 border border-brand-local/20 rounded-md text-brand-local text-sm">
                   <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
                   <span>If an account exists for that email, reset instructions have been sent.</span>
                 </div>
@@ -111,7 +289,7 @@ export default function LoginPage() {
                     <ArrowLeft className="h-4 w-4" />
                     Back to sign in
                   </button>
-                  <h2 className="text-xl font-semibold text-white" style={{ fontFamily: "var(--font-playfair), 'Playfair Display', serif" }}>
+                  <h2 className="text-xl font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif), 'Playfair Display', serif" }}>
                     Reset Password
                   </h2>
                   <p className="text-sm text-text-muted" style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
@@ -120,7 +298,7 @@ export default function LoginPage() {
                 </div>
 
                 {resetError && (
-                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
+                  <div className="flex items-center gap-2 p-3 bg-brand-personal/10 border border-brand-personal/20 rounded-md text-brand-personal text-sm">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     <span>{resetError}</span>
                   </div>
@@ -139,7 +317,7 @@ export default function LoginPage() {
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="you@example.com"
-                      className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all"
                       style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
                     />
                   </div>
@@ -157,10 +335,10 @@ export default function LoginPage() {
             )}
           </div>
         ) : (
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(new FormData(e.currentTarget)); }} className="bg-background-card rounded-lg p-8 border border-background-secondary">
-          <div className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(new FormData(e.currentTarget)); }} className="bg-background-card rounded-lg p-6 border border-border-primary animate-fade-in-up" style={{ animationDelay: "250ms" }}>
+          <div className="space-y-5">
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
+              <div className="flex items-center gap-2 p-3 bg-brand-personal/10 border border-brand-personal/20 rounded-md text-brand-personal text-sm">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span>{error}</span>
               </div>
@@ -178,7 +356,7 @@ export default function LoginPage() {
                   type="email"
                   required
                   placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all"
                   style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
                 />
               </div>
@@ -196,7 +374,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   required
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 bg-background-secondary border border-background-secondary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all"
+                  className="w-full pl-10 pr-10 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all"
                   style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
                 />
                 <button
@@ -218,7 +396,7 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-background-secondary bg-background-secondary accent-accent-primary cursor-pointer"
+                  className="h-4 w-4 rounded border-border-primary bg-background-secondary accent-accent-primary cursor-pointer"
                 />
                 <label
                   htmlFor="rememberMe"
@@ -255,8 +433,9 @@ export default function LoginPage() {
         )}
 
         <p className="text-center text-sm text-text-muted" style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
-          Protected access for approved coaching clients only
+          Invite-only access for The Local Post community
         </p>
+        </div>
       </div>
     </div>
   );

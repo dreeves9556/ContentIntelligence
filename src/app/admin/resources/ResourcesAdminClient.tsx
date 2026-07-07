@@ -50,7 +50,7 @@ function PostCard({
   const [deleting, startDelete] = useTransition();
 
   return (
-    <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] p-5 flex flex-col sm:flex-row sm:items-start gap-4">
+    <div className="bg-background-card rounded-lg border border-border-primary p-5 flex flex-col sm:flex-row sm:items-start gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
           {post.published ? (
@@ -58,20 +58,20 @@ function PostCard({
               <Eye className="h-3 w-3" /> Published
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#2a2a2a] text-[#787878] border border-[#2a2a2a]">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-background-secondary text-text-muted border border-border-primary">
               <EyeOff className="h-3 w-3" /> Draft
             </span>
           )}
           {post.category && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#c8952a]/10 text-[#c8952a] border border-[#c8952a]/20">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-[#c8952a]/20">
               <Tag className="h-3 w-3" /> {post.category}
             </span>
           )}
         </div>
-        <h3 className="text-base font-semibold text-[#e8e8e8] leading-snug mb-1" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base font-semibold text-text-primary leading-snug mb-1" style={{ fontFamily: "var(--font-serif)" }}>
           {post.title}
         </h3>
-        <div className="flex items-center gap-3 text-xs text-[#787878]">
+        <div className="flex items-center gap-3 text-xs text-text-muted">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
             {post.published && post.publishedAt
@@ -84,7 +84,7 @@ function PostCard({
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => onEdit(post)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[#1a1a1a] text-[#787878] hover:text-[#e8e8e8] hover:bg-[#2a2a2a] transition-colors border border-[#2a2a2a]"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-background-secondary text-text-muted hover:text-text-primary hover:bg-background-secondary transition-colors border border-border-primary"
         >
           <Pencil className="h-3.5 w-3.5" />
           Edit
@@ -122,15 +122,15 @@ function EditorModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8 px-4">
-      <div className="bg-[#111111] border border-[#2a2a2a] rounded-xl w-full max-w-4xl shadow-2xl">
+      <div className="bg-background-card border border-border-primary rounded-xl w-full max-w-4xl shadow-2xl">
         {/* Modal header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#1a1a1a]">
-          <h2 className="text-lg font-bold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
+        <div className="flex items-center justify-between p-5 border-b border-border-primary">
+          <h2 className="text-lg font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             {state.mode === "create" ? "New Article" : "Edit Article"}
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-[#787878] hover:text-[#e8e8e8] hover:bg-[#1a1a1a] transition-colors"
+            className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-background-secondary transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -140,7 +140,7 @@ function EditorModal({
         <div className="p-5 space-y-5">
           {/* Title */}
           <div>
-            <label className="block text-xs font-bold tracking-wider text-[#787878] uppercase mb-1.5">
+            <label className="block text-xs font-bold tracking-wider text-text-muted uppercase mb-1.5">
               Title
             </label>
             <input
@@ -148,19 +148,19 @@ function EditorModal({
               value={state.title}
               onChange={(e) => onChange({ title: e.target.value })}
               placeholder="Article title…"
-              className="w-full px-3 py-2.5 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-[#e8e8e8] placeholder:text-[#3a3a3a] focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 text-sm"
+              className="w-full px-3 py-2.5 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 text-sm"
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-xs font-bold tracking-wider text-[#787878] uppercase mb-1.5">
+            <label className="block text-xs font-bold tracking-wider text-text-muted uppercase mb-1.5">
               Category
             </label>
             <select
               value={state.category}
               onChange={(e) => onChange({ category: e.target.value })}
-              className="w-full px-3 py-2.5 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-[#e8e8e8] focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 text-sm appearance-none"
+              className="w-full px-3 py-2.5 bg-background-secondary border border-border-primary rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-[#c8952a]/40 text-sm appearance-none"
             >
               <option value="">No category</option>
               {CATEGORIES.map((c) => (
@@ -171,7 +171,7 @@ function EditorModal({
 
           {/* Rich text editor */}
           <div>
-            <label className="block text-xs font-bold tracking-wider text-[#787878] uppercase mb-1.5">
+            <label className="block text-xs font-bold tracking-wider text-text-muted uppercase mb-1.5">
               Content
             </label>
             <TiptapEditor
@@ -183,18 +183,18 @@ function EditorModal({
         </div>
 
         {/* Modal footer */}
-        <div className="flex items-center justify-end gap-3 p-5 border-t border-[#1a1a1a]">
+        <div className="flex items-center justify-end gap-3 p-5 border-t border-border-primary">
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium rounded-lg text-[#787878] hover:text-[#e8e8e8] hover:bg-[#1a1a1a] transition-colors border border-[#2a2a2a] disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium rounded-lg text-text-muted hover:text-text-primary hover:bg-background-secondary transition-colors border border-border-primary disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={() => onSave(false)}
             disabled={saving || !state.title.trim()}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#1a1a1a] text-[#787878] hover:text-[#e8e8e8] border border-[#2a2a2a] transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-background-secondary text-text-muted hover:text-text-primary border border-border-primary transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />}
             Save as Draft
@@ -202,7 +202,7 @@ function EditorModal({
           <button
             onClick={() => onSave(true)}
             disabled={saving || !state.title.trim()}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#c8952a] text-[#0a0a0a] hover:bg-[#c8952a]/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-white hover:bg-accent-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
             {state.mode === "create" ? "Publish" : "Save & Publish"}
@@ -291,7 +291,7 @@ export default function ResourcesAdminClient({ initialPosts }: { initialPosts: R
       <div className="flex justify-end mb-6">
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#c8952a] text-[#0a0a0a] font-semibold text-sm rounded-lg hover:bg-[#c8952a]/90 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white font-semibold text-sm rounded-lg hover:bg-accent-primary/90 transition-colors"
         >
           <PlusCircle className="h-4 w-4" />
           New Article
@@ -301,13 +301,13 @@ export default function ResourcesAdminClient({ initialPosts }: { initialPosts: R
       {/* Empty state */}
       {posts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="p-4 bg-[#c8952a]/10 rounded-full mb-4">
-            <BookOpen className="h-8 w-8 text-[#c8952a]" />
+          <div className="p-4 bg-accent-primary/10 rounded-full mb-4">
+            <BookOpen className="h-8 w-8 text-accent-primary" />
           </div>
-          <h3 className="text-lg font-bold text-[#e8e8e8] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h3 className="text-lg font-bold text-text-primary mb-2" style={{ fontFamily: "var(--font-serif)" }}>
             No articles yet
           </h3>
-          <p className="text-[#787878] text-sm max-w-xs">
+          <p className="text-text-muted text-sm max-w-xs">
             Create your first resource article to share insights and tools with your clients.
           </p>
         </div>
@@ -316,7 +316,7 @@ export default function ResourcesAdminClient({ initialPosts }: { initialPosts: R
       {/* Published */}
       {published.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-xs font-bold tracking-wider text-[#787878] uppercase mb-3">
+          <h2 className="text-xs font-bold tracking-wider text-text-muted uppercase mb-3">
             Published ({published.length})
           </h2>
           <div className="space-y-3">
@@ -330,7 +330,7 @@ export default function ResourcesAdminClient({ initialPosts }: { initialPosts: R
       {/* Drafts */}
       {drafts.length > 0 && (
         <section>
-          <h2 className="text-xs font-bold tracking-wider text-[#787878] uppercase mb-3">
+          <h2 className="text-xs font-bold tracking-wider text-text-muted uppercase mb-3">
             Drafts ({drafts.length})
           </h2>
           <div className="space-y-3">

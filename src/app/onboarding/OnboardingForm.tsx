@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
+import { RotatingTagline } from "@/components/RotatingTagline";
 
 const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Content Preferences"];
 
@@ -113,8 +114,8 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
       </div>
       <div className="h-1 w-full rounded-full bg-background-secondary overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, background: "#c8952a" }}
+          className="h-full rounded-full transition-all duration-500 bg-accent-primary"
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
@@ -131,7 +132,7 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 }
 
 const inputClass =
-  "w-full px-4 py-3 bg-background-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm";
+  "w-full px-4 py-3 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm";
 
 const textareaClass = inputClass + " resize-none";
 
@@ -157,7 +158,7 @@ function MultiSelect({
           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
             selected.includes(opt)
               ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
-              : "border-white/10 bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
+              : "border-border-primary bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
           }`}
         >
           {opt}
@@ -186,7 +187,7 @@ function RadioGroup({
           className={`px-5 py-2.5 rounded-lg text-sm font-medium border transition-all ${
             value === opt
               ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
-              : "border-white/10 bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
+              : "border-border-primary bg-background-secondary text-text-muted hover:border-accent-primary/40 hover:text-text-primary"
           }`}
         >
           {opt}
@@ -206,7 +207,6 @@ function DaysSlider({ value, onChange }: { value: number; onChange: (v: number) 
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-accent-primary cursor-pointer"
-        style={{ accentColor: "#c8952a" }}
       />
       <div className="flex justify-between">
         {Array.from({ length: 7 }, (_, i) => (
@@ -306,12 +306,11 @@ export default function OnboardingForm() {
     <div className="mb-8">
       <div className="flex items-center gap-3 mb-2">
         <span
-          className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold"
-          style={{ background: "rgba(200,149,42,0.15)", color: "#c8952a", border: "1px solid rgba(200,149,42,0.3)" }}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold bg-accent-primary/15 text-accent-primary border border-accent-primary/30"
         >
           {letter}
         </span>
-        <h2 className="text-xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h2 className="text-xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
           {title}
         </h2>
       </div>
@@ -432,7 +431,7 @@ export default function OnboardingForm() {
                 : "Select your industry in Section A to unlock these questions."
             )}
             {!formData.industry ? (
-              <div className="flex items-center justify-center py-16 text-text-muted text-sm rounded-xl border border-dashed border-white/10">
+              <div className="flex items-center justify-center py-16 text-text-muted text-sm rounded-xl border border-dashed border-border-primary">
                 No industry selected yet — go back to Section A.
               </div>
             ) : (
@@ -746,15 +745,15 @@ export default function OnboardingForm() {
   const isLastStep = step === SECTIONS.length - 1;
 
   return (
-    <div className="min-h-screen" style={{ background: "#0a0a0a" }}>
+    <div className="min-h-screen bg-background-secondary">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-white/5 bg-black/60 backdrop-blur-md">
+      <header className="sticky top-0 z-10 border-b border-border-primary bg-background-secondary/80 backdrop-blur-md">
         <div className="max-w-2xl mx-auto px-6 h-16 flex items-center justify-between">
           <h1
             className="text-lg font-bold tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", color: "#c8952a" }}
+            style={{ fontFamily: "var(--font-serif)", color: "var(--color-accent-primary)" }}
           >
-            CoreOS
+            The Local Post
           </h1>
           <span className="text-xs text-text-muted">Brand Questionnaire</span>
         </div>
@@ -765,11 +764,12 @@ export default function OnboardingForm() {
         <div className="text-center mb-10">
           <h2
             className="text-3xl sm:text-4xl font-bold mb-3"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Let&apos;s Define Your Brand
           </h2>
-          <p className="text-text-muted text-sm max-w-md mx-auto">
+          <RotatingTagline />
+          <p className="text-text-muted text-sm max-w-md mx-auto mt-3">
             This questionnaire powers your entire content strategy. Be honest, be specific — the more you share, the better your results.
           </p>
         </div>
@@ -785,8 +785,8 @@ export default function OnboardingForm() {
                 i === step
                   ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
                   : i < step
-                  ? "border-white/20 text-text-muted cursor-pointer hover:border-white/40"
-                  : "border-white/5 text-white/20 cursor-default"
+                  ? "border-border-primary text-text-muted cursor-pointer hover:border-accent-primary/40"
+                  : "border-border-primary text-text-muted/40 cursor-default"
               }`}
             >
               {s}
@@ -801,8 +801,7 @@ export default function OnboardingForm() {
 
         {/* Form card */}
         <div
-          className="rounded-2xl border p-8 sm:p-10"
-          style={{ background: "#111111", borderColor: "rgba(255,255,255,0.07)" }}
+          className="rounded-2xl border border-border-primary bg-background-card p-8 sm:p-10"
         >
           {renderSection()}
 
@@ -814,12 +813,12 @@ export default function OnboardingForm() {
           )}
 
           {/* Nav buttons */}
-          <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/5">
+          <div className="flex items-center justify-between mt-10 pt-6 border-t border-border-primary">
             <button
               type="button"
               onClick={() => setStep((s) => s - 1)}
               disabled={step === 0}
-              className="px-5 py-2.5 rounded-lg text-sm font-medium border border-white/10 text-text-muted hover:border-white/30 hover:text-text-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 rounded-lg text-sm font-medium border border-border-primary text-text-muted hover:border-accent-primary/40 hover:text-text-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               ← Back
             </button>
@@ -829,8 +828,7 @@ export default function OnboardingForm() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="px-7 py-2.5 rounded-lg text-sm font-bold transition-all disabled:opacity-60"
-                style={{ background: "#c8952a", color: "#0a0a0a" }}
+                className="px-7 py-2.5 rounded-lg text-sm font-bold transition-all disabled:opacity-60 bg-accent-primary text-white hover:bg-accent-primary/90"
               >
                 {isPending ? "Saving…" : "Submit & Go to Dashboard →"}
               </button>
@@ -838,8 +836,7 @@ export default function OnboardingForm() {
               <button
                 type="button"
                 onClick={() => setStep((s) => s + 1)}
-                className="px-7 py-2.5 rounded-lg text-sm font-bold transition-all hover:opacity-90"
-                style={{ background: "#c8952a", color: "#0a0a0a" }}
+                className="px-7 py-2.5 rounded-lg text-sm font-bold transition-all hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
               >
                 Continue →
               </button>

@@ -29,7 +29,7 @@ function AuthorByline({ post }: { post: ResourcePostData }) {
   return (
     <div className="flex items-center gap-2">
       {post.authorImage ? (
-        <div className="relative h-7 w-7 rounded-full overflow-hidden shrink-0 border border-background-secondary">
+        <div className="relative h-7 w-7 rounded-full overflow-hidden shrink-0 border border-border-primary">
           <Image src={post.authorImage} alt={name} fill className="object-cover" unoptimized />
         </div>
       ) : (
@@ -60,7 +60,7 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-background-card rounded-xl border border-background-secondary overflow-hidden transition-all duration-300 hover:border-accent-primary/20">
+    <div className="bg-background-card rounded-xl border border-border-primary overflow-hidden transition-all duration-300 hover:border-accent-primary/20">
       {/* Header — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -76,7 +76,7 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
           </div>
           <h3
             className="text-lg font-bold text-text-primary leading-snug mb-3"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             {post.title}
           </h3>
@@ -89,13 +89,13 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
 
       {/* Expanded article content */}
       {expanded && (
-        <div className="border-t border-background-secondary px-5 py-5 space-y-5">
+        <div className="border-t border-border-primary px-5 py-5 space-y-5">
           <div
             className="tiptap-content"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
           {/* Author footer */}
-          <div className="pt-4 border-t border-background-secondary">
+          <div className="pt-4 border-t border-border-primary">
             <AuthorByline post={post} />
           </div>
         </div>
@@ -126,7 +126,7 @@ export default function ResourcesTab({ posts }: { posts: ResourcePostData[] }) {
         </div>
         <h2
           className="text-xl font-bold text-text-primary mb-2"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           No resources yet
         </h2>
@@ -147,7 +147,7 @@ export default function ResourcesTab({ posts }: { posts: ResourcePostData[] }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search articles…"
-          className="w-full pl-10 pr-4 py-2.5 bg-background-card border border-background-secondary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 text-sm"
+          className="w-full pl-10 pr-4 py-2.5 bg-background-card border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 text-sm"
         />
       </div>
 

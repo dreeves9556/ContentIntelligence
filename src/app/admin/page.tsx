@@ -83,17 +83,17 @@ export default async function AdminPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h1 className="text-3xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             Client Roster
           </h1>
-          <p className="text-[#787878] mt-1">
+          <p className="text-text-muted mt-1">
             Manage your clients and their platform access
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href="/admin/invites"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-[#e8e8e8] font-medium rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-background-secondary hover:bg-background-secondary text-text-primary font-medium rounded-lg transition-colors"
           >
             <Mail className="h-4 w-4" />
             Bulk Invite
@@ -104,62 +104,62 @@ export default async function AdminPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#111111] rounded-lg p-6 border border-[#1a1a1a]">
+        <div className="bg-background-card rounded-lg p-6 border border-border-primary">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-[#787878]">Total Clients</p>
-              <p className="text-2xl font-bold text-[#e8e8e8] mt-1">{totalClients}</p>
+              <p className="text-sm text-text-muted">Total Clients</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">{totalClients}</p>
             </div>
-            <div className="p-3 bg-[#c8952a]/10 rounded-lg">
-              <Users className="h-5 w-5 text-[#c8952a]" />
+            <div className="p-3 bg-[accent-primary-color]/10 rounded-lg">
+              <Users className="h-5 w-5 text-[accent-primary-color]" />
             </div>
           </div>
         </div>
 
-        <div className="bg-[#111111] rounded-lg p-6 border border-[#1a1a1a]">
+        <div className="bg-background-card rounded-lg p-6 border border-border-primary">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-[#787878]">Admin Users</p>
-              <p className="text-2xl font-bold text-[#e8e8e8] mt-1">{adminCount}</p>
+              <p className="text-sm text-text-muted">Admin Users</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">{adminCount}</p>
             </div>
-            <div className="p-3 bg-[#c8952a]/10 rounded-lg">
-              <Crown className="h-5 w-5 text-[#c8952a]" />
+            <div className="p-3 bg-[accent-primary-color]/10 rounded-lg">
+              <Crown className="h-5 w-5 text-[accent-primary-color]" />
             </div>
           </div>
         </div>
 
-        <div className="bg-[#111111] rounded-lg p-6 border border-[#1a1a1a]">
+        <div className="bg-background-card rounded-lg p-6 border border-border-primary">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-[#787878]">Total Users</p>
-              <p className="text-2xl font-bold text-[#e8e8e8] mt-1">{users.length}</p>
+              <p className="text-sm text-text-muted">Total Users</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">{users.length}</p>
             </div>
-            <div className="p-3 bg-[#1a1a1a] rounded-lg">
-              <UserPlus className="h-5 w-5 text-[#787878]" />
+            <div className="p-3 bg-background-secondary rounded-lg">
+              <UserPlus className="h-5 w-5 text-text-muted" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="bg-[#111111] rounded-lg border border-[#1a1a1a] overflow-hidden">
-        <div className="p-6 border-b border-[#1a1a1a]">
-          <h3 className="text-lg font-semibold text-[#e8e8e8]" style={{ fontFamily: "var(--font-playfair)" }}>
+      <div className="bg-background-card rounded-lg border border-border-primary overflow-hidden">
+        <div className="p-6 border-b border-border-primary">
+          <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             All Users
           </h3>
         </div>
 
         {/* Mobile card list (hidden on sm+) */}
-        <div className="sm:hidden divide-y divide-[#1a1a1a]">
+        <div className="sm:hidden divide-y divide-border-primary">
           {users.map((user) => (
             <div key={user.id} className="p-4 space-y-3">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 bg-[#c8952a]/10 rounded-full flex items-center justify-center text-[#c8952a] font-medium shrink-0">
+                <div className="h-10 w-10 bg-[accent-primary-color]/10 rounded-full flex items-center justify-center text-[accent-primary-color] font-medium shrink-0">
                   {user.name?.split(" ").map((n) => n[0]).join("") || user.email?.[0]?.toUpperCase() || "?"}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-[#e8e8e8] truncate">{user.name || "Unnamed User"}</p>
-                  <p className="text-xs text-[#787878] truncate">{user.email ?? "—"}</p>
+                  <p className="font-medium text-text-primary truncate">{user.name || "Unnamed User"}</p>
+                  <p className="text-xs text-text-muted truncate">{user.email ?? "—"}</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -168,28 +168,28 @@ export default async function AdminPage() {
                 <ResetPasswordButton userId={user.id} userEmail={user.email} />
                 <DeleteUserButton userId={user.id} userName={user.name} userEmail={user.email} isSelf={currentUserId === user.id} />
                 <StatusPill status={user.status} />
-                <span className="text-xs text-[#787878]">{format(user.createdAt, "MMM d, yyyy")}</span>
+                <span className="text-xs text-text-muted">{format(user.createdAt, "MMM d, yyyy")}</span>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 {user._count && user._count.questionnaires > 0 ? (
                   <Link
                     href={`/admin/clients/${user.id}/questionnaires`}
-                    className="flex items-center gap-1 text-[#c8952a] hover:underline"
+                    className="flex items-center gap-1 text-[accent-primary-color] hover:underline"
                   >
                     <FileText className="h-3 w-3" />
                     {user._count.questionnaires} questionnaire{user._count.questionnaires !== 1 ? "s" : ""}
                   </Link>
                 ) : (
-                  <span className="flex items-center gap-1 text-[#787878]">
+                  <span className="flex items-center gap-1 text-text-muted">
                     <FileText className="h-3 w-3" />
                     0 questionnaires
                   </span>
                 )}
-                <span className="flex items-center gap-1 text-[#787878]">
+                <span className="flex items-center gap-1 text-text-muted">
                   <CalendarDays className="h-3 w-3" />
                   {user._count?.calendars || 0} calendar{user._count?.calendars !== 1 ? "s" : ""}
                 </span>
-                <span className="flex items-center gap-1 text-[#787878]">
+                <span className="flex items-center gap-1 text-text-muted">
                   <Share2 className="h-3 w-3" />
                   {user._count?.zernioAccounts || 0} social{user._count?.zernioAccounts !== 1 ? "s" : ""}
                 </span>
@@ -202,41 +202,41 @@ export default async function AdminPage() {
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#1a1a1a]">
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+              <tr className="border-b border-border-primary">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Name / Email
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Role
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Plan
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Status
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Actions
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Activity
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#787878] uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Date Joined
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1a1a1a]">
+            <tbody className="divide-y divide-border-primary">
               {users.map((user) => (
-                <tr key={user.id} className="hover:bg-[#1a1a1a]/50 transition-colors">
+                <tr key={user.id} className="hover:bg-background-secondary/50 transition-colors">
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-[#c8952a]/10 rounded-full flex items-center justify-center text-[#c8952a] font-medium">
+                      <div className="h-10 w-10 bg-[accent-primary-color]/10 rounded-full flex items-center justify-center text-[accent-primary-color] font-medium">
                         {user.name?.split(" ").map((n) => n[0]).join("") || user.email?.[0]?.toUpperCase() || "?"}
                       </div>
                       <div>
-                        <p className="font-medium text-[#e8e8e8]">{user.name || "Unnamed User"}</p>
-                        <p className="text-sm text-[#787878]">{user.email ?? "—"}</p>
+                        <p className="font-medium text-text-primary">{user.name || "Unnamed User"}</p>
+                        <p className="text-sm text-text-muted">{user.email ?? "—"}</p>
                       </div>
                     </div>
                   </td>
@@ -260,31 +260,31 @@ export default async function AdminPage() {
                       {user._count && user._count.questionnaires > 0 ? (
                         <Link
                           href={`/admin/clients/${user.id}/questionnaires`}
-                          className="flex items-center gap-1.5 text-[#c8952a] hover:text-[#c8952a]/80 hover:underline transition-colors"
+                          className="flex items-center gap-1.5 text-[accent-primary-color] hover:text-[accent-primary-color]/80 hover:underline transition-colors"
                         >
                           <FileText className="h-3.5 w-3.5" />
                           {user._count.questionnaires} questionnaire{user._count.questionnaires !== 1 ? 's' : ''}
                         </Link>
                       ) : (
-                        <span className="text-[#787878] flex items-center gap-1.5">
+                        <span className="text-text-muted flex items-center gap-1.5">
                           <FileText className="h-3.5 w-3.5" />
                           0 questionnaires
                         </span>
                       )}
                       <span className="text-[#2a2a2a]">|</span>
-                      <span className="text-[#787878] flex items-center gap-1.5">
+                      <span className="text-text-muted flex items-center gap-1.5">
                         <CalendarDays className="h-3.5 w-3.5" />
                         {user._count?.calendars || 0} calendar{user._count?.calendars !== 1 ? 's' : ''}
                       </span>
                       <span className="text-[#2a2a2a]">|</span>
-                      <span className="text-[#787878] flex items-center gap-1.5">
+                      <span className="text-text-muted flex items-center gap-1.5">
                         <Share2 className="h-3.5 w-3.5" />
                         {user._count?.zernioAccounts || 0} social{user._count?.zernioAccounts !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <span className="text-sm text-[#787878]">
+                    <span className="text-sm text-text-muted">
                       {format(user.createdAt, "MMM d, yyyy")}
                     </span>
                   </td>
@@ -297,7 +297,7 @@ export default async function AdminPage() {
         {users.length === 0 && (
           <div className="p-12 text-center">
             <Users className="h-12 w-12 text-[#2a2a2a] mx-auto mb-4" />
-            <p className="text-[#787878]">No users found</p>
+            <p className="text-text-muted">No users found</p>
           </div>
         )}
       </div>

@@ -6,7 +6,7 @@ import { Bug, X, CheckCircle2, AlertCircle, Send } from "lucide-react";
 import { submitBugReport } from "./actions";
 
 const inputClass =
-  "w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm";
+  "w-full px-4 py-3 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 transition-all text-sm";
 
 export default function BugReportButton() {
   const [open, setOpen] = useState(false);
@@ -58,7 +58,7 @@ export default function BugReportButton() {
           onClick={() => !isPending && setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111111] p-6 space-y-4"
+            className="w-full max-w-md rounded-2xl border border-border-primary bg-background-card p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -66,13 +66,13 @@ export default function BugReportButton() {
                 <div className="p-2 rounded-xl bg-red-500/10">
                   <Bug className="h-5 w-5 text-red-400" />
                 </div>
-                <h2 className="text-lg font-bold text-white" style={{ fontFamily: "var(--font-playfair)" }}>
+                <h2 className="text-lg font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
                   Report a Bug
                 </h2>
               </div>
               <button
                 onClick={() => !isPending && setOpen(false)}
-                className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-white/5"
+                className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-background-secondary"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -125,7 +125,7 @@ export default function BugReportButton() {
                       className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium capitalize transition-all border ${
                         deviceInfo === opt
                           ? "bg-accent-primary/15 border-accent-primary/50 text-accent-primary"
-                          : "bg-[#0a0a0a] border-white/10 text-text-muted hover:text-text-primary"
+                          : "bg-background-secondary border-border-primary text-text-muted hover:text-text-primary"
                       }`}
                     >
                       {opt}
@@ -150,15 +150,14 @@ export default function BugReportButton() {
               <button
                 onClick={() => setOpen(false)}
                 disabled={isPending}
-                className="px-4 py-2 rounded-lg text-sm text-text-muted border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm text-text-muted border border-border-primary hover:bg-background-secondary transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold disabled:opacity-60 hover:opacity-90 transition-opacity flex-1"
-                style={{ background: "#c8952a", color: "#0a0a0a" }}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold bg-accent-primary text-white disabled:opacity-60 hover:bg-accent-primary/90 transition-colors flex-1"
               >
                 <Send className="h-3.5 w-3.5" />
                 {isPending ? "Submitting…" : "Submit Report"}

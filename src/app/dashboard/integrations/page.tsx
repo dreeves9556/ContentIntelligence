@@ -70,7 +70,7 @@ export default async function IntegrationsPage() {
         <div>
           <h1
             className="text-3xl font-bold text-text-primary"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "var(--font-serif)" }}
           >
             Integrations
           </h1>
@@ -102,7 +102,7 @@ export default async function IntegrationsPage() {
       <div>
         <h2
           className="text-xl font-semibold text-text-primary mb-4"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Available Integrations
         </h2>
@@ -121,7 +121,7 @@ export default async function IntegrationsPage() {
               connectedCount={connectedCount}
             />
           ))}
-          <div className="bg-background-card rounded-xl border border-dashed border-background-secondary p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
+          <div className="bg-background-card rounded-xl border border-dashed border-border-primary p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
             <div className="p-3 bg-background-secondary rounded-xl mb-3">
               <Plug className="h-6 w-6 text-text-muted" />
             </div>

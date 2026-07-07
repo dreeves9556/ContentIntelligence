@@ -51,7 +51,7 @@ export default async function CalendarPage() {
         <div className="p-4 bg-accent-primary/10 rounded-full mb-4">
           <Sparkles className="h-8 w-8 text-accent-primary" />
         </div>
-        <h2 className="text-xl font-bold text-text-primary mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h2 className="text-xl font-bold text-text-primary mb-2" style={{ fontFamily: "var(--font-serif)" }}>
           Generate Your First Content Calendar
         </h2>
         <p className="text-text-muted max-w-md mb-8">
@@ -67,17 +67,17 @@ export default async function CalendarPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
             Content Calendar
           </h1>
           <p className="text-text-muted mt-1">
             Your AI-powered weekly content strategy
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-background-secondary">
-            <Calendar className="h-4 w-4 text-accent-primary" />
-            <span className="text-sm text-text-primary font-medium">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+          <div className="flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-background-card rounded-lg border border-border-primary">
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
+            <span className="text-sm sm:text-base text-text-primary font-medium">
               Week of {new Date(calendar.weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             </span>
           </div>
@@ -106,7 +106,7 @@ export default async function CalendarPage() {
           </div>
         </div>
         <div className="w-full sm:w-auto flex flex-wrap gap-4 items-center">
-          <div className="w-px h-4 bg-background-secondary hidden sm:block" />
+          <div className="w-px h-4 bg-border-primary hidden sm:block" />
           <span className="text-sm text-text-muted font-medium">Buckets:</span>
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export default async function CalendarPage() {
       </div>
 
       {/* Focus Mode Calendar */}
-      <CalendarClient days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} />
+      <CalendarClient key={calendar.updatedAt} days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} />
     </div>
   );
 }

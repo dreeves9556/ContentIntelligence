@@ -12,7 +12,7 @@ self.addEventListener('push', function (event) {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Content Intelligence', options)
+    self.registration.showNotification(data.title || 'The Local Post', options)
   );
 });
 

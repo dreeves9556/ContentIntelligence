@@ -115,7 +115,7 @@ export const zernio = {
     async create(name: string): Promise<ZernioProfile> {
       const data = await zernioFetch<{ profile: ZernioProfile }>("/profiles", {
         method: "POST",
-        body: JSON.stringify({ name, description: "CoreOS user profile" }),
+        body: JSON.stringify({ name, description: "The Local Post user profile" }),
       });
       return data.profile;
     },

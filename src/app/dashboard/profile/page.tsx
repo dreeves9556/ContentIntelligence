@@ -17,7 +17,7 @@ export default async function ProfilePage() {
     userId
       ? prisma.profileSurvey.findMany({
           where: { userId },
-          select: { id: true, surveyType: true, answersJson: true },
+          select: { id: true, surveyType: true, answersJson: true, updatedAt: true },
         })
       : [],
   ]);
@@ -29,10 +29,11 @@ export default async function ProfilePage() {
           ? { id: questionnaire.id, content: questionnaire.content as Record<string, unknown> }
           : null
       }
-      profileSurveys={profileSurveys.map((s: { id: string; surveyType: string; answersJson: unknown }) => ({
+      profileSurveys={profileSurveys.map((s: { id: string; surveyType: string; answersJson: unknown; updatedAt: Date }) => ({
         id: s.id,
         surveyType: s.surveyType,
         answersJson: s.answersJson as Record<string, string>,
+        updatedAt: s.updatedAt.toISOString(),
       }))}
     />
   );

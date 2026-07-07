@@ -177,19 +177,19 @@ function BestTimeHeatmap({ entry }: { entry: BestTimeEntry }) {
   const maxVal = Math.max(...grid.flat().filter((v) => v > 0), 1);
 
   const colorForValue = (v: number) => {
-    if (v <= 0) return "rgba(255,255,255,0.03)";
+    if (v <= 0) return "rgba(16, 20, 24, 0.04)";
     const intensity = Math.min(v / maxVal, 1);
-    return `rgba(200, 149, 42, ${0.15 + intensity * 0.85})`;
+    return `rgba(30, 86, 214, ${0.15 + intensity * 0.85})`;
   };
 
   const label = PLATFORM_LABELS_LOWER[entry.platform.toLowerCase()] ?? entry.platform;
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Clock className="h-5 w-5 text-accent-primary shrink-0" />
-          <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
             Best Time to Post — {label}
           </h3>
         </div>
@@ -231,7 +231,7 @@ function BestTimeHeatmap({ entry }: { entry: BestTimeEntry }) {
 
       {/* Best slots summary */}
       {bestSlots.length > 0 && (
-        <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-background-secondary">
+        <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-border-primary">
           <p className="text-xs font-bold tracking-wider text-accent-primary uppercase mb-3">
             Top Posting Windows
           </p>
@@ -257,8 +257,8 @@ function BestTimeHeatmap({ entry }: { entry: BestTimeEntry }) {
 }
 
 const PLATFORM_LINE_COLORS: Record<string, string> = {
-  instagram: "#c8952a",
-  tiktok: "#0fcfe3",
+  instagram: "#C23E54",
+  tiktok: "#0E7C7B",
   linkedin: "#4f8eff",
   youtube: "#ff4757",
   facebook: "#3b82f6",
@@ -320,11 +320,11 @@ function FollowerGrowthChart({ followerStats }: { followerStats: FollowerStatsDa
   const tickInterval = chartData.length > 30 ? Math.floor(chartData.length / 8) : 0;
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="mb-4 sm:mb-6">
         <div className="flex items-center gap-2 mb-1">
           <UserPlus className="h-5 w-5 text-accent-primary shrink-0" />
-          <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
             Follower Growth
           </h3>
         </div>
@@ -341,7 +341,7 @@ function FollowerGrowthChart({ followerStats }: { followerStats: FollowerStatsDa
           return (
             <div
               key={s.platform}
-              className="flex items-center justify-between rounded-lg bg-background-secondary/50 border border-background-secondary px-4 py-3"
+              className="flex items-center justify-between rounded-lg bg-background-secondary/50 border border-border-primary px-4 py-3"
             >
               <div className="min-w-0">
                 <p className="text-xs text-text-muted truncate">{s.label}</p>
@@ -369,28 +369,28 @@ function FollowerGrowthChart({ followerStats }: { followerStats: FollowerStatsDa
         <div className="min-w-[280px] h-full w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" />
               <XAxis
                 dataKey="date"
-                stroke="#787878"
-                tick={{ fill: "#787878", fontSize: 10 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
                 tickLine={false}
                 tickFormatter={formatDateShort}
                 minTickGap={15}
                 interval={tickInterval}
               />
             <YAxis
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 12 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 12 }}
               tickLine={false}
               tickFormatter={(value) => formatNumber(value)}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                backgroundColor: "var(--color-background-card)",
+                border: "1px solid var(--color-border-primary)",
                 borderRadius: "8px",
-                color: "#e8e8e8",
+                color: "var(--color-text-primary)",
               }}
               labelFormatter={(label) => formatDateShort(String(label))}
               formatter={(value, name) => [
@@ -411,7 +411,7 @@ function FollowerGrowthChart({ followerStats }: { followerStats: FollowerStatsDa
                 type="monotone"
                 dataKey={platform}
                 name={platform}
-                stroke={PLATFORM_LINE_COLORS[platform.toLowerCase()] ?? "#c8952a"}
+                stroke={PLATFORM_LINE_COLORS[platform.toLowerCase()] ?? "var(--color-accent-primary)"}
                 strokeWidth={2.5}
                 dot={{ r: 3, strokeWidth: 1 }}
                 activeDot={{ r: 5 }}
@@ -441,10 +441,10 @@ function DemographicsCard({ entry }: { entry: DeepAnalyticsEntry }) {
   if (ageData.length === 0 && genderData.length === 0) return null;
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <Users className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Audience Demographics — {label}
         </h3>
       </div>
@@ -525,10 +525,10 @@ function RetentionCurveChart({ entry }: { entry: DeepAnalyticsEntry }) {
   };
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <PlayCircle className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Audience Retention — {label}
         </h3>
       </div>
@@ -558,32 +558,32 @@ function RetentionCurveChart({ entry }: { entry: DeepAnalyticsEntry }) {
           <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <defs>
               <linearGradient id="retentionGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#c8952a" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#c8952a" stopOpacity={0.05} />
+                <stop offset="0%" stopColor="var(--color-accent-primary)" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="var(--color-accent-primary)" stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" />
             <XAxis
               dataKey="time"
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 10 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickLine={false}
               tickFormatter={formatTime}
               minTickGap={30}
             />
             <YAxis
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 10 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickLine={false}
               domain={[0, 100]}
               tickFormatter={(v) => `${v}%`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                backgroundColor: "var(--color-background-card)",
+                border: "1px solid var(--color-border-primary)",
                 borderRadius: "8px",
-                color: "#e8e8e8",
+                color: "var(--color-text-primary)",
               }}
               labelFormatter={(label) => formatTime(Number(label))}
               formatter={(value) => [`${Number(value).toFixed(1)}%`, "Retention"]}
@@ -591,7 +591,7 @@ function RetentionCurveChart({ entry }: { entry: DeepAnalyticsEntry }) {
             <Area
               type="monotone"
               dataKey="percent"
-              stroke="#c8952a"
+              stroke="var(--color-accent-primary)"
               strokeWidth={2.5}
               fill="url(#retentionGrad)"
               dot={false}
@@ -621,10 +621,10 @@ function DailyViewsChart({ entry }: { entry: DeepAnalyticsEntry }) {
   };
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <Eye className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Daily Views — {label}
         </h3>
       </div>
@@ -640,27 +640,27 @@ function DailyViewsChart({ entry }: { entry: DeepAnalyticsEntry }) {
                 <stop offset="100%" stopColor="#ff4757" stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" />
             <XAxis
               dataKey="date"
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 10 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickLine={false}
               tickFormatter={formatDateShort}
               minTickGap={30}
             />
             <YAxis
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 10 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickLine={false}
               tickFormatter={(v) => formatNumber(v)}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                backgroundColor: "var(--color-background-card)",
+                border: "1px solid var(--color-border-primary)",
                 borderRadius: "8px",
-                color: "#e8e8e8",
+                color: "var(--color-text-primary)",
               }}
               labelFormatter={(label) => formatDateShort(String(label))}
               formatter={(value) => [formatNumber(Number(value)), "Views"]}
@@ -688,10 +688,10 @@ function MetricsListCard({ entry, title }: { entry: DeepAnalyticsEntry; title: s
   if (metrics.length === 0) return null;
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <BarChart2 className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           {title} — {label}
         </h3>
       </div>
@@ -702,7 +702,7 @@ function MetricsListCard({ entry, title }: { entry: DeepAnalyticsEntry; title: s
         {metrics.map((m) => (
           <div
             key={m.label}
-            className="rounded-lg bg-background-secondary/50 border border-background-secondary px-4 py-3"
+            className="rounded-lg bg-background-secondary/50 border border-border-primary px-4 py-3"
           >
             <p className="text-xs text-text-muted truncate">{m.label}</p>
             <p className="text-base sm:text-lg font-bold text-text-primary mt-0.5">
@@ -725,10 +725,10 @@ function PostReactionsCard({ entry }: { entry: DeepAnalyticsEntry }) {
   const total = reactions.reduce((s, r) => s + r.count, 0);
 
   return (
-    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <Heart className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Post Reactions — {label}
         </h3>
       </div>
@@ -772,10 +772,10 @@ function ContentDecayCard({ entry }: { entry: DeepAnalyticsEntry }) {
   const cadenceRec = generateCadenceRecommendation(buckets);
 
   return (
-    <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <Timer className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Content Decay — {label}
         </h3>
       </div>
@@ -806,41 +806,41 @@ function ContentDecayCard({ entry }: { entry: DeepAnalyticsEntry }) {
             <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <defs>
                 <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#c8952a" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#c8952a" stopOpacity={0.05} />
+                  <stop offset="0%" stopColor="var(--color-accent-primary)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="var(--color-accent-primary)" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" />
               <XAxis
                 dataKey="label"
-                stroke="#787878"
-                tick={{ fill: "#787878", fontSize: 10 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
                 tickLine={false}
                 minTickGap={20}
               />
               <YAxis
-                stroke="#787878"
-                tick={{ fill: "#787878", fontSize: 10 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
                 tickLine={false}
                 domain={[0, 100]}
                 tickFormatter={(v) => `${v}%`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
+                  backgroundColor: "var(--color-background-card)",
+                  border: "1px solid var(--color-border-primary)",
                   borderRadius: "8px",
-                  color: "#e8e8e8",
+                  color: "var(--color-text-primary)",
                 }}
                 formatter={(value) => [`${Number(value).toFixed(1)}%`, "Engagement Reached"]}
               />
               <Area
                 type="monotone"
                 dataKey="pct"
-                stroke="#c8952a"
+                stroke="var(--color-accent-primary)"
                 strokeWidth={2.5}
                 fill={`url(#${gradId})`}
-                dot={{ fill: "#c8952a", strokeWidth: 1, r: 3 }}
+                dot={{ fill: "var(--color-accent-primary)", strokeWidth: 1, r: 3 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -882,10 +882,10 @@ function DailyMetricsChart({ entry }: { entry: DeepAnalyticsEntry }) {
   }));
 
   return (
-    <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <BarChart2 className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Daily Metrics
         </h3>
       </div>
@@ -898,39 +898,39 @@ function DailyMetricsChart({ entry }: { entry: DeepAnalyticsEntry }) {
           <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <defs>
               <linearGradient id="dailyMetricsViewsGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#c8952a" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#c8952a" stopOpacity={0.05} />
+                <stop offset="0%" stopColor="var(--color-accent-primary)" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="var(--color-accent-primary)" stopOpacity={0.05} />
               </linearGradient>
               <linearGradient id="engagementGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0fcfe3" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#0fcfe3" stopOpacity={0.05} />
+                <stop offset="0%" stopColor="var(--color-brand-local)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="var(--color-brand-local)" stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" />
             <XAxis
               dataKey="date"
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 11 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
               tickLine={false}
               tickFormatter={(v) => v.slice(5)}
             />
             <YAxis
-              stroke="#787878"
-              tick={{ fill: "#787878", fontSize: 12 }}
+              stroke="var(--color-text-muted)"
+              tick={{ fill: "var(--color-text-muted)", fontSize: 12 }}
               tickLine={false}
               tickFormatter={(value) => formatNumber(value)}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                backgroundColor: "var(--color-background-card)",
+                border: "1px solid var(--color-border-primary)",
                 borderRadius: "8px",
-                color: "#e8e8e8",
+                color: "var(--color-text-primary)",
               }}
               formatter={(value) => [typeof value === "number" ? formatNumber(value) : value, ""]}
             />
-            <Area type="monotone" dataKey="views" stroke="#c8952a" strokeWidth={2} fill="url(#dailyMetricsViewsGrad)" name="Views" />
-            <Area type="monotone" dataKey="engagement" stroke="#0fcfe3" strokeWidth={2} fill="url(#engagementGrad)" name="Engagement" />
+            <Area type="monotone" dataKey="views" stroke="var(--color-accent-primary)" strokeWidth={2} fill="url(#dailyMetricsViewsGrad)" name="Views" />
+            <Area type="monotone" dataKey="engagement" stroke="var(--color-brand-local)" strokeWidth={2} fill="url(#engagementGrad)" name="Engagement" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -950,10 +950,10 @@ function PostingFrequencyCard({ entry }: { entry: DeepAnalyticsEntry }) {
   }, {} as Record<string, typeof rows>);
 
   return (
-    <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-background-secondary">
+    <div className="bg-background-card rounded-xl p-5 sm:p-6 border border-border-primary">
       <div className="flex items-center gap-2 mb-1">
         <Activity className="h-5 w-5 text-accent-primary shrink-0" />
-        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
           Posting Frequency vs Engagement
         </h3>
       </div>
@@ -1193,7 +1193,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
       {/* Header */}
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
             Analytics
           </h1>
           <p className="text-text-muted mt-1">
@@ -1207,8 +1207,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           <button
             onClick={handleSeed}
             disabled={seeding}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
-            style={{ background: "#c8952a", color: "#0a0a0a" }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-primary text-white transition-all hover:bg-accent-primary/90 disabled:opacity-50 shrink-0"
           >
             {seeding ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1222,7 +1221,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
 
       {/* Platform Tabs */}
       {platformTabs.length > 0 && (
-        <div className="flex items-center gap-1 p-1 bg-background-card border border-background-secondary rounded-xl overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 bg-background-card border border-border-primary rounded-xl overflow-x-auto">
           <button
             onClick={() => setActivePlatform("ALL")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
@@ -1253,7 +1252,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
 
       {/* Section Sub-Tabs + Sync Button */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1 p-1 bg-background-card border border-background-secondary rounded-xl overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 bg-background-card border border-border-primary rounded-xl overflow-x-auto">
           {SECTIONS.map((section) => {
             const Icon = section.icon;
             return (
@@ -1342,7 +1341,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           return (
             <div
               key={stat.name}
-              className="bg-background-card rounded-xl p-6 border border-background-secondary hover:border-accent-primary/30 transition-colors"
+              className="bg-background-card rounded-xl p-6 border border-border-primary hover:border-accent-primary/30 transition-colors"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -1363,9 +1362,9 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
       </div>
 
       {/* 8-Week Trend Chart */}
-      <div className="bg-background-card rounded-xl p-6 border border-background-secondary">
+      <div className="bg-background-card rounded-xl p-6 border border-border-primary">
         <div className="mb-6">
-          <h3 className="text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+          <h3 className="text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
             8-Week Performance Trend
           </h3>
           <p className="text-sm text-text-muted mt-1">
@@ -1375,15 +1374,15 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%" onResize={(w) => setChartWidth(w)}>
             <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" />
               <XAxis
                 dataKey="week"
-                stroke="#787878"
+                stroke="var(--color-text-muted)"
                 tick={({ x, y, payload, index }: { x: string | number; y: string | number; payload: { value: string }; index: number }) => (
                   <g transform={`translate(${x},${y})`}>
-                    <text x={0} y={0} dy={14} textAnchor="middle" fill="#e8e8e8" fontSize={12} fontWeight={600}>{payload.value}</text>
+                    <text x={0} y={0} dy={14} textAnchor="middle" fill="var(--color-text-primary)" fontSize={12} fontWeight={600}>{payload.value}</text>
                     {chartWidth >= 480 && (
-                      <text x={0} y={0} dy={28} textAnchor="middle" fill="#787878" fontSize={10}>{trendData[index]?.dateRange ?? ""}</text>
+                      <text x={0} y={0} dy={28} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10}>{trendData[index]?.dateRange ?? ""}</text>
                     )}
                   </g>
                 )}
@@ -1392,25 +1391,25 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
               />
               <YAxis
                 yAxisId="left"
-                stroke="#787878"
-                tick={{ fill: "#787878", fontSize: 12 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: "var(--color-text-muted)", fontSize: 12 }}
                 tickLine={false}
                 tickFormatter={(value) => formatNumber(value)}
               />
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                stroke="#0fcfe3"
-                tick={{ fill: "#0fcfe3", fontSize: 12 }}
+                stroke="var(--color-brand-local)"
+                tick={{ fill: "var(--color-brand-local)", fontSize: 12 }}
                 tickLine={false}
                 tickFormatter={(value) => formatNumber(value)}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
+                  backgroundColor: "var(--color-background-card)",
+                  border: "1px solid var(--color-border-primary)",
                   borderRadius: "8px",
-                  color: "#e8e8e8",
+                  color: "var(--color-text-primary)",
                 }}
                 formatter={(value) => [typeof value === "number" ? formatNumber(value) : value, ""]}
                 labelFormatter={(label, payload) => {
@@ -1427,20 +1426,20 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
                 yAxisId="left"
                 dataKey="views"
                 name="Views"
-                stroke="#c8952a"
+                stroke="var(--color-accent-primary)"
                 strokeWidth={3}
-                dot={{ fill: "#c8952a", strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: "#c8952a" }}
+                dot={{ fill: "var(--color-accent-primary)", strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: "var(--color-accent-primary)" }}
               />
               <Line
                 type="monotone"
                 yAxisId="right"
                 dataKey="engagement"
                 name="Engagement"
-                stroke="#0fcfe3"
+                stroke="var(--color-brand-local)"
                 strokeWidth={3}
-                dot={{ fill: "#0fcfe3", strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: "#0fcfe3" }}
+                dot={{ fill: "var(--color-brand-local)", strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: "var(--color-brand-local)" }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -1458,7 +1457,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           {filteredFollowerStats.length > 0 ? (
             <FollowerGrowthChart followerStats={filteredFollowerStats} />
           ) : (
-            <div className="bg-background-card rounded-xl p-12 border border-background-secondary text-center">
+            <div className="bg-background-card rounded-xl p-12 border border-border-primary text-center">
               <UserPlus className="h-10 w-10 text-text-muted mx-auto mb-3" />
               <p className="text-text-muted text-sm">{activePlatform !== "ALL" ? `No audience data for ${PLATFORM_LABELS[activePlatform] ?? activePlatform}` : "No audience data yet — connect a social account to start tracking follower growth"}</p>
             </div>
@@ -1476,7 +1475,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
               ))}
             </div>
           ) : (
-            <div className="bg-background-card rounded-xl p-12 border border-background-secondary text-center">
+            <div className="bg-background-card rounded-xl p-12 border border-border-primary text-center">
               <Clock className="h-10 w-10 text-text-muted mx-auto mb-3" />
               <p className="text-text-muted text-sm">{activePlatform !== "ALL" ? `No best-time data for ${PLATFORM_LABELS[activePlatform] ?? activePlatform}` : "No best-time data yet — connect a social account and sync analytics to see optimal posting times"}</p>
             </div>
@@ -1492,7 +1491,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
               {filteredDeepAnalytics.map((entry) => renderDeepAnalyticsCard(entry))}
             </div>
           ) : (
-            <div className="bg-background-card rounded-xl p-12 border border-background-secondary text-center">
+            <div className="bg-background-card rounded-xl p-12 border border-border-primary text-center">
               <Layers className="h-10 w-10 text-text-muted mx-auto mb-3" />
               <p className="text-text-muted text-sm">{activePlatform !== "ALL" ? `No deep analytics data for ${PLATFORM_LABELS[activePlatform] ?? activePlatform}` : "No deep analytics yet — connect a social account and sync analytics to unlock platform-specific insights like demographics, retention curves, and more"}</p>
             </div>
@@ -1504,9 +1503,9 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
       {activeSection === "performance" && (
         <>
       {/* Recent Performance Table */}
-      <div className="bg-background-card rounded-xl border border-background-secondary overflow-hidden">
-        <div className="p-6 border-b border-background-secondary">
-          <h3 className="text-lg font-semibold" style={{ fontFamily: "var(--font-playfair)" }}>
+      <div className="bg-background-card rounded-xl border border-border-primary overflow-hidden">
+        <div className="p-6 border-b border-border-primary">
+          <h3 className="text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>
             Recent Performance
             {activePlatform !== "ALL" && (
               <span className="ml-2 text-sm font-normal text-text-muted">— {PLATFORM_LABELS[activePlatform] ?? activePlatform}</span>
@@ -1525,7 +1524,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
         ) : (
           <>
             {/* Mobile card list (hidden on sm+) */}
-            <div className="sm:hidden divide-y divide-background-secondary">
+            <div className="sm:hidden divide-y divide-border-primary">
               {sortedPosts.map((post) => (
                 <div key={post.id} className="p-4 space-y-3">
                   <div className="flex items-start gap-3">
@@ -1562,7 +1561,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-background-secondary">
+                  <tr className="border-b border-border-primary">
                     <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">
                       Content
                     </th>
@@ -1602,7 +1601,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
                   {sortedPosts.map((post) => (
                     <tr
                       key={post.id}
-                      className="border-b border-background-secondary last:border-b-0 hover:bg-background-secondary/50 transition-colors"
+                      className="border-b border-border-primary last:border-b-0 hover:bg-background-secondary/50 transition-colors"
                     >
                       <td className="px-6 py-4">
                         <ConditionalLink href={post.postUrl} className="flex items-center gap-4 group">
