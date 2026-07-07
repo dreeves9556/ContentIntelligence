@@ -17,6 +17,75 @@ function generateRandomPassword(): string {
   return password;
 }
 
+async function sendOnboardingEmail(email: string, tempPassword: string): Promise<boolean> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await prisma.passwordResetToken.deleteMany({ where: { email } });
+  await prisma.passwordResetToken.create({
+    data: { email, token, expiresAt },
+  });
+
+  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+  const loginUrl = `${baseUrl}/login`;
+
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const result = await resend.emails.send({
+      from: `The Local Post <${fromAddress}>`,
+      to: email,
+      subject: "Welcome to The Local Post — Your Account Is Ready",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;background:#FFFFFF;color:#101418;border-radius:12px;overflow:hidden;border:1px solid #E2E8F0;">
+          <div style="background:#F7F9FC;padding:32px 32px 24px;border-bottom:1px solid #E2E8F0;text-align:center;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#101418;letter-spacing:-0.02em;">The Local Post</p>
+            <p style="margin:6px 0 0;font-size:11px;font-weight:600;color:#1E56D6;letter-spacing:0.12em;text-transform:uppercase;">Your Town. Your Post.</p>
+          </div>
+          <div style="padding:32px;">
+            <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:#101418;">Welcome to The Local Post</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#5B6472;line-height:1.6;">
+              Your account is ready. Here are your temporary login credentials. After signing in, we recommend setting your own password.
+            </p>
+
+            <div style="background:#F7F9FC;border:1px solid #E2E8F0;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
+              <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#5B6472;letter-spacing:0.08em;text-transform:uppercase;">Email</p>
+              <p style="margin:0 0 16px;font-size:14px;color:#101418;font-family:monospace;">${email}</p>
+              <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#5B6472;letter-spacing:0.08em;text-transform:uppercase;">Temporary Password</p>
+              <p style="margin:0;font-size:14px;color:#101418;font-family:monospace;">${tempPassword}</p>
+            </div>
+
+            <a href="${loginUrl}" style="display:inline-block;padding:12px 28px;background:#1E56D6;color:#FFFFFF;font-weight:600;font-size:14px;text-decoration:none;border-radius:6px;margin-bottom:16px;">Sign In Now</a>
+
+            <div style="border-top:1px solid #E2E8F0;margin:24px 0 0;padding-top:24px;">
+              <p style="margin:0 0 8px;font-size:14px;color:#101418;font-weight:600;">Want to set your own password?</p>
+              <a href="${resetUrl}" style="display:inline-block;padding:10px 24px;background:#FFFFFF;color:#1E56D6;font-weight:600;font-size:13px;text-decoration:none;border-radius:6px;border:1px solid #1E56D6;">Reset Password</a>
+              <p style="margin:12px 0 0;font-size:12px;color:#5B6472;line-height:1.6;">
+                This reset link expires in 24 hours.
+              </p>
+            </div>
+          </div>
+          <div style="background:#F7F9FC;padding:20px 32px;border-top:1px solid #E2E8F0;">
+            <p style="margin:0;font-size:11px;color:#5B6472;text-align:center;line-height:1.6;">
+              The Local Post — Be the local authority.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    if (result.error) {
+      console.error("[ONBOARDING EMAIL] Resend error:", result.error);
+      return false;
+    }
+    return true;
+  } catch (emailError) {
+    console.error("[ONBOARDING EMAIL] Failed to send:", emailError);
+    return false;
+  }
+}
+
 export async function createClientProfile(email: string, plan?: UserPlan): Promise<{ password: string; error?: string } | { error: string }> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
@@ -51,7 +120,9 @@ export async function createClientProfile(email: string, plan?: UserPlan): Promi
     return { error: "Failed to create account. Please try again." };
   }
 
-  return { password };
+  const emailSent = await sendOnboardingEmail(normalizedEmail, password);
+
+  return { password, error: emailSent ? undefined : "Account created, but welcome email failed to send. Share credentials manually." };
 }
 
 export async function updateUserPlan(
@@ -182,7 +253,8 @@ export async function bulkCreateInvites(
           plan,
         },
       });
-      results.push({ email, success: true, password });
+      const emailSent = await sendOnboardingEmail(email, password);
+      results.push({ email, success: true, password, error: emailSent ? undefined : "Welcome email failed — share credentials manually" });
     } catch {
       results.push({ email, success: false, error: "Failed to create account" });
     }

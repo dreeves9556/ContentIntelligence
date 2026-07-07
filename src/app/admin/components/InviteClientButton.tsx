@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, X, Link2, Copy, Check, Loader2, Mail } from "lucide-react";
+import { UserPlus, X, Link2, Copy, Check, Loader2, Mail, MailCheck } from "lucide-react";
 import { createClientProfile } from "../actions";
 
 export function InviteClientButton() {
@@ -12,6 +12,7 @@ export function InviteClientButton() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [emailSent, setEmailSent] = useState(false);
   const router = useRouter();
 
   function handleClose() {
@@ -29,6 +30,7 @@ export function InviteClientButton() {
       const result = await createClientProfile(email);
       if ("password" in result) {
         setGeneratedPassword(result.password);
+        setEmailSent(!result.error);
         router.refresh();
         if (result.error) {
           setError(result.error);
@@ -149,9 +151,20 @@ export function InviteClientButton() {
                     Account Created
                   </h3>
                   <p className="text-sm text-text-muted">
-                    Share these credentials with <span className="text-accent-primary">{email}</span> so they can log in. They will be prompted to complete onboarding after their first login.
+                    {emailSent ? (
+                      <>A welcome email with login credentials and a password reset link has been sent to <span className="text-accent-primary">{email}</span>.</>
+                    ) : (
+                      <>Share these credentials with <span className="text-accent-primary">{email}</span> so they can log in. They will be prompted to complete onboarding after their first login.</>
+                    )}
                   </p>
                 </div>
+
+                {emailSent && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 mb-4">
+                    <MailCheck className="h-4 w-4 shrink-0" />
+                    Welcome email delivered successfully.
+                  </div>
+                )}
 
                 <div className="bg-background-secondary border border-border-primary rounded-lg p-4 mb-4 space-y-2">
                   <div>
