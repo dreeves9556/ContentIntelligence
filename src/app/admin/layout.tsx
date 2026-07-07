@@ -15,6 +15,7 @@ import {
   Mail,
   Bug,
   Brain,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -23,6 +24,7 @@ const adminNavItems = [
   { name: "Exit Admin Mode", href: "/dashboard", icon: LogOut },
   { name: "Client Roster", href: "/admin", icon: Users },
   { name: "Bulk Invites", href: "/admin/invites", icon: Mail },
+  { name: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { name: "Resources", href: "/admin/resources", icon: BookOpen },
   { name: "Creator Memories", href: "/admin/memories", icon: Brain },
   { name: "Bug Reports", href: "/admin/bugs", icon: Bug },
