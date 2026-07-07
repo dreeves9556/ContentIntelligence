@@ -203,13 +203,37 @@ export async function sendBroadcast(
     return { success: false, sent: 0, failed: 0, errors: ["Subject and content are required."] };
   }
 
-  return executeBroadcast(subject, htmlContent, segment);
+  const broadcast = await prisma.scheduledBroadcast.create({
+    data: {
+      subject: subject.trim(),
+      htmlContent,
+      segment,
+      scheduledFor: new Date(),
+      status: "SENT",
+      createdBy: session.user.id,
+    },
+  });
+
+  const result = await executeBroadcast(subject, htmlContent, segment, broadcast.id);
+
+  await prisma.scheduledBroadcast.update({
+    where: { id: broadcast.id },
+    data: {
+      status: result.success ? "SENT" : "FAILED",
+      sentCount: result.sent,
+      failedCount: result.failed,
+      errors: result.errors.length > 0 ? result.errors : Prisma.JsonNull,
+    },
+  });
+
+  return result;
 }
 
 async function executeBroadcast(
   subject: string,
   htmlContent: string,
-  segment: EmailSegment
+  segment: EmailSegment,
+  broadcastId?: string
 ): Promise<BroadcastResult> {
   const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -283,16 +307,57 @@ async function executeBroadcast(
       if (result.error) {
         failed++;
         errors.push(`${recipient.email}: ${result.error.message}`);
+        if (broadcastId) {
+          await prisma.broadcastEmail.create({
+            data: {
+              broadcastId,
+              recipientEmail: recipient.email,
+              status: "failed",
+              errorMessage: result.error.message,
+            },
+          });
+        }
       } else {
         sent++;
+        if (broadcastId) {
+          await prisma.broadcastEmail.create({
+            data: {
+              broadcastId,
+              recipientEmail: recipient.email,
+              resendId: result.data?.id ?? null,
+              status: "sent",
+            },
+          });
+        }
       }
     } catch (err) {
       failed++;
-      errors.push(`${recipient.email}: ${err instanceof Error ? err.message : "Unknown error"}`);
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
+      errors.push(`${recipient.email}: ${errMsg}`);
+      if (broadcastId) {
+        await prisma.broadcastEmail.create({
+          data: {
+            broadcastId,
+            recipientEmail: recipient.email,
+            status: "failed",
+            errorMessage: errMsg,
+          },
+        });
+      }
     }
   }
 
   return { success: failed === 0, sent, failed, errors };
+}
+
+export interface BroadcastAnalytics {
+  delivered: number;
+  bounced: number;
+  opened: number;
+  clicked: number;
+  complained: number;
+  failed: number;
+  total: number;
 }
 
 export interface ScheduledBroadcastData {
@@ -304,6 +369,7 @@ export interface ScheduledBroadcastData {
   sentCount: number;
   failedCount: number;
   createdAt: string;
+  analytics: BroadcastAnalytics;
 }
 
 export async function scheduleBroadcast(
@@ -357,19 +423,40 @@ export async function getScheduledBroadcasts(): Promise<{ broadcasts: ScheduledB
   const rows = await prisma.scheduledBroadcast.findMany({
     orderBy: { scheduledFor: "desc" },
     take: 50,
+    include: { emails: { select: { status: true } } },
   });
 
   return {
-    broadcasts: rows.map((r) => ({
-      id: r.id,
-      subject: r.subject,
-      segment: r.segment,
-      scheduledFor: r.scheduledFor.toISOString(),
-      status: r.status,
-      sentCount: r.sentCount,
-      failedCount: r.failedCount,
-      createdAt: r.createdAt.toISOString(),
-    })),
+    broadcasts: rows.map((r) => {
+      const analytics: BroadcastAnalytics = {
+        delivered: 0,
+        bounced: 0,
+        opened: 0,
+        clicked: 0,
+        complained: 0,
+        failed: 0,
+        total: r.emails.length,
+      };
+      for (const e of r.emails) {
+        if (e.status === "delivered") analytics.delivered++;
+        else if (e.status === "bounced") analytics.bounced++;
+        else if (e.status === "opened") analytics.opened++;
+        else if (e.status === "clicked") analytics.clicked++;
+        else if (e.status === "complained") analytics.complained++;
+        else if (e.status === "failed") analytics.failed++;
+      }
+      return {
+        id: r.id,
+        subject: r.subject,
+        segment: r.segment,
+        scheduledFor: r.scheduledFor.toISOString(),
+        status: r.status,
+        sentCount: r.sentCount,
+        failedCount: r.failedCount,
+        createdAt: r.createdAt.toISOString(),
+        analytics,
+      };
+    }),
   };
 }
 
@@ -418,7 +505,8 @@ export async function processDueBroadcasts(): Promise<{ processed: number; sent:
     const result = await executeBroadcast(
       broadcast.subject,
       broadcast.htmlContent,
-      broadcast.segment as EmailSegment
+      broadcast.segment as EmailSegment,
+      broadcast.id
     );
 
     await prisma.scheduledBroadcast.update({
@@ -436,4 +524,129 @@ export async function processDueBroadcasts(): Promise<{ processed: number; sent:
   }
 
   return { processed, sent: totalSent, failed: totalFailed };
+}
+
+export async function refreshBroadcastAnalytics(
+  broadcastId: string
+): Promise<{ success: boolean; error?: string; analytics?: BroadcastAnalytics }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return { success: false, error: "Resend API key not configured." };
+  }
+
+  const emails = await prisma.broadcastEmail.findMany({
+    where: {
+      broadcastId,
+      resendId: { not: null },
+      status: { notIn: ["failed", "bounced", "complained"] },
+    },
+    select: { id: true, resendId: true, status: true },
+  });
+
+  if (emails.length === 0) {
+    return { success: true, analytics: await computeAnalytics(broadcastId) };
+  }
+
+  let updated = 0;
+  for (const email of emails) {
+    if (!email.resendId) continue;
+    try {
+      const response = await fetch(`https://api.resend.com/emails/${email.resendId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!response.ok) continue;
+      const data = await response.json();
+      const lastEvent = data.last_event as string | undefined;
+      if (lastEvent && lastEvent !== email.status) {
+        await prisma.broadcastEmail.update({
+          where: { id: email.id },
+          data: { status: lastEvent },
+        });
+        updated++;
+      }
+    } catch (err) {
+      console.error(`[REFRESH ANALYTICS] Failed for ${email.resendId}:`, err);
+    }
+  }
+
+  return { success: true, analytics: await computeAnalytics(broadcastId) };
+}
+
+async function computeAnalytics(broadcastId: string): Promise<BroadcastAnalytics> {
+  const emails = await prisma.broadcastEmail.findMany({
+    where: { broadcastId },
+    select: { status: true },
+  });
+
+  const analytics: BroadcastAnalytics = {
+    delivered: 0,
+    bounced: 0,
+    opened: 0,
+    clicked: 0,
+    complained: 0,
+    failed: 0,
+    total: emails.length,
+  };
+
+  for (const e of emails) {
+    if (e.status === "delivered") analytics.delivered++;
+    else if (e.status === "bounced") analytics.bounced++;
+    else if (e.status === "opened") analytics.opened++;
+    else if (e.status === "clicked") analytics.clicked++;
+    else if (e.status === "complained") analytics.complained++;
+    else if (e.status === "failed") analytics.failed++;
+  }
+
+  return analytics;
+}
+
+export interface BroadcastEmailData {
+  id: string;
+  recipientEmail: string;
+  resendId: string | null;
+  status: string;
+  errorMessage: string | null;
+}
+
+export async function getBroadcastDetail(
+  broadcastId: string
+): Promise<{ success: boolean; error?: string; subject?: string; htmlContent?: string; emails?: BroadcastEmailData[] }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const broadcast = await prisma.scheduledBroadcast.findUnique({
+    where: { id: broadcastId },
+    select: { subject: true, htmlContent: true },
+  });
+
+  if (!broadcast) {
+    return { success: false, error: "Broadcast not found." };
+  }
+
+  const emails = await prisma.broadcastEmail.findMany({
+    where: { broadcastId },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    select: { id: true, recipientEmail: true, resendId: true, status: true, errorMessage: true },
+  });
+
+  return {
+    success: true,
+    subject: broadcast.subject,
+    htmlContent: broadcast.htmlContent,
+    emails: emails.map((e) => ({
+      id: e.id,
+      recipientEmail: e.recipientEmail,
+      resendId: e.resendId,
+      status: e.status,
+      errorMessage: e.errorMessage,
+    })),
+  };
 }

@@ -462,7 +462,24 @@ model ScheduledBroadcast {
   createdBy     String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  emails        BroadcastEmail[]
 
   @@index([status, scheduledFor])
   @@map("scheduled_broadcasts")
+}
+
+model BroadcastEmail {
+  id             String   @id @default(cuid())
+  broadcastId    String
+  broadcast      ScheduledBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  recipientEmail String
+  resendId       String?
+  status         String   @default("sent") // sent, delivered, bounced, opened, clicked, complained, delivery_delayed
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([broadcastId])
+  @@index([resendId])
+  @@map("broadcast_emails")
 }
