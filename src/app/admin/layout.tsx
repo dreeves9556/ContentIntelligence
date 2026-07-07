@@ -41,7 +41,9 @@ export default function AdminLayout({
   const { data: session } = useSession();
 
   const handleLogout = () => {
-    signOut({ callbackUrl: `${window.location.origin}/login` });
+    signOut({ redirect: false }).then(() => {
+      window.location.href = "/login";
+    });
   };
 
   return (

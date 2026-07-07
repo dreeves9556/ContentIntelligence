@@ -60,7 +60,9 @@ export default function DashboardLayout({
   const navItems = getNavItems(plan);
 
   const handleLogout = () => {
-    signOut({ callbackUrl: `${window.location.origin}/login` });
+    signOut({ redirect: false }).then(() => {
+      window.location.href = "/login";
+    });
   };
 
   return (
