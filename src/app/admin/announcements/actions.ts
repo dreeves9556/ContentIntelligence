@@ -1,6 +1,7 @@
 "use server";
 
 import { Resend } from "resend";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getAnthropicApiKey, getAnthropicModel } from "@/lib/platform-config";
@@ -201,6 +202,14 @@ export async function sendBroadcast(
     return { success: false, sent: 0, failed: 0, errors: ["Subject and content are required."] };
   }
 
+  return executeBroadcast(subject, htmlContent, segment);
+}
+
+async function executeBroadcast(
+  subject: string,
+  htmlContent: string,
+  segment: EmailSegment
+): Promise<BroadcastResult> {
   const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
   const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -271,4 +280,147 @@ export async function sendBroadcast(
   }
 
   return { success: failed === 0, sent, failed, errors };
+}
+
+export interface ScheduledBroadcastData {
+  id: string;
+  subject: string;
+  segment: string;
+  scheduledFor: string;
+  status: string;
+  sentCount: number;
+  failedCount: number;
+  createdAt: string;
+}
+
+export async function scheduleBroadcast(
+  subject: string,
+  htmlContent: string,
+  segment: EmailSegment,
+  scheduledFor: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (!subject.trim() || !htmlContent.trim()) {
+    return { success: false, error: "Subject and content are required." };
+  }
+
+  const scheduledDate = new Date(scheduledFor);
+  if (isNaN(scheduledDate.getTime())) {
+    return { success: false, error: "Invalid date/time." };
+  }
+
+  if (scheduledDate.getTime() <= Date.now()) {
+    return { success: false, error: "Scheduled time must be in the future." };
+  }
+
+  try {
+    await prisma.scheduledBroadcast.create({
+      data: {
+        subject: subject.trim(),
+        htmlContent,
+        segment,
+        scheduledFor: scheduledDate,
+        status: "PENDING",
+        createdBy: session.user.id,
+      },
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("[SCHEDULE BROADCAST] Failed:", err);
+    return { success: false, error: "Failed to schedule broadcast." };
+  }
+}
+
+export async function getScheduledBroadcasts(): Promise<{ broadcasts: ScheduledBroadcastData[] }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { broadcasts: [] };
+  }
+
+  const rows = await prisma.scheduledBroadcast.findMany({
+    orderBy: { scheduledFor: "desc" },
+    take: 50,
+  });
+
+  return {
+    broadcasts: rows.map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      segment: r.segment,
+      scheduledFor: r.scheduledFor.toISOString(),
+      status: r.status,
+      sentCount: r.sentCount,
+      failedCount: r.failedCount,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  };
+}
+
+export async function cancelScheduledBroadcast(id: string): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const broadcast = await prisma.scheduledBroadcast.findUnique({ where: { id } });
+    if (!broadcast) {
+      return { success: false, error: "Broadcast not found." };
+    }
+    if (broadcast.status !== "PENDING") {
+      return { success: false, error: "Only pending broadcasts can be cancelled." };
+    }
+
+    await prisma.scheduledBroadcast.update({
+      where: { id },
+      data: { status: "CANCELLED" },
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("[CANCEL BROADCAST] Failed:", err);
+    return { success: false, error: "Failed to cancel broadcast." };
+  }
+}
+
+export async function processDueBroadcasts(): Promise<{ processed: number; sent: number; failed: number }> {
+  const dueBroadcasts = await prisma.scheduledBroadcast.findMany({
+    where: {
+      status: "PENDING",
+      scheduledFor: { lte: new Date() },
+    },
+    orderBy: { scheduledFor: "asc" },
+    take: 10,
+  });
+
+  let processed = 0;
+  let totalSent = 0;
+  let totalFailed = 0;
+
+  for (const broadcast of dueBroadcasts) {
+    processed++;
+    const result = await executeBroadcast(
+      broadcast.subject,
+      broadcast.htmlContent,
+      broadcast.segment as EmailSegment
+    );
+
+    await prisma.scheduledBroadcast.update({
+      where: { id: broadcast.id },
+      data: {
+        status: result.success ? "SENT" : "FAILED",
+        sentCount: result.sent,
+        failedCount: result.failed,
+        errors: result.errors.length > 0 ? result.errors : Prisma.JsonNull,
+      },
+    });
+
+    totalSent += result.sent;
+    totalFailed += result.failed;
+  }
+
+  return { processed, sent: totalSent, failed: totalFailed };
 }

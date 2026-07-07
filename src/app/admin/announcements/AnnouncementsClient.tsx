@@ -12,8 +12,19 @@ import {
   AlertCircle,
   Mail,
   Wand2,
+  Clock,
+  Calendar,
+  XCircle,
 } from "lucide-react";
-import { enhanceWithAI, suggestSubject, sendBroadcast, type EmailSegment } from "./actions";
+import {
+  enhanceWithAI,
+  suggestSubject,
+  sendBroadcast,
+  scheduleBroadcast,
+  cancelScheduledBroadcast,
+  type EmailSegment,
+  type ScheduledBroadcastData,
+} from "./actions";
 
 const SEGMENTS: { value: EmailSegment; label: string }[] = [
   { value: "all", label: "All Users" },
@@ -24,7 +35,31 @@ const SEGMENTS: { value: EmailSegment; label: string }[] = [
   { value: "unconnected", label: "No Social Accounts Connected" },
 ];
 
-export function AnnouncementsClient() {
+const SEGMENT_LABELS: Record<string, string> = Object.fromEntries(
+  SEGMENTS.map((s) => [s.value, s.label])
+);
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function statusBadge(status: string) {
+  const styles: Record<string, string> = {
+    PENDING: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    SENT: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    CANCELLED: "bg-background-secondary text-text-muted border-border-primary",
+    FAILED: "bg-red-500/10 text-red-400 border-red-500/20",
+  };
+  return styles[status] ?? styles.PENDING;
+}
+
+export function AnnouncementsClient({ initialBroadcasts }: { initialBroadcasts: ScheduledBroadcastData[] }) {
   const [subject, setSubject] = useState("");
   const [plainText, setPlainText] = useState("");
   const [htmlContent, setHtmlContent] = useState("");
@@ -33,9 +68,13 @@ export function AnnouncementsClient() {
   const [enhancing, startEnhance] = useTransition();
   const [suggesting, startSuggest] = useTransition();
   const [sending, startSend] = useTransition();
+  const [scheduling, startSchedule] = useTransition();
+  const [cancelling, startCancel] = useTransition();
   const [enhanced, setEnhanced] = useState(false);
   const [result, setResult] = useState<{ sent: number; failed: number; errors: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [broadcasts, setBroadcasts] = useState(initialBroadcasts);
 
   function handleSuggestSubject() {
     if (!plainText.trim()) {
@@ -95,6 +134,50 @@ export function AnnouncementsClient() {
         }
       } else {
         setError(res.errors[0] ?? "Failed to send broadcast.");
+      }
+    });
+  }
+
+  function handleSchedule() {
+    if (!subject.trim()) {
+      setError("Subject is required.");
+      return;
+    }
+    if (!htmlContent.trim()) {
+      setError("Email content is required. Write your message and click AI Enhance first.");
+      return;
+    }
+    if (!scheduledFor) {
+      setError("Pick a date and time to schedule.");
+      return;
+    }
+    setError(null);
+    startSchedule(async () => {
+      const res = await scheduleBroadcast(subject, htmlContent, segment, scheduledFor);
+      if (res.success) {
+        setSubject("");
+        setPlainText("");
+        setHtmlContent("");
+        setEnhanced(false);
+        setScheduledFor("");
+        setView("write");
+        window.location.reload();
+      } else {
+        setError(res.error ?? "Failed to schedule broadcast.");
+      }
+    });
+  }
+
+  function handleCancel(id: string) {
+    if (!confirm("Cancel this scheduled broadcast?")) return;
+    startCancel(async () => {
+      const res = await cancelScheduledBroadcast(id);
+      if (res.success) {
+        setBroadcasts((prev) =>
+          prev.map((b) => (b.id === id ? { ...b, status: "CANCELLED" } : b))
+        );
+      } else {
+        setError(res.error ?? "Failed to cancel broadcast.");
       }
     });
   }
@@ -303,31 +386,110 @@ export function AnnouncementsClient() {
         </div>
       )}
 
-      {/* Send button */}
-      <div className="flex items-center justify-between border-t border-border-primary pt-6">
-        <p className="text-xs text-text-muted">
-          {htmlContent
-            ? "Ready to send. This will email all users in the selected segment."
-            : "Write your message and enhance it before sending."}
-        </p>
-        <button
-          onClick={handleSend}
-          disabled={sending || !subject.trim() || !htmlContent.trim()}
-          className="flex items-center gap-2 px-6 py-2.5 bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
-        >
-          {sending ? (
-            <>
+      {/* Schedule + Send */}
+      <div className="border-t border-border-primary pt-6 space-y-4">
+        {/* Schedule row */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <Calendar className="h-4 w-4 text-text-muted shrink-0" />
+            <input
+              type="datetime-local"
+              value={scheduledFor}
+              onChange={(e) => setScheduledFor(e.target.value)}
+              className="flex-1 px-3 py-2 bg-background-secondary border border-border-primary rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50 transition-colors"
+            />
+          </div>
+          <button
+            onClick={handleSchedule}
+            disabled={scheduling || !subject.trim() || !htmlContent.trim() || !scheduledFor}
+            className="flex items-center gap-2 px-5 py-2.5 bg-background-secondary hover:bg-background-secondary/80 disabled:opacity-60 disabled:cursor-not-allowed text-text-primary font-medium rounded-lg transition-colors text-sm border border-border-primary"
+          >
+            {scheduling ? (
               <Loader2 className="h-4 w-4 animate-spin" />
-              Sending…
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4" />
-              Send Broadcast
-            </>
-          )}
-        </button>
+            ) : (
+              <Clock className="h-4 w-4" />
+            )}
+            Schedule
+          </button>
+        </div>
+
+        {/* Send now row */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-text-muted">
+            {htmlContent
+              ? "Ready to send. This will email all users in the selected segment immediately."
+              : "Write your message and enhance it before sending."}
+          </p>
+          <button
+            onClick={handleSend}
+            disabled={sending || !subject.trim() || !htmlContent.trim()}
+            className="flex items-center gap-2 px-6 py-2.5 bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
+          >
+            {sending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4" />
+                Send Now
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Scheduled broadcasts list */}
+      {broadcasts.length > 0 && (
+        <div className="pt-6 border-t border-border-primary">
+          <h2 className="text-xs font-bold tracking-wider text-text-muted uppercase mb-4">
+            Broadcast History
+          </h2>
+          <div className="space-y-3">
+            {broadcasts.map((b) => (
+              <div
+                key={b.id}
+                className="bg-background-card rounded-lg border border-border-primary p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{b.subject}</p>
+                  <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-text-muted">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {formatDateTime(b.scheduledFor)}
+                    </span>
+                    <span>{SEGMENT_LABELS[b.segment] ?? b.segment}</span>
+                    {b.status === "SENT" && (
+                      <span className="text-emerald-400">{b.sentCount} sent</span>
+                    )}
+                    {b.status === "FAILED" && b.failedCount > 0 && (
+                      <span className="text-red-400">{b.failedCount} failed</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full border ${statusBadge(b.status)}`}
+                  >
+                    {b.status}
+                  </span>
+                  {b.status === "PENDING" && (
+                    <button
+                      onClick={() => handleCancel(b.id)}
+                      disabled={cancelling}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors border border-red-500/20 disabled:opacity-50"
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
