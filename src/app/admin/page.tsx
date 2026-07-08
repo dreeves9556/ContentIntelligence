@@ -22,6 +22,7 @@ interface UserWithStats {
   status: "ACTIVE" | "PENDING";
   _count?: {
     questionnaires: number;
+    profileSurveys: number;
     calendars: number;
     zernioAccounts: number;
   };
@@ -36,6 +37,7 @@ async function getUsers(): Promise<UserWithStats[]> {
       _count: {
         select: {
           questionnaires: true,
+          profileSurveys: true,
           calendars: true,
           zernioAccounts: true,
         },
@@ -49,6 +51,7 @@ async function getUsers(): Promise<UserWithStats[]> {
     status:
       user.role === "ADMIN" ||
       (user._count?.questionnaires ?? 0) > 0 ||
+      (user._count?.profileSurveys ?? 0) > 0 ||
       (user._count?.calendars ?? 0) > 0
         ? "ACTIVE"
         : "PENDING",
@@ -171,20 +174,20 @@ export default async function AdminPage() {
                 <span className="text-xs text-text-muted">{format(user.createdAt, "MMM d, yyyy")}</span>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs">
-                {user._count && user._count.questionnaires > 0 ? (
+                {(() => { const total = (user._count?.questionnaires ?? 0) + (user._count?.profileSurveys ?? 0); return total > 0 ? (
                   <Link
                     href={`/admin/clients/${user.id}/questionnaires`}
                     className="flex items-center gap-1 text-[accent-primary-color] hover:underline"
                   >
                     <FileText className="h-3 w-3" />
-                    {user._count.questionnaires} questionnaire{user._count.questionnaires !== 1 ? "s" : ""}
+                    {total} survey{total !== 1 ? "s" : ""}
                   </Link>
                 ) : (
                   <span className="flex items-center gap-1 text-text-muted">
                     <FileText className="h-3 w-3" />
-                    0 questionnaires
+                    0 surveys
                   </span>
-                )}
+                ); })()}
                 <span className="flex items-center gap-1 text-text-muted">
                   <CalendarDays className="h-3 w-3" />
                   {user._count?.calendars || 0} calendar{user._count?.calendars !== 1 ? "s" : ""}
@@ -257,20 +260,20 @@ export default async function AdminPage() {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-4 text-sm">
-                      {user._count && user._count.questionnaires > 0 ? (
+                      {(() => { const total = (user._count?.questionnaires ?? 0) + (user._count?.profileSurveys ?? 0); return total > 0 ? (
                         <Link
                           href={`/admin/clients/${user.id}/questionnaires`}
                           className="flex items-center gap-1.5 text-[accent-primary-color] hover:text-[accent-primary-color]/80 hover:underline transition-colors"
                         >
                           <FileText className="h-3.5 w-3.5" />
-                          {user._count.questionnaires} questionnaire{user._count.questionnaires !== 1 ? 's' : ''}
+                          {total} survey{total !== 1 ? 's' : ''}
                         </Link>
                       ) : (
                         <span className="text-text-muted flex items-center gap-1.5">
                           <FileText className="h-3.5 w-3.5" />
-                          0 questionnaires
+                          0 surveys
                         </span>
-                      )}
+                      ); })()}
                       <span className="text-[#2a2a2a]">|</span>
                       <span className="text-text-muted flex items-center gap-1.5">
                         <CalendarDays className="h-3.5 w-3.5" />

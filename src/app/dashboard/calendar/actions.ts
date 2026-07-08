@@ -614,25 +614,17 @@ Days must be one of: ${targetDays.join(", ")}.
       day: dayName,
     }));
 
-    const existing = await prisma.calendar.findFirst({
+    const existingCount = await prisma.calendar.count({
       where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
     });
 
-    if (existing) {
-      await prisma.calendar.update({
-        where: { id: existing.id },
-        data: { contentJson: calendarData as unknown as Prisma.InputJsonValue },
-      });
-    } else {
-      await prisma.calendar.create({
-        data: {
-          userId: session.user.id,
-          weekNumber: 1,
-          contentJson: calendarData as unknown as Prisma.InputJsonValue,
-        },
-      });
-    }
+    await prisma.calendar.create({
+      data: {
+        userId: session.user.id,
+        weekNumber: existingCount + 1,
+        contentJson: calendarData as unknown as Prisma.InputJsonValue,
+      },
+    });
 
     // Touch memories that were used in this prompt (updates lastUsedAt)
     if (relevantMemories.length > 0) {

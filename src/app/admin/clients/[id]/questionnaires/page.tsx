@@ -10,13 +10,25 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getUserWithQuestionnaires(userId: string) {
+const SURVEY_TYPE_TITLES: Record<string, string> = {
+  LOCAL_MAYOR: "The Local Mayor",
+  TRENCH_WARFARE: "Trench Warfare",
+  ORIGIN_STORY: "Origin Story",
+  CLIENT_AVATAR: "Client Avatar",
+};
+
+async function getUserWithSurveys(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       questionnaires: {
         orderBy: {
           createdAt: "desc",
+        },
+      },
+      profileSurveys: {
+        orderBy: {
+          updatedAt: "desc",
         },
       },
     },
@@ -141,9 +153,43 @@ function QuestionnaireCard({ questionnaire }: { questionnaire: any }) {
   );
 }
 
+function ProfileSurveyCard({ survey }: { survey: any }) {
+  const answers = typeof survey.answersJson === "string"
+    ? JSON.parse(survey.answersJson)
+    : survey.answersJson;
+  const title = SURVEY_TYPE_TITLES[survey.surveyType] ?? survey.surveyType;
+
+  return (
+    <div className="bg-background-card rounded-lg border border-border-primary overflow-hidden">
+      <div className="p-6 border-b border-border-primary">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+            {title}
+          </h3>
+          <span className="text-xs text-text-muted">
+            {format(new Date(survey.updatedAt), "MMM d, yyyy 'at' h:mm a")}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
+            Deep-Dive Survey
+          </span>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <h4 className="text-sm font-medium text-accent-primary mb-4 uppercase tracking-wider">
+          Survey Answers
+        </h4>
+        <QuestionnaireAnswers content={answers} />
+      </div>
+    </div>
+  );
+}
+
 export default async function ClientQuestionnairesPage({ params }: PageProps) {
   const { id } = await params;
-  const user = await getUserWithQuestionnaires(id);
+  const user = await getUserWithSurveys(id);
 
   if (!user) {
     notFound();
@@ -186,38 +232,54 @@ export default async function ClientQuestionnairesPage({ params }: PageProps) {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-background-card rounded-lg p-4 border border-border-primary">
-          <p className="text-sm text-text-muted">Total Questionnaires</p>
+          <p className="text-sm text-text-muted">Onboarding Questionnaires</p>
           <p className="text-2xl font-bold text-text-primary mt-1">{user.questionnaires.length}</p>
         </div>
         <div className="bg-background-card rounded-lg p-4 border border-border-primary">
-          <p className="text-sm text-text-muted">Published</p>
-          <p className="text-2xl font-bold text-text-primary mt-1">
-            {user.questionnaires.filter((q) => q.isPublished).length}
-          </p>
+          <p className="text-sm text-text-muted">Deep-Dive Surveys</p>
+          <p className="text-2xl font-bold text-text-primary mt-1">{user.profileSurveys.length}</p>
         </div>
         <div className="bg-background-card rounded-lg p-4 border border-border-primary">
-          <p className="text-sm text-text-muted">Drafts</p>
-          <p className="text-2xl font-bold text-text-primary mt-1">
-            {user.questionnaires.filter((q) => !q.isPublished).length}
-          </p>
+          <p className="text-sm text-text-muted">Total Surveys</p>
+          <p className="text-2xl font-bold text-text-primary mt-1">{user.questionnaires.length + user.profileSurveys.length}</p>
         </div>
       </div>
 
-      {/* Questionnaires List */}
+      {/* Onboarding Questionnaires */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
-          Questionnaires
+          Onboarding Questionnaires
         </h2>
 
         {user.questionnaires.length === 0 ? (
           <div className="bg-background-card rounded-lg p-12 border border-border-primary text-center">
             <FileText className="h-12 w-12 text-[#2a2a2a] mx-auto mb-4" />
-            <p className="text-text-muted">No questionnaires found for this user</p>
+            <p className="text-text-muted">No onboarding questionnaires found for this user</p>
           </div>
         ) : (
           <div className="space-y-6">
             {user.questionnaires.map((questionnaire) => (
               <QuestionnaireCard key={questionnaire.id} questionnaire={questionnaire} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Deep-Dive Surveys */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+          Deep-Dive Surveys
+        </h2>
+
+        {user.profileSurveys.length === 0 ? (
+          <div className="bg-background-card rounded-lg p-12 border border-border-primary text-center">
+            <FileText className="h-12 w-12 text-[#2a2a2a] mx-auto mb-4" />
+            <p className="text-text-muted">No deep-dive surveys found for this user</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {user.profileSurveys.map((survey) => (
+              <ProfileSurveyCard key={survey.id} survey={survey} />
             ))}
           </div>
         )}
