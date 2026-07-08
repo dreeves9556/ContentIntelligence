@@ -230,6 +230,7 @@ function DaysSlider({ value, onChange }: { value: number; onChange: (v: number) 
 export default function OnboardingForm() {
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
 
   const [formData, setFormData] = useState<QuestionnaireFormData>({
@@ -280,6 +281,7 @@ export default function OnboardingForm() {
     }));
 
   const handleSubmit = () => {
+    setSubmitError(null);
     startTransition(async () => {
       try {
         const res = await fetch("/api/questionnaire", {
@@ -295,9 +297,12 @@ export default function OnboardingForm() {
             // ignore
           }
           router.push("/dashboard");
+        } else {
+          setSubmitError(result.error ?? "Something went wrong. Please try again.");
         }
       } catch (err) {
         console.error("Submit error:", err);
+        setSubmitError("Network error. Please check your connection and try again.");
       }
     });
   };
@@ -810,6 +815,13 @@ export default function OnboardingForm() {
             <p className="mt-6 text-xs text-text-muted leading-relaxed">
               By submitting, you acknowledge that your answers will be processed by our AI provider (Anthropic) to generate personalized content recommendations. Your data is handled in accordance with our privacy policy.
             </p>
+          )}
+
+          {/* Submit error */}
+          {submitError && (
+            <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {submitError}
+            </div>
           )}
 
           {/* Nav buttons */}

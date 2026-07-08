@@ -2,11 +2,11 @@ import { z } from "zod";
 
 export const questionnaireSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
-  businessName: z.string().min(1, "Business name is required").max(200),
-  city: z.string().min(1, "City is required").max(100),
+  businessName: z.string().max(200).optional().default(""),
+  city: z.string().max(100).optional().default(""),
   whatYouDo: z.string().min(1, "This field is required").max(500),
   industry: z.string().min(1, "Industry is required").max(100),
-  brandType: z.string().min(1, "Brand type is required").max(50),
+  brandType: z.string().max(50).optional().default(""),
   personalStory: z.string().max(5000).optional().default(""),
   industryAnswers: z.record(z.string(), z.string().max(2000)).optional().default({}),
   onCameraPersonality: z.array(z.string().max(100)).optional().default([]),
