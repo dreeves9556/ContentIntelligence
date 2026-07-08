@@ -31,10 +31,10 @@ export default function FacebookInfoAccordion() {
       {open && (
         <div className="px-5 pb-5 pt-1 space-y-3 text-sm text-text-muted leading-relaxed">
           <p>
-            Facebook&apos;s API only allows third-party tools like CoreOS to
+            Facebook&apos;s API only allows third-party tools like The Local Post to
             connect to <strong className="text-text-primary">Facebook Pages</strong>,
             not personal profiles. This is a restriction set by Meta (Facebook&apos;s
-            parent company), not CoreOS or our analytics partner Zernio.
+            parent company), not The Local Post or our analytics partner Zernio.
           </p>
 
           <p>
@@ -57,7 +57,7 @@ export default function FacebookInfoAccordion() {
             <strong className="text-text-primary">What you can do:</strong> Create a
             Facebook Page for your brand or creator presence. A Page doesn&apos;t
             require a separate business entity &mdash; you can be the sole admin and
-            post as yourself. Once connected, CoreOS can pull full analytics for that
+            post as yourself. Once connected, The Local Post can pull full analytics for that
             Page. Many creators run a Page alongside their personal profile for this
             reason.
           </p>
