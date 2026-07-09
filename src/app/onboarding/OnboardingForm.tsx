@@ -136,6 +136,35 @@ const inputClass =
 
 const textareaClass = inputClass + " resize-none";
 
+function TextareaWithCounter({
+  value,
+  onChange,
+  max,
+  rows,
+  placeholder,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  max: number;
+  rows?: number;
+  placeholder?: string;
+}) {
+  return (
+    <>
+      <textarea
+        rows={rows}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={textareaClass}
+      />
+      <div className="mt-1 text-right text-xs text-text-muted">
+        {value.length} / {max}
+      </div>
+    </>
+  );
+}
+
 function MultiSelect({
   options,
   selected,
@@ -364,12 +393,12 @@ export default function OnboardingForm() {
               </div>
               <div>
                 <FieldLabel required>What exactly do you do?</FieldLabel>
-                <textarea
+                <TextareaWithCounter
                   rows={4}
                   placeholder="Describe your work in plain language — what you do, who you help, and how..."
                   value={formData.whatYouDo}
-                  onChange={(e) => set("whatYouDo", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("whatYouDo", v)}
+                  max={2000}
                 />
               </div>
               <div>
@@ -412,12 +441,12 @@ export default function OnboardingForm() {
             <div className="space-y-5">
               <div>
                 <FieldLabel>Your Personal Story</FieldLabel>
-                <textarea
+                <TextareaWithCounter
                   rows={5}
                   placeholder="Share the journey that led you here — the pivotal moments, the why behind what you do..."
                   value={formData.personalStory}
-                  onChange={(e) => set("personalStory", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("personalStory", v)}
+                  max={5000}
                 />
               </div>
             </div>
@@ -444,12 +473,12 @@ export default function OnboardingForm() {
                 {questions.map((q) => (
                   <div key={q.key}>
                     <FieldLabel>{q.label}</FieldLabel>
-                    <textarea
+                    <TextareaWithCounter
                       rows={3}
                       placeholder={q.placeholder}
                       value={formData.industryAnswers[q.key] ?? ""}
-                      onChange={(e) => setIndustryAnswer(q.key, e.target.value)}
-                      className={textareaClass}
+                      onChange={(v) => setIndustryAnswer(q.key, v)}
+                      max={2000}
                     />
                   </div>
                 ))}
@@ -506,100 +535,100 @@ export default function OnboardingForm() {
               </div>
               <div>
                 <FieldLabel>Words or phrases the AI should NEVER use</FieldLabel>
-                <textarea
+                <TextareaWithCounter
                   rows={3}
                   placeholder={`e.g. "hustle", "dream home", "boss babe" — anything that feels off-brand or cliché to you`}
                   value={formData.antiBrandWords}
-                  onChange={(e) => set("antiBrandWords", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("antiBrandWords", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>Numbers that impress you (proof points for content)</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Stats, milestones, or metrics that build credibility</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "100+ deals closed", "15 years in the business", "$50M in sales volume"`}
                   value={formData.numbersThatImpress}
-                  onChange={(e) => set("numbersThatImpress", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("numbersThatImpress", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>A recent win worth bragging about</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">A deal, client result, or achievement from the last 30 days</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "Just closed a deal 3 days after listing, above asking price"`}
                   value={formData.recentWin}
-                  onChange={(e) => set("recentWin", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("recentWin", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>Top 3 questions you get asked all the time</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Your FAQ — these make great content topics</p>
-                <textarea
+                <TextareaWithCounter
                   rows={3}
                   placeholder={`1. How much down payment do I need?\n2. Is now a good time to buy?\n3. ...`}
                   value={formData.faqTop3}
-                  onChange={(e) => set("faqTop3", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("faqTop3", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>Seasonal rhythm of your business</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">When does your market heat up or slow down?</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "Spring is listing season, December is dead, September picks back up"`}
                   value={formData.seasonalRhythm}
-                  onChange={(e) => set("seasonalRhythm", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("seasonalRhythm", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>Upcoming events or launches in the next 30-60 days</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Open houses, course launches, market updates, speaking gigs</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "Open house on the 15th, new lead magnet launching next week"`}
                   value={formData.upcomingEvents}
-                  onChange={(e) => set("upcomingEvents", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("upcomingEvents", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>Words or catchphrases you use a lot</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Things you say all the time and want to be known for</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "here's the thing", "let's get into it", "straight talk"`}
                   value={formData.signaturePhrases}
-                  onChange={(e) => set("signaturePhrases", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("signaturePhrases", v)}
+                  max={1000}
                 />
               </div>
               <div>
                 <FieldLabel>Words that feel on-brand for you</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">The vocabulary of your brand — words the AI should lean into</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "no fluff", "real talk", "done right", "unapologetic"`}
                   value={formData.brandWords}
-                  onChange={(e) => set("brandWords", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("brandWords", v)}
+                  max={1000}
                 />
               </div>
               <div>
                 <FieldLabel>What are you currently promoting or selling?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">This makes your CTAs specific instead of generic</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "Free buyer consultation", "12-week coaching program", "Download my free guide"`}
                   value={formData.currentOffer}
-                  onChange={(e) => set("currentOffer", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("currentOffer", v)}
+                  max={1000}
                 />
               </div>
               <div>
@@ -613,23 +642,23 @@ export default function OnboardingForm() {
               <div>
                 <FieldLabel>Paste 1-3 posts or captions you've written that feel most "you"</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">The single most powerful way to calibrate your voice — paste real examples</p>
-                <textarea
+                <TextareaWithCounter
                   rows={6}
                   placeholder={`Paste posts, captions, or even emails you've written that capture your tone perfectly...`}
                   value={formData.contentSample}
-                  onChange={(e) => set("contentSample", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("contentSample", v)}
+                  max={5000}
                 />
               </div>
               <div>
                 <FieldLabel>How would friends describe the way you talk?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Verbal texture — pace, rhythm, style</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "fast-paced and punchy", "slow and thoughtful", "lots of analogies"`}
                   value={formData.speakingStyle}
-                  onChange={(e) => set("speakingStyle", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("speakingStyle", v)}
+                  max={2000}
                 />
               </div>
               <div>
@@ -662,56 +691,56 @@ export default function OnboardingForm() {
               <div>
                 <FieldLabel>What exact words do your clients use when describing their problem?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Mirror their language in hooks for instant resonance</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "I'm stuck", "I feel behind", "I don't know where to start"`}
                   value={formData.clientWords}
-                  onChange={(e) => set("clientWords", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("clientWords", v)}
+                  max={1000}
                 />
               </div>
               <div>
                 <FieldLabel>Anything you DON'T want to show or talk about?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Content boundaries — prevents unusable suggestions</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "don't show my kids' faces", "no political topics", "don't feature clients by name"`}
                   value={formData.contentBoundaries}
-                  onChange={(e) => set("contentBoundaries", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("contentBoundaries", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>Anything about your life outside work you're comfortable sharing?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Fuels authentic Personal bucket content</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`Kids, pets, partner, where you live, hobbies...`}
                   value={formData.familyContext}
-                  onChange={(e) => set("familyContext", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("familyContext", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>What does your typical morning look like?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Perfect for day-in-the-life content</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`e.g. "5am gym, coffee, journal, inbox by 8"`}
                   value={formData.morningRoutine}
-                  onChange={(e) => set("morningRoutine", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("morningRoutine", v)}
+                  max={2000}
                 />
               </div>
               <div>
                 <FieldLabel>What's a controversial opinion in your industry you're willing to stake your name on?</FieldLabel>
                 <p className="text-xs text-text-muted mb-3">Hot takes drive engagement</p>
-                <textarea
+                <TextareaWithCounter
                   rows={2}
                   placeholder={`The thing other professionals won't say out loud...`}
                   value={formData.hotTakes}
-                  onChange={(e) => set("hotTakes", e.target.value)}
-                  className={textareaClass}
+                  onChange={(v) => set("hotTakes", v)}
+                  max={2000}
                 />
               </div>
               <div>
