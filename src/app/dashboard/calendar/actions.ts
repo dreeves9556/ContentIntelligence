@@ -541,6 +541,8 @@ BUCKET DISTRIBUTION: this is the most important balance to get right:
 ${bucketDistStr}
 
 Days must be one of: ${targetDays.join(", ")}.
+
+MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Carousel, or Static). The creator overlays music on all their posts using Instagram's music sticker, so always pick a real, recognizable song with artist name that fits the mood.
 </generation_instructions>`;
 
   const systemPrompt = (config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT)

@@ -414,7 +414,7 @@ Content field definitions:
 - "directions": filming, performance, or design directions. Tell the creator HOW to make the piece (e.g., shot type, energy, visuals, slide layout). This is NOT copy-pasteable post text.
 - "cta": the closing call-to-action the creator should say or write.
 - "caption": the social media caption to paste below the post. Do NOT include any hashtags.
-- "musicSuggestion": music or audio vibe for Reels.
+- "musicSuggestion": a specific song or audio track the creator should overlay on the post using Instagram's music sticker/feature. This applies to ALL formats (Reels, Carousels, AND Static posts). Pick a real, recognizable song that fits the mood and energy of the content. Always include the song name and artist.
 - "duration": target length for Reels (e.g., "45-60 seconds") or read-time estimate for Carousels/Static.
 
 HUMAN WRITING RULES: CRITICAL (obey these in every text field: hook, body, cta, caption, directions):
