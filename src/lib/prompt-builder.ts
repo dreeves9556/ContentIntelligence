@@ -456,7 +456,7 @@ TAKE A POSITION: NO HEDGING:
 WRITE LIKE YOU TALK: THE PUB TEST:
 - Read every hook and body aloud in your head. If it sounds like an essay, a press release, or a LinkedIn thought-leadership post, rewrite it.
 - Use the words this person would actually say out loud to a friend or client. If they would not say "leverage" or "optimize" in conversation, do not put it in their content.
-- Be specific, not generic. "I closed 14 deals last month" beats "I have had a lot of success." Real numbers, real names, real details win every time.
+- Be specific, not generic. "I brought in 14 new clients last month" beats "I have had a lot of success." Real numbers, real names, real details win every time.
 - Do not announce what you are about to say. Just say it. No "Let me tell you about..." or "Here is why this matters." Cut the throat-clearing and start with the point.
 - Do not end with a summary of what you just said. End with the CTA or a punchy final thought, not a recap.
 

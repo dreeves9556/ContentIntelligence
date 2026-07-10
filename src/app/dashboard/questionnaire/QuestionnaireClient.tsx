@@ -63,27 +63,125 @@ interface SurveyDef {
   fields: SurveyField[];
 }
 
-const TRENCH_WARFARE_WILDEST_LABEL: Record<string, string> = {
-  "Real Estate": "Wildest thing you've seen at an inspection or closing?",
-  "Fitness / Personal Training": "Wildest thing you've seen in a gym or training session?",
-  "Financial Services": "Wildest thing you've seen in a client's portfolio or tax audit?",
-  "Coaching / Consulting": "Wildest thing you've uncovered during a client discovery call?",
-  Other: "Wildest thing you've uncovered during a client discovery call?",
+const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
+  LOCAL_MAYOR: {
+    "Real Estate": "Hyper-local knowledge that sets you apart from every out-of-town agent.",
+    "Fitness / Personal Training": "Hyper-local knowledge that sets you apart from every out-of-town trainer.",
+    "Financial Services": "Hyper-local knowledge that sets you apart from every out-of-town advisor.",
+    "Coaching / Consulting": "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
+    Other: "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
+  },
+  TRENCH_WARFARE: {
+    "Real Estate": "Battle-tested wisdom from the deals only real agents survive.",
+    "Fitness / Personal Training": "Battle-tested wisdom from the trenches only real trainers survive.",
+    "Financial Services": "Battle-tested wisdom from the trenches only real advisors survive.",
+    "Coaching / Consulting": "Battle-tested wisdom from the trenches only real practitioners survive.",
+    Other: "Battle-tested wisdom from the trenches only real pros survive.",
+  },
 };
 
-const ORIGIN_STORY_PETPEEVE_LABEL: Record<string, string> = {
-  "Real Estate": "Your biggest pet peeve about other agents?",
-  "Fitness / Personal Training": "Your biggest pet peeve about other trainers or influencers?",
-  "Financial Services": "Your biggest pet peeve about other advisors?",
-  "Coaching / Consulting": "Your biggest pet peeve about others in your industry?",
-  Other: "Your biggest pet peeve about others in your industry?",
+const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { label?: string; placeholder?: string }>>> = {
+  TRENCH_WARFARE: {
+    "Real Estate": {
+      wildestStory: { label: "Wildest thing you've seen at an inspection or closing?" },
+      negotiationStyle: { label: "Your negotiation style in 3 words?" },
+      trophyRoomWin: { placeholder: "The deal everyone said couldn't be done..." },
+    },
+    "Fitness / Personal Training": {
+      wildestStory: { label: "Wildest thing you've seen in a gym or training session?" },
+      negotiationStyle: { label: "Your sales or closing style in 3 words?" },
+      trophyRoomWin: { placeholder: "The client transformation everyone said was impossible..." },
+    },
+    "Financial Services": {
+      wildestStory: { label: "Wildest thing you've seen in a client's portfolio or tax audit?" },
+      negotiationStyle: { label: "Your negotiation style in 3 words?" },
+      trophyRoomWin: { placeholder: "The outcome everyone said couldn't be done..." },
+    },
+    "Coaching / Consulting": {
+      wildestStory: { label: "Wildest thing you've uncovered during a client discovery call?" },
+      negotiationStyle: { label: "Your sales or closing style in 3 words?" },
+      trophyRoomWin: { placeholder: "The breakthrough everyone said was impossible..." },
+    },
+    Other: {
+      wildestStory: { label: "Wildest thing you've uncovered during a client engagement?" },
+    },
+  },
+  ORIGIN_STORY: {
+    "Real Estate": {
+      agentPetPeeve: { label: "Your biggest pet peeve about other agents?" },
+      yearOneFailure: { placeholder: "The deal that fell apart, the client you lost, and what changed after..." },
+    },
+    "Fitness / Personal Training": {
+      agentPetPeeve: { label: "Your biggest pet peeve about other trainers or influencers?" },
+      yearOneFailure: { placeholder: "The client you couldn't help, the program that failed, and what changed after..." },
+    },
+    "Financial Services": {
+      agentPetPeeve: { label: "Your biggest pet peeve about other advisors?" },
+      yearOneFailure: { placeholder: "The client you lost, the portfolio that blew up, and what changed after..." },
+    },
+    "Coaching / Consulting": {
+      agentPetPeeve: { label: "Your biggest pet peeve about others in your industry?" },
+      yearOneFailure: { placeholder: "The engagement that failed, the breakthrough that didn't happen, and what changed after..." },
+    },
+    Other: {
+      agentPetPeeve: { label: "Your biggest pet peeve about others in your industry?" },
+    },
+  },
+  CLIENT_AVATAR: {
+    "Real Estate": {
+      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing..." },
+    },
+    "Fitness / Personal Training": {
+      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before committing to a program..." },
+    },
+    "Financial Services": {
+      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before trusting you with their money..." },
+    },
+    "Coaching / Consulting": {
+      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing up to work with you..." },
+    },
+  },
+  WEEKLY_CONTEXT: {
+    "Real Estate": {
+      professionalUpdates: { placeholder: "Deals in motion, client meetings, showings, deadlines..." },
+    },
+    "Fitness / Personal Training": {
+      professionalUpdates: { placeholder: "Clients in progress, training sessions, program launches, deadlines..." },
+    },
+    "Financial Services": {
+      professionalUpdates: { placeholder: "Clients in motion, portfolio reviews, meetings, deadlines..." },
+    },
+    "Coaching / Consulting": {
+      professionalUpdates: { placeholder: "Client engagements in motion, sessions, projects, launches, deadlines..." },
+    },
+  },
 };
+
+function resolveSubtitle(surveyType: string, defaultSubtitle: string, industry?: string): string {
+  if (!industry) return defaultSubtitle;
+  return INDUSTRY_SUBTITLE_OVERRIDES[surveyType]?.[industry] ?? defaultSubtitle;
+}
+
+function resolveFields(surveyType: string, fields: SurveyField[], industry?: string): SurveyField[] {
+  if (!industry) return fields;
+  const overrides = INDUSTRY_FIELD_OVERRIDES[surveyType]?.[industry];
+  if (!overrides) return fields;
+  return fields.map((f) => {
+    const ov = overrides[f.key];
+    if (!ov) return f;
+    return {
+      ...f,
+      label: ov.label ?? f.label,
+      placeholder: ov.placeholder ?? f.placeholder,
+    };
+  });
+}
 
 const DEEP_DIVE_SURVEYS: SurveyDef[] = [
   {
     type: "LOCAL_MAYOR",
     title: "The Local Mayor",
-    subtitle: "Hyper-local knowledge that sets you apart from every out-of-town agent.",
+    subtitle: "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
     icon: MapPin,
     color: "#3b82f6",
     fields: [
@@ -101,15 +199,15 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
   {
     type: "TRENCH_WARFARE",
     title: "Trench Warfare",
-    subtitle: "Battle-tested wisdom from the deals only real agents survive.",
+    subtitle: "Battle-tested wisdom from the trenches only real pros survive.",
     icon: Sword,
     color: "#ef4444",
     fields: [
-      { key: "wildestStory", label: "Wildest thing you've seen at an inspection or closing?", placeholder: "The story that still makes you shake your head..." },
+      { key: "wildestStory", label: "Wildest thing you've seen on the job?", placeholder: "The story that still makes you shake your head..." },
       { key: "disagreesWith", label: "Common advice you publicly disagree with?", placeholder: "The myth you push back on at every dinner party..." },
       { key: "negotiationStyle", label: "Your negotiation style in 3 words?", placeholder: "e.g. Patient, Strategic, Relentless" },
       { key: "mostCommonDM", label: "What's the #1 question you get in your DMs?", placeholder: "The question you answer so often you could do it in your sleep..." },
-      { key: "trophyRoomWin", label: "The Trophy Room: A recent 'miracle' win you pulled off for a client that seemed impossible?", placeholder: "The deal everyone said couldn't be done..." },
+      { key: "trophyRoomWin", label: "The Trophy Room: A recent 'miracle' win you pulled off for a client that seemed impossible?", placeholder: "The one everyone said couldn't be done..." },
       { key: "objectionCrusher", label: "The Objection Crusher: Most common reason a prospect says 'no' or 'I want to wait', and how you respond?", placeholder: "The hesitation you've heard a hundred times..." },
     ],
   },
@@ -120,8 +218,8 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
     icon: BookOpen,
     color: "#a855f7",
     fields: [
-      { key: "yearOneFailure", label: "Your biggest failure in year 1 and the lesson it taught you?", placeholder: "The deal that fell apart, the client you lost, and what changed after..." },
-      { key: "agentPetPeeve", label: "Your biggest pet peeve about other agents?", placeholder: "The thing that makes you cringe when you see it..." },
+      { key: "yearOneFailure", label: "Your biggest failure in year 1 and the lesson it taught you?", placeholder: "The project that fell apart, the client you lost, and what changed after..." },
+      { key: "agentPetPeeve", label: "Your biggest pet peeve about others in your industry?", placeholder: "The thing that makes you cringe when you see it..." },
       { key: "geekHobby", label: "A hobby or interest you absolutely geek out about?", placeholder: "The thing your friends tease you for knowing too much about..." },
       { key: "alternativeCareer", label: "If not in this industry, what career would you have pursued?", placeholder: "Your alternate universe..." },
     ],
@@ -134,7 +232,7 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
     color: "#10b981",
     fields: [
       { key: "favoriteClientType", label: "Describe your absolute favourite type of client to work with?", placeholder: "Not just demographics — what's their energy, attitude, situation?" },
-      { key: "clientBiggestFear", label: "What is the single biggest fear your ideal client has?", placeholder: "The thing that keeps them awake at 2am before signing..." },
+      { key: "clientBiggestFear", label: "What is the single biggest fear your ideal client has?", placeholder: "The thing that keeps them awake at 2am before making a decision..." },
       { key: "clientRedFlag", label: "A red flag that tells you to politely walk away from a client?", placeholder: "The moment you know it's not a good fit..." },
       { key: "clientMisbeliefs", label: "What do clients wrongly believe they should do first? (myth-busting fuel)", placeholder: "The common misconception you love correcting in your content..." },
       { key: "clientDreamOutcome", label: "What is your client's dream outcome — in their own words?", placeholder: "The transformation they fantasize about but rarely say out loud..." },
@@ -177,7 +275,7 @@ const WEEKLY_CONTEXT_DEF: TimedSurveyDef = {
   },
   fields: [
     { key: "personalHighlights", label: "What's happening personally this week?", placeholder: "Family stuff, social plans, things you're excited about outside of work..." },
-    { key: "professionalUpdates", label: "What's happening professionally this week?", placeholder: "Deals in motion, client meetings, projects, launches, deadlines..." },
+    { key: "professionalUpdates", label: "What's happening professionally this week?", placeholder: "Clients in motion, meetings, projects, launches, deadlines..." },
     { key: "newSpots", label: "Any new restaurants, hangouts, or spots you've discovered?", placeholder: "Tried a new coffee shop? Found a hidden trail? A new lunch spot?" },
     { key: "winsMoments", label: "Any wins, stories, or moments worth sharing this week?", placeholder: "A client win, a funny moment, something that surprised you..." },
     { key: "onYourMind", label: "What's on your mind this week that could spark content?", placeholder: "An opinion forming, a question you keep getting asked, a trend you're noticing..." },
@@ -320,15 +418,7 @@ function DeepDivePanel({
   const [status, setStatus] = useState<"success" | "error" | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const resolvedFields = survey.fields.map((f) => {
-    if (survey.type === "TRENCH_WARFARE" && f.key === "wildestStory" && industry) {
-      return { ...f, label: TRENCH_WARFARE_WILDEST_LABEL[industry] ?? f.label };
-    }
-    if (survey.type === "ORIGIN_STORY" && f.key === "agentPetPeeve" && industry) {
-      return { ...f, label: ORIGIN_STORY_PETPEEVE_LABEL[industry] ?? f.label };
-    }
-    return f;
-  });
+  const resolvedFields = resolveFields(survey.type, survey.fields, industry);
 
   const handleSave = () => {
     startTransition(async () => {
@@ -434,9 +524,11 @@ function DeepDivePanel({
 function TimedSurveyPanel({
   survey,
   existing,
+  industry,
 }: {
   survey: TimedSurveyDef;
   existing: ProfileSurveyRecord | undefined;
+  industry?: string;
 }) {
   const expired = survey.isExpired(existing?.updatedAt);
   const [isEditing, setIsEditing] = useState(!existing || expired);
@@ -446,6 +538,7 @@ function TimedSurveyPanel({
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<"success" | "error" | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const resolvedFields = resolveFields(survey.type, survey.fields, industry);
 
   const handleSave = () => {
     startTransition(async () => {
@@ -466,7 +559,7 @@ function TimedSurveyPanel({
       <div className="pt-4 space-y-4">
         <StatusBanner status={status} error={errorMsg} />
         <div className="space-y-3">
-          {survey.fields.map((field) => {
+          {resolvedFields.map((field) => {
             const answer = answers[field.key] ?? existing.answersJson[field.key];
             return (
               <div key={field.key} className="space-y-1">
@@ -506,7 +599,7 @@ function TimedSurveyPanel({
           Your previous answers have expired ({survey.resetLabel}). Update them with what&apos;s happening now.
         </div>
       )}
-      {survey.fields.map((field) => (
+      {resolvedFields.map((field) => (
         <div key={field.key}>
           <label className="block text-xs font-medium text-text-muted mb-1.5">{field.label}</label>
           <textarea
@@ -709,7 +802,7 @@ export default function QuestionnaireClient({
               key={survey.type}
               icon={survey.icon}
               title={survey.title}
-              subtitle={survey.subtitle}
+              subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
               color={survey.color}
               isCompleted={!!existing}
             >
@@ -739,12 +832,12 @@ export default function QuestionnaireClient({
               key={survey.type}
               icon={survey.icon}
               title={survey.title}
-              subtitle={survey.subtitle}
+              subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
               color={survey.color}
               isCompleted={isCurrent}
               badge={survey.resetLabel}
             >
-              <TimedSurveyPanel survey={survey} existing={existing} />
+              <TimedSurveyPanel survey={survey} existing={existing} industry={industry} />
             </AccordionRow>
           );
         })}
