@@ -77,7 +77,12 @@ export function PushNotificationManager() {
       setDbSubscribed(true);
       setMessage("Push notifications enabled");
     } catch (error) {
-      setMessage("Failed to enable push notifications");
+      const isSecureContext = window.isSecureContext;
+      if (!isSecureContext) {
+        setMessage("Push notifications require HTTPS on mobile. They work on localhost on your computer, but your phone needs a secure connection.");
+      } else {
+        setMessage("Failed to enable push notifications. Make sure notifications are allowed in your browser settings.");
+      }
       console.error(error);
     } finally {
       setLoading(false);
@@ -87,11 +92,12 @@ export function PushNotificationManager() {
   const unsubscribeFromPush = useCallback(async () => {
     setLoading(true);
     try {
+      const endpoint = subscription?.endpoint;
       await subscription?.unsubscribe();
       setSubscription(null);
-      await unsubscribeUser();
-      setDbSubscribed(false);
-      setMessage("Push notifications disabled");
+      await unsubscribeUser(endpoint);
+      await checkDbStatus();
+      setMessage("Push notifications disabled on this device");
     } catch (error) {
       setMessage("Failed to disable push notifications");
       console.error(error);

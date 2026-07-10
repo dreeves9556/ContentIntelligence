@@ -369,13 +369,19 @@ export async function subscribeUser(sub: {
   return { success: true };
 }
 
-export async function unsubscribeUser() {
+export async function unsubscribeUser(endpoint?: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  await prisma.pushSubscription.deleteMany({
-    where: { userId: session.user.id },
-  });
+  if (endpoint) {
+    await prisma.pushSubscription.deleteMany({
+      where: { userId: session.user.id, endpoint },
+    });
+  } else {
+    await prisma.pushSubscription.deleteMany({
+      where: { userId: session.user.id },
+    });
+  }
 
   return { success: true };
 }
