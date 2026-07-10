@@ -343,27 +343,26 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
   }
 }
 
-export async function subscribeUser(sub: PushSubscription) {
+export async function subscribeUser(sub: {
+  endpoint: string;
+  expirationTime: number | null;
+  keys: { p256dh: string; auth: string };
+}) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  const serializedSub = JSON.parse(JSON.stringify(sub)) as {
-    endpoint: string;
-    keys: { p256dh: string; auth: string };
-  };
-
   await prisma.pushSubscription.upsert({
-    where: { endpoint: serializedSub.endpoint },
+    where: { endpoint: sub.endpoint },
     update: {
       userId: session.user.id,
-      p256dh: serializedSub.keys.p256dh,
-      auth: serializedSub.keys.auth,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
     },
     create: {
       userId: session.user.id,
-      endpoint: serializedSub.endpoint,
-      p256dh: serializedSub.keys.p256dh,
-      auth: serializedSub.keys.auth,
+      endpoint: sub.endpoint,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
     },
   });
 

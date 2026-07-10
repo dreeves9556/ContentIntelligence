@@ -51,6 +51,7 @@ export async function saveProfileSurvey(
   });
 
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/questionnaire");
 
   // Build/update memories from survey answers (background, non-blocking)
   buildMemoriesFromSurvey(session.user.id, surveyType, answers).catch((err) =>
@@ -71,6 +72,7 @@ export async function deleteProfileSurvey(
   });
 
   revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard/questionnaire");
   return { success: true };
 }
 
@@ -110,6 +112,7 @@ export async function updateOnboarding(
 
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/questionnaire");
   return { success: true };
 }
 

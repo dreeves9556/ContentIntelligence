@@ -230,7 +230,7 @@ function SectionHeading({
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="rounded-2xl border border-border-primary bg-background-card p-6 sm:p-8 space-y-5"
+      className="rounded-2xl border border-border-primary bg-background-card p-4 sm:p-6 space-y-5"
     >
       {children}
     </div>
@@ -720,7 +720,7 @@ export default function SettingsForm({
           type="button"
           onClick={handleSave}
           disabled={isPending}
-          className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-60 hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
+          className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-60 hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
         >
           <Save className="h-4 w-4" />
           {isPending ? "Saving…" : "Save Changes"}

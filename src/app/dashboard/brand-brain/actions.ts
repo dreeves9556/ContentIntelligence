@@ -27,6 +27,7 @@ export async function deleteMyMemory(id: string): Promise<{ success: boolean; er
 
   await deleteMemory(id);
   revalidatePath("/dashboard/brand-brain");
+  revalidatePath("/dashboard/questionnaire");
   return { success: true };
 }
 
@@ -42,6 +43,7 @@ export async function togglePinMemory(id: string): Promise<{ success: boolean; e
 
   await updateMemory(id, { pinned: !memory.pinned });
   revalidatePath("/dashboard/brand-brain");
+  revalidatePath("/dashboard/questionnaire");
   return { success: true };
 }
 
@@ -63,6 +65,7 @@ export async function correctMemory(
 
   await updateMemory(id, { summary: summary.trim() });
   revalidatePath("/dashboard/brand-brain");
+  revalidatePath("/dashboard/questionnaire");
   return { success: true };
 }
 

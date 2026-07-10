@@ -112,12 +112,12 @@ export default function BrandBrainClient({ groupedMemories, typeLabels, typeDesc
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-text-muted" />
+                  <ChevronDown className="h-4 w-4 text-text-muted shrink-0" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-text-muted" />
+                  <ChevronRight className="h-4 w-4 text-text-muted shrink-0" />
                 )}
-                <span className="text-lg">{TYPE_ICONS[type]}</span>
-                <div className="text-left">
+                <span className="text-lg shrink-0">{TYPE_ICONS[type]}</span>
+                <div className="text-left min-w-0">
                   <p className="text-sm font-semibold text-text-primary">
                     {typeLabels[type]}
                   </p>
@@ -144,7 +144,7 @@ export default function BrandBrainClient({ groupedMemories, typeLabels, typeDesc
                   <div className="divide-y divide-border-primary">
                     {memories.map((memory) => (
                       <div key={memory.id} className="p-4 hover:bg-background-secondary/50 transition-colors">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <p className="text-sm font-medium text-text-primary">
@@ -208,7 +208,7 @@ export default function BrandBrainClient({ groupedMemories, typeLabels, typeDesc
                             </div>
                           </div>
                           {editingId !== memory.id && (
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
                               <button
                                 onClick={() => handlePin(memory.id)}
                                 disabled={isPending}

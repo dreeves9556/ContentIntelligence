@@ -8,7 +8,7 @@ self.addEventListener('push', function (event) {
     badge: data.badge || '/icon.svg',
     tag: data.tag || 'default',
     requireInteraction: data.requireInteraction ?? false,
-    data: data.data || { url: '/', dateOfArrival: Date.now() },
+    data: { url: data.url || (data.data && data.data.url) || '/', dateOfArrival: Date.now() },
   };
 
   event.waitUntil(

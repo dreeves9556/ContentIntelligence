@@ -11,6 +11,7 @@ import { normalizeFollowerStatsResponse } from "@/lib/follower-stats";
 import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, normalizePostingFrequency } from "@/lib/deep-analytics";
 import { runLearningPipeline } from "@/lib/memory/memory-builder";
 import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
+import { checkAndSendAnalyticsMilestone } from "@/lib/notifications";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -284,6 +285,24 @@ export async function syncAnalytics() {
     generateAIInsight(session.user.id).catch((err) =>
       console.error("Background AI insight generation failed:", err)
     );
+
+    // Check analytics milestones for recently synced posts (background, non-blocking)
+    (async () => {
+      const recentPosts = await prisma.postAnalytics.findMany({
+        where: { userId: session.user.id },
+        orderBy: { publishedAt: "desc" },
+        take: 10,
+        select: { title: true, views: true, format: true },
+      });
+      for (const post of recentPosts) {
+        checkAndSendAnalyticsMilestone(
+          session.user.id,
+          post.title,
+          post.views,
+          post.format
+        ).catch((err) => console.error("[MILESTONE] Check failed:", err));
+      }
+    })().catch((err) => console.error("[MILESTONE] Batch failed:", err));
   }
 
   revalidatePath("/dashboard");

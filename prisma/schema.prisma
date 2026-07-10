@@ -42,6 +42,9 @@ model User {
   resourcePosts    ResourcePost[]
   bugReports      BugReport[]
   creatorMemories CreatorMemory[]
+  notificationLogs NotificationLog[]
+  notificationPreference NotificationPreference?
+  scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
   accounts      Account[]
   sessions      Session[]
 
@@ -482,4 +485,58 @@ model BroadcastEmail {
   @@index([broadcastId])
   @@index([resendId])
   @@map("broadcast_emails")
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postingReminder     Boolean @default(true)
+  postPublished       Boolean @default(true)
+  postFailed          Boolean @default(true)
+  newComment          Boolean @default(true)
+  analyticsMilestone  Boolean @default(true)
+  streakWarning       Boolean @default(true)
+  weeklyDigest        Boolean @default(true)
+  accountDisconnected Boolean @default(true)
+  adminBroadcast      Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // posting_reminder, post_published, post_failed, new_comment, analytics_milestone, streak_warning, weekly_digest, account_disconnected, admin_broadcast
+  title       String
+  body        String
+  url         String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, type])
+  @@map("notification_logs")
+}
+
+model ScheduledPushNotification {
+  id            String   @id @default(cuid())
+  title         String
+  body          String
+  url           String?
+  segment       String   @default("all") // all, CALENDAR_ONLY, CREATOR, PRO
+  scheduledFor  DateTime
+  status        String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
+  sentCount     Int      @default(0)
+  failedCount   Int      @default(0)
+  createdBy     String
+  creator       User     @relation("ScheduledPushCreator", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, scheduledFor])
+  @@map("scheduled_push_notifications")
 }

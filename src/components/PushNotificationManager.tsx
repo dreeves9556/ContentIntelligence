@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Send, Loader2 } from "lucide-react";
+import { Bell, BellOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   subscribeUser,
   unsubscribeUser,
-  sendNotification,
   getPushSubscriptionStatus,
 } from "@/app/dashboard/actions";
 
@@ -30,7 +29,6 @@ export function PushNotificationManager() {
   const [dbSubscribed, setDbSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [testMessage, setTestMessage] = useState("");
 
   const registerServiceWorker = useCallback(async () => {
     const registration = await navigator.serviceWorker.register("/sw.js", {
@@ -52,8 +50,6 @@ export function PushNotificationManager() {
 
   useEffect(() => {
     if (!isSupported) return;
-    // Async initialization of push subscription state; this is the standard
-    // Web Push pattern and is triggered once on mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     registerServiceWorker();
     checkDbStatus();
@@ -70,7 +66,14 @@ export function PushNotificationManager() {
         ),
       });
       setSubscription(sub);
-      await subscribeUser(sub);
+      await subscribeUser({
+        endpoint: sub.endpoint,
+        expirationTime: sub.expirationTime,
+        keys: {
+          p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("p256dh") as ArrayBuffer))),
+          auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth") as ArrayBuffer))),
+        },
+      });
       setDbSubscribed(true);
       setMessage("Push notifications enabled");
     } catch (error) {
@@ -96,21 +99,6 @@ export function PushNotificationManager() {
       setLoading(false);
     }
   }, [subscription]);
-
-  const sendTestNotification = useCallback(async () => {
-    if (!testMessage.trim()) return;
-    setLoading(true);
-    try {
-      await sendNotification(testMessage);
-      setMessage("Test notification sent");
-      setTestMessage("");
-    } catch (error) {
-      setMessage("Failed to send test notification");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [testMessage]);
 
   if (!isSupported) {
     return (
@@ -153,33 +141,15 @@ export function PushNotificationManager() {
       </p>
 
       {isSubscribed ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={testMessage}
-              onChange={(e) => setTestMessage(e.target.value)}
-              placeholder="Enter test message"
-              className="flex-1 px-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
-            />
-            <Button
-              onClick={sendTestNotification}
-              disabled={loading || !testMessage.trim()}
-              className="bg-accent-primary text-black hover:bg-accent-primary/90"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
-          <Button
-            variant="outline"
-            onClick={unsubscribeFromPush}
-            disabled={loading}
-            className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BellOff className="h-4 w-4 mr-2" />}
-            Disable Push Notifications
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={unsubscribeFromPush}
+          disabled={loading}
+          className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BellOff className="h-4 w-4 mr-2" />}
+          Disable Push Notifications
+        </Button>
       ) : (
         <Button
           onClick={subscribeToPush}
@@ -193,3 +163,4 @@ export function PushNotificationManager() {
     </div>
   );
 }
+

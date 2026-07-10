@@ -56,6 +56,7 @@ export async function updateQuestionnaire(
   }
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/questionnaire");
 
   return { success: true };
 }
