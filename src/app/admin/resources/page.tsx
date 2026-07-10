@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminResourcesPage() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "ADMIN") redirect("/dashboard");
+  if (!session?.user?.id || session.user.role !== "ADMIN") redirect("/dashboard");
 
   const [posts, authorProfile] = await Promise.all([
     getResourcePosts(),

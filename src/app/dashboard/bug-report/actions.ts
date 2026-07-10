@@ -8,6 +8,15 @@ import type { BugReportStatus } from "@prisma/client";
 
 const BUG_REPORT_NOTIFY_EMAIL = "daniel.reevesky@gmail.com";
 
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function requireUser() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -43,13 +52,17 @@ export async function submitBugReport(data: {
       return { success: false, error: "Please select Mobile or Browser." };
     }
 
+    const name = data.name.trim();
+    const email = data.email.trim();
+    const description = data.description.trim();
+
     await prisma.bugReport.create({
       data: {
         userId: user.id,
-        name: data.name.trim(),
-        email: data.email.trim(),
+        name,
+        email,
         deviceInfo: data.deviceInfo,
-        description: data.description.trim(),
+        description,
       },
     });
 
@@ -60,7 +73,7 @@ export async function submitBugReport(data: {
       .send({
         from: `The Local Post <${fromAddress}>`,
         to: BUG_REPORT_NOTIFY_EMAIL,
-        subject: `Bug Report from ${data.name.trim()}`,
+        subject: `Bug Report from ${name}`,
         html: `
           <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#FFFFFF;color:#101418;border-radius:12px;overflow:hidden;border:1px solid #E2E8F0;">
             <div style="background:#F7F9FC;padding:32px 32px 24px;border-bottom:1px solid #E2E8F0;text-align:center;">
@@ -69,13 +82,13 @@ export async function submitBugReport(data: {
             </div>
             <div style="padding:32px;">
               <table style="width:100%;font-size:14px;color:#101418;">
-                <tr><td style="padding:4px 0;font-weight:600;width:100px;vertical-align:top;">Name:</td><td style="padding:4px 0;">${data.name.trim()}</td></tr>
-                <tr><td style="padding:4px 0;font-weight:600;vertical-align:top;">Email:</td><td style="padding:4px 0;">${data.email.trim()}</td></tr>
-                <tr><td style="padding:4px 0;font-weight:600;vertical-align:top;">Device:</td><td style="padding:4px 0;">${data.deviceInfo}</td></tr>
-                <tr><td style="padding:4px 0;font-weight:600;vertical-align:top;">Account:</td><td style="padding:4px 0;">${user.email ?? user.id}</td></tr>
+                <tr><td style="padding:4px 0;font-weight:600;width:100px;vertical-align:top;">Name:</td><td style="padding:4px 0;">${escapeHtml(name)}</td></tr>
+                <tr><td style="padding:4px 0;font-weight:600;vertical-align:top;">Email:</td><td style="padding:4px 0;">${escapeHtml(email)}</td></tr>
+                <tr><td style="padding:4px 0;font-weight:600;vertical-align:top;">Device:</td><td style="padding:4px 0;">${escapeHtml(data.deviceInfo)}</td></tr>
+                <tr><td style="padding:4px 0;font-weight:600;vertical-align:top;">Account:</td><td style="padding:4px 0;">${escapeHtml(user.email ?? user.id)}</td></tr>
               </table>
               <h3 style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#101418;">Description</h3>
-              <p style="margin:0;font-size:14px;color:#5B6472;line-height:1.6;white-space:pre-wrap;">${data.description.trim()}</p>
+              <p style="margin:0;font-size:14px;color:#5B6472;line-height:1.6;white-space:pre-wrap;">${escapeHtml(description)}</p>
             </div>
             <div style="background:#F7F9FC;padding:20px 32px;border-top:1px solid #E2E8F0;">
               <p style="margin:0;font-size:11px;color:#5B6472;text-align:center;line-height:1.6;">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -54,7 +54,21 @@ export default function DashboardLayout({
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  // A session whose token has soft-expired or been invalidated (e.g. password
+  // reset) keeps `session.user` truthy but strips `user.id`. In that state the
+  // plan falls back to CALENDAR_ONLY and every server action returns
+  // "Not authenticated". Detect it and force a clean re-login instead.
+  const sessionInvalidated = status === "authenticated" && !session?.user?.id;
+
+  useEffect(() => {
+    if (sessionInvalidated) {
+      signOut({ redirect: false }).then(() => {
+        window.location.href = "/login";
+      });
+    }
+  }, [sessionInvalidated]);
 
   const plan = (session?.user?.plan ?? "CALENDAR_ONLY") as UserPlan;
   const navItems = getNavItems(plan);

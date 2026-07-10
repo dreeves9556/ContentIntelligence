@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LibraryPage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
 
   const [rawCalendars, archivedPosts, resourcePosts] = await Promise.all([
     prisma.calendar.findMany({

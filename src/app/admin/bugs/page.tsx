@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminBugsPage() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "ADMIN") redirect("/dashboard");
+  if (!session?.user?.id || session.user.role !== "ADMIN") redirect("/dashboard");
 
   const reports = await getBugReports();
 
