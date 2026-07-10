@@ -358,13 +358,18 @@ function DeepDivePanel({
         <div className="space-y-3">
           {resolvedFields.map((field) => {
             const answer = answers[field.key] ?? existing.answersJson[field.key];
-            if (!answer) return null;
             return (
               <div key={field.key} className="space-y-1">
                 <p className="text-xs font-medium text-text-muted">{field.label}</p>
-                <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
-                  {answer}
-                </p>
+                {answer ? (
+                  <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
+                    {answer}
+                  </p>
+                ) : (
+                  <p className="text-sm text-text-muted/50 italic bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/30">
+                    Not answered yet
+                  </p>
+                )}
               </div>
             );
           })}
@@ -463,13 +468,18 @@ function TimedSurveyPanel({
         <div className="space-y-3">
           {survey.fields.map((field) => {
             const answer = answers[field.key] ?? existing.answersJson[field.key];
-            if (!answer) return null;
             return (
               <div key={field.key} className="space-y-1">
                 <p className="text-xs font-medium text-text-muted">{field.label}</p>
-                <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
-                  {answer}
-                </p>
+                {answer ? (
+                  <p className="text-sm text-text-primary leading-relaxed bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/50">
+                    {answer}
+                  </p>
+                ) : (
+                  <p className="text-sm text-text-muted/50 italic bg-background-secondary rounded-lg px-3 py-2 border border-border-primary/30">
+                    Not answered yet
+                  </p>
+                )}
               </div>
             );
           })}
