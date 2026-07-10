@@ -330,7 +330,7 @@ export async function adminResetPassword(
 
   const email = user.email;
   const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
   await prisma.passwordResetToken.deleteMany({ where: { email } });
   await prisma.passwordResetToken.create({
@@ -362,7 +362,7 @@ export async function adminResetPassword(
               Reset Password
             </a>
             <p style="margin:24px 0 0;font-size:12px;color:#5B6472;line-height:1.6;">
-              This link expires in 1 hour.<br/>
+              This link expires in 24 hours.<br/>
               If you didn&apos;t request a password reset, you can safely ignore this email.
             </p>
           </div>
