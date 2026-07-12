@@ -4,8 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import { RotatingTagline } from "@/components/RotatingTagline";
+import { PushNotificationManager } from "@/components/PushNotificationManager";
 
-const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Content Preferences"];
+const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Content Preferences", "Push Notifications"];
 
 const INDUSTRY_OPTIONS = [
   "Real Estate",
@@ -766,6 +767,44 @@ export default function OnboardingForm() {
                   value={formData.storytellingStyle}
                   onChange={(v) => set("storytellingStyle", v)}
                 />
+              </div>
+            </div>
+          </>
+        );
+
+      case 4:
+        return (
+          <>
+            {sectionHeading("E", "Push Notifications", "Stay updated with timely reminders and important updates.")}
+            <div className="space-y-6">
+              <div>
+                <p className="text-text-muted text-sm mb-4">
+                  Enable push notifications to receive:
+                </p>
+                <ul className="space-y-2 text-sm text-text-muted mb-6">
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent-primary mt-0.5">•</span>
+                    Posting reminders for your scheduled content
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent-primary mt-0.5">•</span>
+                    Analytics milestones and performance updates
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent-primary mt-0.5">•</span>
+                    Important account notifications
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent-primary mt-0.5">•</span>
+                    Weekly performance summaries
+                  </li>
+                </ul>
+              </div>
+              <PushNotificationManager />
+              <div className="bg-background-secondary rounded-lg p-4 border border-border-primary">
+                <p className="text-xs text-text-muted">
+                  <strong>Optional:</strong> You can always change these settings later in your Profile. Push notifications work best when you have the app open in your browser or when your browser is running in the background.
+                </p>
               </div>
             </div>
           </>

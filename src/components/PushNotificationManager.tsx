@@ -29,6 +29,13 @@ export function PushNotificationManager() {
   const [dbSubscribed, setDbSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [errorDetail, setErrorDetail] = useState("");
+
+  const isIOS = typeof window !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true);
 
   const registerServiceWorker = useCallback(async () => {
     const registration = await navigator.serviceWorker.register("/sw.js", {
@@ -57,7 +64,24 @@ export function PushNotificationManager() {
 
   const subscribeToPush = useCallback(async () => {
     setLoading(true);
+    setErrorDetail("");
     try {
+      if (isIOS && !isStandalone) {
+        setMessage("On iPhone, you need to add this app to your Home Screen first. Tap the Share button at the bottom of Safari, then 'Add to Home Screen', then open The Local Post from your home screen icon.");
+        return;
+      }
+
+      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+        setMessage("Push notifications are not configured on this server. Contact support.");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setMessage("Notification permission was denied. Go to Settings → The Local Post → Notifications to allow notifications, then try again.");
+        return;
+      }
+
       const registration = await navigator.serviceWorker.ready;
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -78,16 +102,25 @@ export function PushNotificationManager() {
       setMessage("Push notifications enabled");
     } catch (error) {
       const isSecureContext = window.isSecureContext;
+      const errStr = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      console.error("[PUSH] Subscribe failed:", error);
+
       if (!isSecureContext) {
         setMessage("Push notifications require HTTPS on mobile. They work on localhost on your computer, but your phone needs a secure connection.");
+      } else if (errStr.includes("aborted") || errStr.includes("AbortError")) {
+        setMessage("Notification permission was denied. Go to Settings → The Local Post → Notifications to allow notifications, then try again.");
+      } else if (errStr.includes("activation") || errStr.includes("registering")) {
+        setMessage("Service worker failed to activate. Close the app completely, reopen it from your Home Screen, and try again.");
+      } else if (isIOS) {
+        setMessage(`Push setup failed on iOS. Make sure you opened this from your Home Screen icon (not Safari). Error: ${errStr}`);
       } else {
-        setMessage("Failed to enable push notifications. Make sure notifications are allowed in your browser settings.");
+        setMessage(`Failed to enable push notifications. Error: ${errStr}`);
       }
-      console.error(error);
+      setErrorDetail(errStr);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isIOS, isStandalone]);
 
   const unsubscribeFromPush = useCallback(async () => {
     setLoading(true);
@@ -135,8 +168,14 @@ export function PushNotificationManager() {
       </div>
 
       {message && (
-        <div className={`mb-4 p-3 rounded-md text-sm ${message.includes("Failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"}`}>
+        <div className={`mb-4 p-3 rounded-md text-sm ${message.includes("Failed") || message.includes("denied") || message.includes("not configured") || message.includes("Home Screen") || message.includes("failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"}`}>
           {message}
+          {errorDetail && (
+            <details className="mt-2 text-xs opacity-70">
+              <summary>Technical details</summary>
+              {errorDetail}
+            </details>
+          )}
         </div>
       )}
 
