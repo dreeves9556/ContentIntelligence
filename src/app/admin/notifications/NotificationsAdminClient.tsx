@@ -143,7 +143,7 @@ export function NotificationsAdminClient({
       </div>
 
       {/* Compose Card */}
-      <div className="bg-background-card rounded-xl p-6 border border-border-primary">
+      <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="h-5 w-5 text-accent-primary" />
           <h2 className="text-lg font-semibold text-text-primary">Compose Notification</h2>
@@ -157,7 +157,7 @@ export function NotificationsAdminClient({
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-hidden">
           {/* Mode toggle */}
           <div className="flex gap-2">
             <button
@@ -236,7 +236,7 @@ export function NotificationsAdminClient({
                 type="datetime-local"
                 value={scheduledFor}
                 onChange={(e) => setScheduledFor(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+                className="w-full max-w-full px-3 sm:px-4 py-2.5 bg-background-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
               />
             </div>
           )}
