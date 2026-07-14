@@ -260,7 +260,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
           {day.title}
         </h2>
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-xs font-semibold tracking-wider text-accent-primary uppercase">{day.day} Edition</span>
+          <span className="text-xs font-semibold tracking-wider text-accent-primary uppercase">{dateForDay.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()} Edition</span>
           <span className="h-px flex-1 bg-border-primary" />
         </div>
       </div>
