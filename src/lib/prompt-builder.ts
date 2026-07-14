@@ -410,7 +410,7 @@ BUCKET DEFINITIONS: read these carefully:
 
 Content field definitions:
 - "hook": the opening line the creator should say on camera (for Reels) or the headline of the post (for Carousel/Static). This should be copy-pasteable spoken text.
-- "body": the full spoken script for Reels, or the main body text for Carousel/Static. This should be copy-pasteable text the creator delivers or writes directly into the post. Do NOT include filming instructions here.
+- "body": the full spoken script for Reels, or the main body text for Carousel/Static. This should be copy-pasteable text the creator delivers or writes directly into the post. Do NOT include filming instructions here. For Carousel posts, format the body as individual slides, each on its own line(s), prefixed with "Slide N:" (e.g., "Slide 1: ...", "Slide 2: ..."). Each slide should be self-contained text for one carousel image. Aim for 5-8 slides per carousel.
 - "directions": filming, performance, or design directions. Tell the creator HOW to make the piece (e.g., shot type, energy, visuals, slide layout). This is NOT copy-pasteable post text.
 - "cta": the closing call-to-action the creator should say or write.
 - "caption": the social media caption to paste below the post. Do NOT include any hashtags.

@@ -213,6 +213,36 @@ function BucketBadge({ bucket }: { bucket: ContentBucket }) {
   );
 }
 
+export function parseCarouselSlides(body: string): { label: string; text: string }[] {
+  const slidePattern = /(?:^|\n)(Slide\s*\d+\s*[:\-]\s*)([^\n]*(?:\n(?!\s*Slide\s*\d+\s*[:\-])[^\n]*)*)/gi;
+  const slides: { label: string; text: string }[] = [];
+  let match;
+  while ((match = slidePattern.exec(body)) !== null) {
+    const label = match[1].trim().replace(/\s+/g, " ");
+    const text = match[2].trim();
+    if (text) slides.push({ label, text });
+  }
+  if (slides.length > 0) return slides;
+
+  const lines = body.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length <= 1) return [{ label: "Slide 1", text: body.trim() }];
+
+  const numberedPattern = /^\d+\.\s+/;
+  if (lines.every((l) => numberedPattern.test(l))) {
+    return lines.map((l, i) => {
+      const text = l.replace(numberedPattern, "").trim();
+      return { label: `Slide ${i + 1}`, text };
+    });
+  }
+
+  const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length > 1) {
+    return paragraphs.map((p, i) => ({ label: `Slide ${i + 1}`, text: p }));
+  }
+
+  return [{ label: "Slide 1", text: body.trim() }];
+}
+
 function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes, feedback, onFeedback }: { day: CalendarDay; dayIndex: number; weekStarting: string; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; feedback: "up" | "down" | null; onFeedback: (value: "up" | "down") => void; }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
@@ -310,16 +340,41 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
             </p>
           </div>
 
-          {/* Body */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold tracking-wider text-text-muted uppercase">Body</span>
-              <CopyButton text={day.body} label="Copy body" />
+          {/* Body — for Carousels, render individual slides with copy buttons */}
+          {day.format === "Carousel" ? (() => {
+            const slides = parseCarouselSlides(day.body);
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold tracking-wider text-text-muted uppercase">Slides</span>
+                  <CopyButton text={day.body} label="Copy all" />
+                </div>
+                <div className="space-y-2.5">
+                  {slides.map((slide, i) => (
+                    <div key={i} className="rounded-lg border border-border-primary/60 bg-background-secondary/40 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold tracking-wider text-accent-primary/80 uppercase">{slide.label}</span>
+                        <CopyButton text={slide.text} label="Copy slide" />
+                      </div>
+                      <p className="text-base text-text-secondary leading-relaxed whitespace-pre-line">
+                        {slide.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })() : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold tracking-wider text-text-muted uppercase">Body</span>
+                <CopyButton text={day.body} label="Copy body" />
+              </div>
+              <p className="text-base text-text-secondary leading-relaxed whitespace-pre-line">
+                {day.body}
+              </p>
             </div>
-            <p className="text-base text-text-secondary leading-relaxed whitespace-pre-line">
-              {day.body}
-            </p>
-          </div>
+          )}
 
           {/* CTA */}
           <div className="space-y-2">

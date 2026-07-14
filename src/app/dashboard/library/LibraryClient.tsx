@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Search, Video, Images, FileText, User, GraduationCap, MapPin, Music, Clock, MessageCircle, BookOpen, CheckCircle2 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import type { ContentFormat, ContentBucket, CalendarDay } from "@/app/dashboard/calendar/actions";
+import { parseCarouselSlides } from "@/app/dashboard/calendar/CalendarClient";
 
 interface SavedCalendar {
   id: string;
@@ -72,13 +73,36 @@ function DayDetail({ day }: { day: CalendarDay }) {
           </div>
           <p className="text-sm text-text-primary leading-relaxed font-medium">{day.hook}</p>
         </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold tracking-wider text-text-muted uppercase">Body</span>
-            <CopyButton text={day.body} />
+        {day.format === "Carousel" ? (() => {
+          const slides = parseCarouselSlides(day.body);
+          return (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold tracking-wider text-text-muted uppercase">Slides</span>
+                <CopyButton text={day.body} label="Copy all" />
+              </div>
+              <div className="space-y-2">
+                {slides.map((slide, i) => (
+                  <div key={i} className="rounded-lg border border-border-primary/60 bg-background-secondary/40 p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold tracking-wider text-accent-primary/80 uppercase">{slide.label}</span>
+                      <CopyButton text={slide.text} label="Copy slide" />
+                    </div>
+                    <p className="text-sm text-text-muted leading-relaxed whitespace-pre-line">{slide.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })() : (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold tracking-wider text-text-muted uppercase">Body</span>
+              <CopyButton text={day.body} />
+            </div>
+            <p className="text-sm text-text-muted leading-relaxed whitespace-pre-line">{day.body}</p>
           </div>
-          <p className="text-sm text-text-muted leading-relaxed whitespace-pre-line">{day.body}</p>
-        </div>
+        )}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold tracking-wider text-brand-expert uppercase">Call to Action</span>
