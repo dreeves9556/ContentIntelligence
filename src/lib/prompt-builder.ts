@@ -33,6 +33,13 @@ const SURVEY_LABELS: Record<string, Record<string, string>> = {
     winsMoments: "Wins, stories, or moments worth sharing",
     onYourMind: "What's on their mind this week",
   },
+  STORY_REFRESH: {
+    recentWins: "Recent wins or successes",
+    newStories: "New stories or anecdotes",
+    newObservations: "New observations or opinions",
+    newClientStories: "New client interactions worth sharing",
+    whatsChanging: "What's changing in business or market",
+  },
   MONTHLY_CONTEXT: {
     monthlyTheme: "Monthly theme or focus",
     majorMilestones: "Major milestones or events this month",
@@ -81,6 +88,7 @@ const SURVEY_XML_TAG: Record<string, string> = {
   CLIENT_AVATAR: "client_avatar",
   WEEKLY_CONTEXT: "weekly_context",
   MONTHLY_CONTEXT: "monthly_context",
+  STORY_REFRESH: "story_refresh",
 };
 
 const LOCAL_MAYOR_LABELS: Record<string, string> = {
@@ -108,6 +116,12 @@ const INDUSTRY_LABELS: Record<string, Record<string, string>> = {
   "Financial Services": {
     specialization: "Financial specialization",
     clientFear: "Clients' biggest financial fear",
+  },
+  "Car Sales": {
+    yearsInCarSales: "Years selling cars",
+    dealershipNiche: "What they sell",
+    biggestBuyerMisconception: "Biggest misconception car buyers have",
+    carBrands: "Car brands they focus on",
   },
   "Coaching / Consulting": {
     transformationDelivered: "Transformation delivered",
@@ -243,10 +257,88 @@ function buildLocalMayorBlock(profileSurveys: ProfileSurveyRow[]): string {
   return `<local_mayor>\nThis is the user's hyper-local knowledge. Use these specific spots, opinions, and neighbourhood insights to make "Local" bucket content feel authentic and specific, not generic. Reference real business names and details.\n${parts.join("\n")}\n</local_mayor>`;
 }
 
+function buildOfferFunnelBlock(profileSurveys: ProfileSurveyRow[]): string {
+  const survey = profileSurveys.find((s) => s.surveyType === "OFFER_FUNNEL");
+  if (!survey) return "";
+  const answers = (survey.answersJson ?? {}) as Record<string, string>;
+  const labels: Record<string, string> = {
+    mainOffer: "Main offer",
+    offerForWho: "Target audience",
+    painPointSolved: "Problem solved",
+    dreamOutcome: "Dream outcome",
+    offerDetails: "What's included",
+    primaryCTA: "Primary CTA",
+    bookingLink: "Booking link",
+    leadMagnet: "Lead magnet / free resource",
+    commonObjections: "Common objections",
+    urgencyReason: "Real urgency",
+    proofPoints: "Supporting proof",
+    doNotPromise: "Do NOT promise (hard guardrail)",
+  };
+  const lines: string[] = [];
+  for (const [key, label] of Object.entries(labels)) {
+    if (hasText(answers[key])) {
+      lines.push(`- ${label}: ${answers[key]}`);
+    }
+  }
+  if (lines.length === 0) return "";
+  return `<offer_funnel>\nWhat the creator is selling and how content should move people toward action. Use this strategically — not every post needs a CTA. Personal bucket content stays personal. Expert and Local bucket content can weave in offers, CTAs, objections, and lead magnets where natural. The "Do NOT promise" field is a hard guardrail — never violate it.\n${lines.join("\n")}\n</offer_funnel>`;
+}
+
+function buildProofBankBlock(profileSurveys: ProfileSurveyRow[]): string {
+  const survey = profileSurveys.find((s) => s.surveyType === "PROOF_BANK");
+  if (!survey) return "";
+  const answers = (survey.answersJson ?? {}) as Record<string, string>;
+  const labels: Record<string, string> = {
+    bestTestimonials: "Testimonials",
+    clientWins: "Client wins",
+    beforeAfterStories: "Before/after stories",
+    numbersAndStats: "Numbers and stats",
+    caseStudyDetails: "Case study",
+    permissionLevel: "Permission level",
+    proofBoundaries: "Proof boundaries (hard guardrail)",
+  };
+  const lines: string[] = [];
+  for (const [key, label] of Object.entries(labels)) {
+    if (hasText(answers[key])) {
+      lines.push(`- ${label}: ${answers[key]}`);
+    }
+  }
+  if (lines.length === 0) return "";
+  return `<proof_bank>\nReal proof the creator has approved for use in content. Use these to make hooks and bodies feel earned and specific. NEVER fabricate testimonials, results, or case studies — only use what's listed here. Respect the permission level: if "Anonymized", remove names and identifying details; if "Inspiration only", do not quote directly; if "Private", do not use in generated content at all. The "Proof boundaries" field is a hard guardrail — never share what's listed there.\n${lines.join("\n")}\n</proof_bank>`;
+}
+
+function buildComplianceGuardrailsBlock(profileSurveys: ProfileSurveyRow[]): string {
+  const survey = profileSurveys.find((s) => s.surveyType === "COMPLIANCE_GUARDRAILS");
+  if (!survey) return "";
+  const answers = (survey.answersJson ?? {}) as Record<string, string>;
+  const labels: Record<string, string> = {
+    requiredDisclaimers: "Required disclaimers",
+    forbiddenClaims: "Forbidden claims (hard guardrail)",
+    regulatedTopics: "Regulated topics",
+    companyRules: "Company / brand rules",
+    approvalProcess: "Approval process",
+    wordsToAvoidForCompliance: "Words to avoid",
+    sensitiveTopics: "Sensitive topics",
+    licenseOrCredentialRules: "License / credential rules",
+  };
+  const lines: string[] = [];
+  for (const [key, label] of Object.entries(labels)) {
+    if (hasText(answers[key])) {
+      lines.push(`- ${label}: ${answers[key]}`);
+    }
+  }
+  if (lines.length === 0) return "";
+  return `<compliance_guardrails>\nHARD GUARDRAILS — these rules override Offer, Proof, and all other context blocks. If any conflict arises, always choose the safer, more compliant angle. Never invent legal, financial, medical, or compliance advice. If a topic is regulated or requires a disclaimer, include the specified disclaimer. If content needs approval before posting, note that in the output. Never make forbidden claims or use forbidden words. When in doubt, soften or omit.\n${lines.join("\n")}\n</compliance_guardrails>`;
+}
+
 function buildDeepDiveSurveysBlock(profileSurveys: ProfileSurveyRow[]): string {
   const blocks: string[] = [];
   for (const survey of profileSurveys) {
     if (survey.surveyType === "LOCAL_MAYOR") continue;
+    if (survey.surveyType === "OFFER_FUNNEL") continue;
+    if (survey.surveyType === "PROOF_BANK") continue;
+    if (survey.surveyType === "COMPLIANCE_GUARDRAILS") continue;
     const labels = SURVEY_LABELS[survey.surveyType];
     const tag = SURVEY_XML_TAG[survey.surveyType];
     if (!labels || !tag) continue;
@@ -263,7 +355,9 @@ function buildDeepDiveSurveysBlock(profileSurveys: ProfileSurveyRow[]): string {
           ? "This is what the creator is doing THIS WEEK, fresh, current input. Prioritize this over older questionnaire material where there's overlap."
           : survey.surveyType === "MONTHLY_CONTEXT"
             ? "Broad strokes for this month, use as a strategic backdrop for the week's content."
-            : null;
+            : survey.surveyType === "STORY_REFRESH"
+              ? "New stories and observations from the creator — refreshes every 4-6 weeks. These are fresh anecdotes and perspectives that supersede older questionnaire material. Prioritize weaving these into upcoming content."
+              : null;
       blocks.push(`<${tag}>\n${intro ? `${intro}\n` : ""}${lines.join("\n")}\n</${tag}>`);
     }
   }
@@ -360,6 +454,9 @@ export function buildUserProfileXml(ctx: PromptContext): string {
   const boundaries = buildBoundariesBlock(answers);
   if (boundaries) blocks.push(boundaries);
 
+  const complianceGuardrails = buildComplianceGuardrailsBlock(profileSurveys);
+  if (complianceGuardrails) blocks.push(complianceGuardrails);
+
   const personal = buildPersonalContextBlock(answers);
   if (personal) blocks.push(personal);
 
@@ -368,6 +465,12 @@ export function buildUserProfileXml(ctx: PromptContext): string {
 
   const localMayor = buildLocalMayorBlock(profileSurveys);
   if (localMayor) blocks.push(localMayor);
+
+  const offerFunnel = buildOfferFunnelBlock(profileSurveys);
+  if (offerFunnel) blocks.push(offerFunnel);
+
+  const proofBank = buildProofBankBlock(profileSurveys);
+  if (proofBank) blocks.push(proofBank);
 
   const deepDives = buildDeepDiveSurveysBlock(profileSurveys);
   if (deepDives) blocks.push(deepDives);

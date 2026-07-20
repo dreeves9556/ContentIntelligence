@@ -3,6 +3,7 @@ import type { MemoryType, Importance, MemorySource } from "@prisma/client";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import { saveMemory } from "./memory-service";
 import { summarizeDemographicsForAI } from "@/lib/deep-analytics";
+import { classifyPost } from "@/lib/freshness";
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -283,11 +284,61 @@ export async function buildMemoriesFromQuestionnaire(
 
 // ─── Initial Memory Creation from Profile Surveys ──────────────────
 
-const SURVEY_MEMORY_MAP: Record<string, { type: MemoryType; title: string; importance: Importance }> = {
+interface SurveyMemoryConfig {
+  type: MemoryType;
+  title: string;
+  importance: Importance;
+  fields?: string[];
+}
+
+const SURVEY_MEMORY_MAP: Record<string, SurveyMemoryConfig | SurveyMemoryConfig[]> = {
   LOCAL_MAYOR: { type: "CONTENT", title: "Hyper-local knowledge & spots", importance: "MEDIUM" },
   TRENCH_WARFARE: { type: "IDENTITY", title: "Trench warfare stories & negotiation style", importance: "HIGH" },
   ORIGIN_STORY: { type: "IDENTITY", title: "Origin story & industry pet peeves", importance: "HIGH" },
   CLIENT_AVATAR: { type: "AUDIENCE", title: "Client avatar & dream outcome", importance: "HIGH" },
+  STORY_REFRESH: { type: "CONTENT", title: "Story refresh: new anecdotes & observations", importance: "HIGH" },
+  OFFER_FUNNEL: [
+    {
+      type: "STRATEGY",
+      title: "Offer, funnel & CTAs",
+      importance: "HIGH",
+      fields: ["mainOffer", "offerForWho", "painPointSolved", "dreamOutcome", "offerDetails", "primaryCTA", "bookingLink", "leadMagnet", "commonObjections", "urgencyReason", "proofPoints"],
+    },
+    {
+      type: "WARNING",
+      title: "Offer guardrails: do NOT promise",
+      importance: "HIGH",
+      fields: ["doNotPromise"],
+    },
+  ],
+  PROOF_BANK: [
+    {
+      type: "PERFORMANCE",
+      title: "Proof bank: testimonials & client wins",
+      importance: "HIGH",
+      fields: ["bestTestimonials", "clientWins", "beforeAfterStories", "numbersAndStats", "caseStudyDetails", "permissionLevel"],
+    },
+    {
+      type: "WARNING",
+      title: "Proof boundaries: do NOT share",
+      importance: "HIGH",
+      fields: ["proofBoundaries"],
+    },
+  ],
+  COMPLIANCE_GUARDRAILS: [
+    {
+      type: "WARNING",
+      title: "Compliance guardrails: forbidden claims & words",
+      importance: "CRITICAL",
+      fields: ["forbiddenClaims", "wordsToAvoidForCompliance", "sensitiveTopics", "regulatedTopics"],
+    },
+    {
+      type: "PREFERENCE",
+      title: "Compliance: disclaimers, approval & credentials",
+      importance: "HIGH",
+      fields: ["requiredDisclaimers", "companyRules", "approvalProcess", "licenseOrCredentialRules"],
+    },
+  ],
 };
 
 export async function buildMemoriesFromSurvey(
@@ -298,24 +349,33 @@ export async function buildMemoriesFromSurvey(
   const config = SURVEY_MEMORY_MAP[surveyType];
   if (!config) return 0;
 
-  const entries = Object.entries(answers).filter(([, v]) => hasText(v));
-  if (entries.length === 0) return 0;
+  const configs = Array.isArray(config) ? config : [config];
+  let saved = 0;
 
-  const summary = entries.map(([k, v]) => `${k}: ${v}`).join(". ");
-  const evidence = entries.map(([k, v]) => `${k}: ${v}`).join("\n");
+  for (const cfg of configs) {
+    const allEntries = Object.entries(answers).filter(([, v]) => hasText(v));
+    const entries = cfg.fields
+      ? allEntries.filter(([k]) => cfg.fields!.includes(k))
+      : allEntries;
+    if (entries.length === 0) continue;
 
-  await saveMemory({
-    userId,
-    memoryType: config.type,
-    title: config.title,
-    summary: summary.slice(0, 500),
-    evidence,
-    importance: config.importance,
-    source: "PROFILE_SURVEY",
-    confidence: 80,
-  });
+    const summary = entries.map(([k, v]) => `${k}: ${v}`).join(". ");
+    const evidence = entries.map(([k, v]) => `${k}: ${v}`).join("\n");
 
-  return 1;
+    await saveMemory({
+      userId,
+      memoryType: cfg.type,
+      title: cfg.title,
+      summary: summary.slice(0, 500),
+      evidence,
+      importance: cfg.importance,
+      source: "PROFILE_SURVEY",
+      confidence: 80,
+    });
+    saved++;
+  }
+
+  return saved;
 }
 
 // ─── Auto-Learning from Analytics ──────────────────────────────────
@@ -512,14 +572,89 @@ export async function learnFromAnalytics(userId: string): Promise<number> {
     }
   }
 
+  // 6. Winning formula extraction — distill patterns from top-performing posts
+  if (matches.length >= 5) {
+    const sortedMatches = [...matches].sort((a, b) => engagement(b) - engagement(a));
+    const topPosts = sortedMatches.slice(0, 5).filter((p) => engagement(p) > 0);
+
+    if (topPosts.length >= 3) {
+      // Classify archetypes of top posts
+      const archetypeCounts = new Map<string, number>();
+      const bucketCounts = new Map<string, number>();
+      for (const post of topPosts) {
+        const archetype = classifyPost({
+          title: post.title,
+          hook: post.hook,
+          bucket: post.bucket,
+          format: post.format,
+        });
+        archetypeCounts.set(archetype, (archetypeCounts.get(archetype) ?? 0) + 1);
+        bucketCounts.set(post.bucket, (bucketCounts.get(post.bucket) ?? 0) + 1);
+      }
+
+      // Find dominant archetype(s) — any appearing in ≥40% of top posts
+      const dominantArchetypes: string[] = [];
+      for (const [archetype, count] of archetypeCounts) {
+        if (archetype !== "Other" && count / topPosts.length >= 0.4) {
+          dominantArchetypes.push(`${archetype} (${count}/${topPosts.length} top posts)`);
+        }
+      }
+
+      // Find dominant bucket
+      const sortedBuckets = [...bucketCounts.entries()].sort((a, b) => b[1] - a[1]);
+      const dominantBucket = sortedBuckets[0]?.[0];
+
+      // Extract common hook keywords from top posts
+      const hookWords = new Map<string, number>();
+      for (const post of topPosts) {
+        const words = post.hook.toLowerCase().match(/[a-z]+/g) ?? [];
+        const seen = new Set<string>();
+        for (const word of words) {
+          if (word.length < 4 || seen.has(word)) continue;
+          seen.add(word);
+          hookWords.set(word, (hookWords.get(word) ?? 0) + 1);
+        }
+      }
+      const commonHookWords = [...hookWords.entries()]
+        .filter(([, count]) => count >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([word]) => word);
+
+      // Build summary
+      const parts: string[] = [];
+      if (dominantArchetypes.length > 0) {
+        parts.push(`Dominant archetype(s) in top posts: ${dominantArchetypes.join(", ")}`);
+      }
+      if (dominantBucket) {
+        const bucketCount = bucketCounts.get(dominantBucket) ?? 0;
+        parts.push(`${dominantBucket} bucket appears in ${bucketCount}/${topPosts.length} top posts`);
+      }
+      if (commonHookWords.length > 0) {
+        parts.push(`Common hook keywords in top posts: ${commonHookWords.join(", ")}`);
+      }
+
+      if (parts.length > 0) {
+        candidates.push({
+          memoryType: "STRATEGY",
+          title: "Winning formula: top-performing content patterns",
+          summary: `Top ${topPosts.length} posts by engagement share these patterns. ${parts.join(". ")}. Lean toward these archetypes, buckets, and hook styles in future content without repeating the exact posts.`,
+          importance: "HIGH",
+          source: "ANALYTICS",
+          confidence: 65,
+        });
+      }
+    }
+  }
+
   return saveCandidates(userId, candidates);
 }
 
 function matchArchiveToAnalytics(
   archives: ArchiveRow[],
   analytics: AnalyticsPostRow[]
-): { bucket: string; format: string; views: number; likes: number; comments: number }[] {
-  const matches: { bucket: string; format: string; views: number; likes: number; comments: number }[] = [];
+): { title: string; hook: string; bucket: string; format: string; views: number; likes: number; comments: number }[] {
+  const matches: { title: string; hook: string; bucket: string; format: string; views: number; likes: number; comments: number }[] = [];
   for (const archive of archives) {
     const captionKey = normalizeForMatch(archive.caption);
     const hookKey = normalizeForMatch(archive.hook);
@@ -534,6 +669,8 @@ function matchArchiveToAnalytics(
     });
     if (hit) {
       matches.push({
+        title: archive.title,
+        hook: archive.hook,
         bucket: archive.bucket,
         format: archive.format,
         views: hit.views,

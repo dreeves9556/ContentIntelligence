@@ -19,6 +19,9 @@ import {
   RefreshCw,
   Brain,
   Settings as SettingsIcon,
+  Target,
+  Award,
+  ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { saveProfileSurvey, deleteProfileSurvey } from "../profile/actions";
@@ -61,11 +64,13 @@ interface SurveyDef {
   icon: React.ElementType;
   color: string;
   fields: SurveyField[];
+  disclaimer?: string;
 }
 
 const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   LOCAL_MAYOR: {
     "Real Estate": "Hyper-local knowledge that sets you apart from every out-of-town agent.",
+    "Car Sales": "Hyper-local knowledge that sets you apart from every out-of-town dealer.",
     "Fitness / Personal Training": "Hyper-local knowledge that sets you apart from every out-of-town trainer.",
     "Financial Services": "Hyper-local knowledge that sets you apart from every out-of-town advisor.",
     "Coaching / Consulting": "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
@@ -73,10 +78,35 @@ const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   },
   TRENCH_WARFARE: {
     "Real Estate": "Battle-tested wisdom from the deals only real agents survive.",
+    "Car Sales": "Battle-tested wisdom from the deals only real car salesmen survive.",
     "Fitness / Personal Training": "Battle-tested wisdom from the trenches only real trainers survive.",
     "Financial Services": "Battle-tested wisdom from the trenches only real advisors survive.",
     "Coaching / Consulting": "Battle-tested wisdom from the trenches only real practitioners survive.",
     Other: "Battle-tested wisdom from the trenches only real pros survive.",
+  },
+  OFFER_FUNNEL: {
+    "Real Estate": "Tell the AI what you're selling — listings, consultations, buyer services — and how content should drive leads.",
+    "Car Sales": "Tell the AI what you're selling — vehicles, financing, trade-ins — and how content should drive floor traffic.",
+    "Fitness / Personal Training": "Tell the AI what you're selling — programs, coaching, memberships — and how content should drive signups.",
+    "Financial Services": "Tell the AI what you're offering — reviews, planning, consultations — and how content should drive appointments.",
+    "Coaching / Consulting": "Tell the AI what you're selling — coaching, programs, courses — and how content should drive leads.",
+    Other: "Tell the AI what you are selling, who it is for, and how content should move people toward action.",
+  },
+  PROOF_BANK: {
+    "Real Estate": "Give the AI real wins, testimonials, and deal results it can use to build trust.",
+    "Car Sales": "Give the AI real wins, testimonials, and sales results it can use to build trust.",
+    "Fitness / Personal Training": "Give the AI real transformations, testimonials, and client wins it can use to build trust.",
+    "Financial Services": "Give the AI real outcomes, testimonials, and client results it can use to build trust.",
+    "Coaching / Consulting": "Give the AI real breakthroughs, testimonials, and client wins it can use to build trust.",
+    Other: "Give the AI real proof it can use to make your content more specific and credible.",
+  },
+  COMPLIANCE_GUARDRAILS: {
+    "Real Estate": "Fair housing, brokerage rules, license disclosure — set the guardrails the AI must follow.",
+    "Car Sales": "Financing claims, approval claims, dealership rules — set the guardrails the AI must follow.",
+    "Fitness / Personal Training": "Medical claims, injury claims, supplement rules — set the guardrails the AI must follow.",
+    "Financial Services": "Investment claims, compliance rules, fiduciary language — set the guardrails the AI must follow.",
+    "Coaching / Consulting": "Income claims, guaranteed results, testimonial rules — set the guardrails the AI must follow.",
+    Other: "Set the rules for what the AI should avoid, soften, disclose, or never claim.",
   },
 };
 
@@ -85,6 +115,11 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     "Real Estate": {
       wildestStory: { label: "Wildest thing you've seen at an inspection or closing?" },
       negotiationStyle: { label: "Your negotiation style in 3 words?" },
+      trophyRoomWin: { placeholder: "The deal everyone said couldn't be done..." },
+    },
+    "Car Sales": {
+      wildestStory: { label: "Wildest thing you've seen on the lot or in the finance office?" },
+      negotiationStyle: { label: "Your closing style in 3 words?" },
       trophyRoomWin: { placeholder: "The deal everyone said couldn't be done..." },
     },
     "Fitness / Personal Training": {
@@ -111,6 +146,10 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
       agentPetPeeve: { label: "Your biggest pet peeve about other agents?" },
       yearOneFailure: { placeholder: "The deal that fell apart, the client you lost, and what changed after..." },
     },
+    "Car Sales": {
+      agentPetPeeve: { label: "Your biggest pet peeve about other car salesmen?" },
+      yearOneFailure: { placeholder: "The deal that fell through, the customer you lost, and what changed after..." },
+    },
     "Fitness / Personal Training": {
       agentPetPeeve: { label: "Your biggest pet peeve about other trainers or influencers?" },
       yearOneFailure: { placeholder: "The client you couldn't help, the program that failed, and what changed after..." },
@@ -131,6 +170,9 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     "Real Estate": {
       clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing..." },
     },
+    "Car Sales": {
+      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing on the dotted line..." },
+    },
     "Fitness / Personal Training": {
       clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before committing to a program..." },
     },
@@ -145,6 +187,9 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     "Real Estate": {
       professionalUpdates: { placeholder: "Deals in motion, client meetings, showings, deadlines..." },
     },
+    "Car Sales": {
+      professionalUpdates: { placeholder: "Deals in motion, test drives, deliveries, month-end push, deadlines..." },
+    },
     "Fitness / Personal Training": {
       professionalUpdates: { placeholder: "Clients in progress, training sessions, program launches, deadlines..." },
     },
@@ -153,6 +198,47 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     },
     "Coaching / Consulting": {
       professionalUpdates: { placeholder: "Client engagements in motion, sessions, projects, launches, deadlines..." },
+    },
+  },
+  COMPLIANCE_GUARDRAILS: {
+    "Real Estate": {
+      requiredDisclaimers: { placeholder: "Equal Housing Opportunity, fair housing disclaimers, brokerage disclosures..." },
+      forbiddenClaims: { placeholder: "Guaranteed appreciation, guaranteed sale, best rate, risk-free investment..." },
+      regulatedTopics: { placeholder: "Market predictions, lending/mortgage claims, protected-class language, fair housing..." },
+      companyRules: { placeholder: "Brokerage rules, team rules, MLS guidelines, commission disclosures..." },
+      licenseOrCredentialRules: { placeholder: "How your license, brokerage affiliation, or designations should be mentioned..." },
+    },
+    "Car Sales": {
+      requiredDisclaimers: { placeholder: "Price/payment disclaimers, availability disclaimers, financing subject to approval..." },
+      forbiddenClaims: { placeholder: "Guaranteed approval, guaranteed financing, lowest price, risk-free, no credit check guaranteed..." },
+      regulatedTopics: { placeholder: "Financing claims, approval claims, trade-in estimates, warranty claims, pricing..." },
+      companyRules: { placeholder: "Dealership rules, manufacturer guidelines, advertising standards, compliance review..." },
+      licenseOrCredentialRules: { placeholder: "How your dealership affiliation, sales license, or certifications should be mentioned..." },
+    },
+    "Fitness / Personal Training": {
+      requiredDisclaimers: { placeholder: "Results not guaranteed, consult your doctor before starting, not medical advice..." },
+      forbiddenClaims: { placeholder: "Guaranteed weight loss, guaranteed results, cure or treat any condition, spot reduction..." },
+      regulatedTopics: { placeholder: "Medical claims, injury claims, supplement claims, diagnosis language..." },
+      companyRules: { placeholder: "Gym/studio rules, brand guidelines, certification requirements, insurance..." },
+      licenseOrCredentialRules: { placeholder: "How your certifications, training credentials, or affiliations should be mentioned..." },
+    },
+    "Financial Services": {
+      requiredDisclaimers: { placeholder: "Not financial advice, past performance not indicative of future results, consult your advisor..." },
+      forbiddenClaims: { placeholder: "Guaranteed returns, risk-free, guaranteed growth, best investment, tax savings guaranteed..." },
+      regulatedTopics: { placeholder: "Investment advice, tax claims, risk disclosures, fiduciary language, specific recommendations..." },
+      companyRules: { placeholder: "Firm/broker-dealer rules, compliance review, SEC/FINRA guidelines, advertising standards..." },
+      licenseOrCredentialRules: { placeholder: "How your licenses, registrations, designations, or firm affiliation should be mentioned..." },
+    },
+    "Coaching / Consulting": {
+      requiredDisclaimers: { placeholder: "Results not guaranteed, income claims disclaimers, not financial/medical/legal advice..." },
+      forbiddenClaims: { placeholder: "Guaranteed income, guaranteed results, specific earnings claims, cure or treat..." },
+      regulatedTopics: { placeholder: "Income claims, client confidentiality, case-study permissions, testimonial rules..." },
+      companyRules: { placeholder: "Company/brand rules, client confidentiality, NDA restrictions, advertising standards..." },
+      licenseOrCredentialRules: { placeholder: "How your credentials, certifications, or professional affiliations should be mentioned..." },
+    },
+    Other: {
+      regulatedTopics: { placeholder: "Topics that require review or careful wording in your industry..." },
+      forbiddenClaims: { placeholder: "Claims that create legal, regulatory, or brand risk..." },
     },
   },
 };
@@ -237,6 +323,61 @@ const DEEP_DIVE_SURVEYS: SurveyDef[] = [
       { key: "clientMisbeliefs", label: "What do clients wrongly believe they should do first? (myth-busting fuel)", placeholder: "The common misconception you love correcting in your content..." },
       { key: "clientDreamOutcome", label: "What is your client's dream outcome — in their own words?", placeholder: "The transformation they fantasize about but rarely say out loud..." },
       { key: "beforeAfterStory", label: "A real client before → after story?", placeholder: "Where they started, what you did, where they ended up..." },
+    ],
+  },
+  {
+    type: "OFFER_FUNNEL",
+    title: "Offer & Funnel",
+    subtitle: "Tell the AI what you are selling, who it is for, and how content should move people toward action.",
+    icon: Target,
+    color: "#f97316",
+    fields: [
+      { key: "mainOffer", label: "What is your main offer right now?", placeholder: "Example: listing consultation, buyer consult, dealership appointment, 6-week training program, financial review..." },
+      { key: "offerForWho", label: "Who is this offer specifically for?", placeholder: "Example: first-time buyers, growing families, busy parents, local business owners, car shoppers with trade-ins..." },
+      { key: "painPointSolved", label: "What problem does this solve?", placeholder: "What frustration, fear, confusion, or bottleneck does this solve?" },
+      { key: "dreamOutcome", label: "What result does someone want when they buy, book, or reach out?", placeholder: "What does success look like in the client's own words?" },
+      { key: "offerDetails", label: "What exactly is included?", placeholder: "What do they actually get when they say yes?" },
+      { key: "primaryCTA", label: "What should people do next?", placeholder: "DM me, book a call, fill out the form, visit the link, comment a word..." },
+      { key: "bookingLink", label: "Booking link, lead form, website, or landing page", placeholder: "Paste the link you want people to use." },
+      { key: "leadMagnet", label: "Do you have a free resource, checklist, guide, giveaway, or event?", placeholder: "Example: free checklist, buyer guide, seller guide, car buying guide, webinar, workshop..." },
+      { key: "commonObjections", label: "Why do people hesitate before saying yes?", placeholder: "Example: I'm not ready, I need to think about it, it costs too much, I don't know where to start..." },
+      { key: "urgencyReason", label: "Is there a real reason to act now?", placeholder: "Only include real urgency. Avoid fake scarcity." },
+      { key: "proofPoints", label: "What proof supports this offer?", placeholder: "Numbers, results, testimonials, experience, awards, client wins, examples..." },
+      { key: "doNotPromise", label: "What should the AI never promise about this offer?", placeholder: "Anything legal, ethical, compliance-related, or unrealistic that should never be claimed." },
+    ],
+  },
+  {
+    type: "PROOF_BANK",
+    title: "Proof Bank",
+    subtitle: "Give the AI real proof it can use to make your content more specific and credible.",
+    icon: Award,
+    color: "#eab308",
+    fields: [
+      { key: "bestTestimonials", label: "Paste testimonials or kind words from clients/customers.", placeholder: "Paste exact quotes if you have permission, or summarize the kind words you often hear." },
+      { key: "clientWins", label: "List 3-5 client/customer wins you helped create.", placeholder: "Example: helped a buyer win in a multiple-offer situation, helped a client lose 20 lbs, helped a customer get approved..." },
+      { key: "beforeAfterStories", label: "Describe before-and-after stories you are allowed to share.", placeholder: "Before they worked with you, they were ___. Afterward, they were able to ___." },
+      { key: "numbersAndStats", label: "What numbers, rankings, results, milestones, or experience markers can you mention?", placeholder: "Years in business, number of clients served, awards, rankings, sales volume, reviews, repeat customers, certifications..." },
+      { key: "caseStudyDetails", label: "Tell one detailed client/customer success story.", placeholder: "What was the situation, what did you do, and what changed?" },
+      { key: "permissionLevel", label: "How can this proof be used publicly?", placeholder: "Public - can be shared directly | Anonymized - remove names/details | Inspiration only - do not quote directly | Private - save for context but do not use in generated content" },
+      { key: "proofBoundaries", label: "What should not be shared publicly?", placeholder: "Names, dollar amounts, medical/financial/legal claims, private details, or anything that needs approval." },
+    ],
+  },
+  {
+    type: "COMPLIANCE_GUARDRAILS",
+    title: "Compliance & Brand Safety",
+    subtitle: "Set the rules for what the AI should avoid, soften, disclose, or never claim.",
+    icon: ShieldAlert,
+    color: "#dc2626",
+    disclaimer: "The Local Post does not provide legal, financial, medical, or compliance advice. These settings only guide AI-generated content.",
+    fields: [
+      { key: "requiredDisclaimers", label: "Are there any disclaimers you must include?", placeholder: "Example: Equal Housing Opportunity, results not guaranteed, not financial advice, consult your advisor..." },
+      { key: "forbiddenClaims", label: "What claims should the AI never make?", placeholder: "Example: guaranteed approval, guaranteed returns, guaranteed weight loss, best rate, cheapest, risk-free..." },
+      { key: "regulatedTopics", label: "What topics require extra caution in your industry?", placeholder: "Topics that require review or careful wording." },
+      { key: "companyRules", label: "Are there company, brokerage, dealership, firm, or brand rules we need to follow?", placeholder: "Brokerage, dealership, team, employer, compliance, or brand rules." },
+      { key: "approvalProcess", label: "Does content need approval before posting?", placeholder: "Example: I need to send posts to my broker/compliance manager before publishing." },
+      { key: "wordsToAvoidForCompliance", label: "Any legal, compliance, or brand-sensitive words to avoid?", placeholder: "Words that create legal, regulatory, or brand risk." },
+      { key: "sensitiveTopics", label: "Any topics you avoid publicly?", placeholder: "Topics you avoid because they are polarizing, private, risky, or off-brand." },
+      { key: "licenseOrCredentialRules", label: "How should your license, credentials, certifications, or company affiliation be mentioned?", placeholder: "How credentials should be shown or not shown." },
     ],
   },
 ];
@@ -373,8 +514,28 @@ function getMonthlyContextDef(date: Date = new Date()): TimedSurveyDef {
   };
 }
 
+const STORY_REFRESH_DEF: TimedSurveyDef = {
+  type: "STORY_REFRESH",
+  title: "Story Refresh",
+  subtitle: "New stories and observations — refreshes every 4-6 weeks.",
+  icon: RefreshCw,
+  color: "#06b6d4",
+  resetLabel: "Resets every 4-6 weeks",
+  isExpired: (updatedAt) => {
+    if (!updatedAt) return true;
+    return new Date(updatedAt) < new Date(Date.now() - 42 * 24 * 60 * 60 * 1000);
+  },
+  fields: [
+    { key: "recentWins", label: "Any wins or successes since you last updated this?", placeholder: "Deals closed, client breakthroughs, milestones hit, recognition received..." },
+    { key: "newStories", label: "Any new stories, anecdotes, or memorable moments?", placeholder: "Funny things that happened, surprising situations, behind-the-scenes moments..." },
+    { key: "newObservations", label: "New observations or opinions forming in your industry?", placeholder: "Trends you're noticing, shifts in client behavior, takes you're developing..." },
+    { key: "newClientStories", label: "Any new client interactions worth sharing?", placeholder: "A conversation that stuck with you, a question you keep getting, a transformation..." },
+    { key: "whatsChanging", label: "What's changing in your business or market right now?", placeholder: "New offerings, new processes, market shifts, competitive landscape changes..." },
+  ],
+};
+
 function getTimedSurveys(date: Date = new Date()): TimedSurveyDef[] {
-  return [WEEKLY_CONTEXT_DEF, getMonthlyContextDef(date)];
+  return [WEEKLY_CONTEXT_DEF, getMonthlyContextDef(date), STORY_REFRESH_DEF];
 }
 
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
@@ -445,6 +606,12 @@ function DeepDivePanel({
     return (
       <div className="pt-4 space-y-4">
         <StatusBanner status={status} error={errorMsg} />
+        {survey.disclaimer && (
+          <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs leading-relaxed">
+            <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{survey.disclaimer}</span>
+          </div>
+        )}
         <div className="space-y-3">
           {resolvedFields.map((field) => {
             const answer = answers[field.key] ?? existing.answersJson[field.key];
@@ -488,6 +655,12 @@ function DeepDivePanel({
   return (
     <div className="pt-4 space-y-4">
       <StatusBanner status={status} error={errorMsg} />
+      {survey.disclaimer && (
+        <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs leading-relaxed">
+          <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{survey.disclaimer}</span>
+        </div>
+      )}
       {resolvedFields.map((field) => (
         <div key={field.key}>
           <label className="block text-xs font-medium text-text-muted mb-1.5">{field.label}</label>
@@ -718,7 +891,7 @@ export default function QuestionnaireClient({
 }: Props) {
   const industry = questionnaire?.formData.industry as string | undefined;
   const completedCount = profileSurveys.length + (questionnaire ? 1 : 0);
-  const totalCount = DEEP_DIVE_SURVEYS.length + 1 + 2; // +1 for brand questionnaire, +2 for timed surveys
+  const totalCount = DEEP_DIVE_SURVEYS.length + 1 + 3; // +1 for brand questionnaire, +3 for timed surveys
 
   return (
     <div className="max-w-2xl mx-auto lg:max-w-none lg:mx-0 space-y-4 sm:space-y-6">

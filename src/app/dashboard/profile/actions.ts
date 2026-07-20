@@ -15,6 +15,10 @@ const VALID_SURVEY_TYPES = [
   "LOCAL_MAYOR",
   "WEEKLY_CONTEXT",
   "MONTHLY_CONTEXT",
+  "STORY_REFRESH",
+  "OFFER_FUNNEL",
+  "PROOF_BANK",
+  "COMPLIANCE_GUARDRAILS",
 ] as const;
 
 function validateSurveyAnswers(answers: Record<string, string>): boolean {

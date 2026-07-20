@@ -48,6 +48,10 @@ import {
   buildTemporalContextBlock,
   buildAudienceFatigueBlock,
   buildArcDirectiveBlock,
+  buildDynamicConstraintsPrompt,
+  DYNAMIC_CONSTRAINTS_THRESHOLD,
+  buildStalenessWarningBlock,
+  buildSeasonalHistoryBlock,
   type ArchivePostForFreshness,
   type QuestionnaireMaterial,
   type AnalyticsRowForFatigue,
@@ -340,15 +344,38 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   // Count distinct weeks to estimate generation count
   const generationCount = new Set(recentArchived.map((p) => p.weekStarting)).size;
 
-  const [config, trendHeadlines] = await Promise.all([
+  // #10: Seasonal / cross-year awareness — fetch posts from 11-13 months ago
+  // to prevent repeating the same seasonal content year over year
+  const seasonalStart = new Date(Date.now() - 13 * 30 * 24 * 60 * 60 * 1000);
+  const seasonalEnd = new Date(Date.now() - 11 * 30 * 24 * 60 * 60 * 1000);
+
+  const [config, trendHeadlines, seasonalArchived] = await Promise.all([
     getPlatformConfig(),
     fetchTrendingHeadlines(answers.industry),
+    prisma.contentArchive.findMany({
+      where: {
+        userId: session.user.id,
+        archivedAt: { gte: seasonalStart, lte: seasonalEnd },
+      },
+      orderBy: { archivedAt: "desc" },
+      take: 20,
+      select: { title: true, hook: true, bucket: true, format: true, weekStarting: true },
+    }),
   ]);
   const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
   if (!apiKey) {
     console.error("Anthropic API key is not configured");
     return { success: false, error: "API key not configured" };
   }
+
+  const seasonalPosts: ArchivePostForFreshness[] = seasonalArchived.map((p) => ({
+    title: p.title,
+    hook: p.hook,
+    bucket: p.bucket,
+    format: p.format,
+    weekStarting: p.weekStarting,
+  }));
+  const seasonalHistoryBlock = buildSeasonalHistoryBlock(seasonalPosts);
 
   const model = config.anthropicModel || "claude-opus-4-8";
 
@@ -366,7 +393,44 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const usedHooksBlock = buildUsedHooksBlock(freshnessPosts);
   const archetypeHistoryBlock = buildArchetypeHistoryBlock(freshnessPosts);
   const themesExploredBlock = buildThemesExploredBlock(freshnessPosts);
-  const creativeConstraintsBlock = buildCreativeConstraintsBlock();
+
+  // Dynamic LLM-generated constraints for power users (generation count ≥ threshold).
+  // Makes a lightweight pre-generation API call asking Claude to propose constraints
+  // that target this creator's specific unexplored territory. Falls back to the static
+  // pool on any failure.
+  let dynamicConstraints: string[] | undefined;
+  if (generationCount >= DYNAMIC_CONSTRAINTS_THRESHOLD && freshnessPosts.length >= 8) {
+    const constraintsPrompt = buildDynamicConstraintsPrompt(freshnessPosts, generationCount);
+    if (constraintsPrompt) {
+      try {
+        const constraintsResponse = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 500,
+            system: constraintsPrompt.system,
+            messages: [{ role: "user", content: constraintsPrompt.user }],
+          }),
+        });
+        if (constraintsResponse.ok) {
+          const constraintsData = await constraintsResponse.json();
+          const constraintsText: string = constraintsData.content?.[0]?.text || "";
+          dynamicConstraints = constraintsText
+            .split("\n")
+            .map((line: string) => line.trim())
+            .filter((line: string) => line.length > 0);
+        }
+      } catch (err) {
+        console.error("Dynamic constraints generation failed, falling back to static pool:", err);
+      }
+    }
+  }
+  const creativeConstraintsBlock = buildCreativeConstraintsBlock(undefined, dynamicConstraints);
   const variationDirectiveBlock = buildVariationDirectiveBlock(generationCount);
 
   // #2: Anecdote cooldown — extract questionnaire/survey material and check usage
@@ -486,6 +550,9 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   }));
   const audienceFatigueBlock = buildAudienceFatigueBlock(fatigueRows);
 
+  // #9: Proactive staleness score — leading indicator before engagement declines
+  const stalenessWarningBlock = buildStalenessWarningBlock(freshnessPosts);
+
   const matches = matchArchiveToAnalytics(recentArchived, analyticsRows);
   const contentPerformanceBlock = buildContentPerformanceBlock(matches);
 
@@ -524,8 +591,10 @@ ${contentGapBlock ? `\n${contentGapBlock}` : ""}
 ${variationDirectiveBlock ? `\n${variationDirectiveBlock}` : ""}
 ${creativeConstraintsBlock ? `\n${creativeConstraintsBlock}` : ""}
 ${temporalContextBlock ? `\n${temporalContextBlock}` : ""}
+${seasonalHistoryBlock ? `\n${seasonalHistoryBlock}` : ""}
 ${arcDirectiveBlock ? `\n${arcDirectiveBlock}` : ""}
 ${audienceFatigueBlock ? `\n${audienceFatigueBlock}` : ""}
+${stalenessWarningBlock ? `\n${stalenessWarningBlock}` : ""}
 ${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
 ${demographicsBlock ? `\n${demographicsBlock}` : ""}
 ${performanceBlock ? `\n${performanceBlock}` : ""}

@@ -33,7 +33,7 @@ export async function enhanceWithAI(plainText: string): Promise<{ success: boole
 
   const model = await getAnthropicModel();
 
-  const systemPrompt = `You are a world-class email marketing designer and copywriter for "The Local Post" — a premium content intelligence platform for real estate agents and local business owners. You design emails that look like they came from a top-tier brand: Apple, Stripe, Airbnb quality. Emails that make people stop scrolling and actually read.
+  const systemPrompt = `You are a world-class email marketing designer and copywriter for "The Local Post" — a premium content intelligence platform for local business owners and industry professionals (real estate agents, car salesmen, fitness trainers, financial advisors, coaches, and more). You design emails that look like they came from a top-tier brand: Apple, Stripe, Airbnb quality. Emails that make people stop scrolling and actually read.
 
 Your job: take the admin's plain-text announcement and transform it into a visually stunning, conversion-optimized HTML email that jumps off the screen.
 
@@ -131,7 +131,7 @@ export async function suggestSubject(plainText: string): Promise<{ success: bool
 
   const model = await getAnthropicModel();
 
-  const systemPrompt = `You are an expert email marketing copywriter for "The Local Post" — a premium content intelligence platform for real estate agents and local business owners.
+  const systemPrompt = `You are an expert email marketing copywriter for "The Local Post" — a premium content intelligence platform for local business owners and industry professionals (real estate agents, car salesmen, fitness trainers, financial advisors, coaches, and more).
 
 Your job: write ONE compelling email subject line based on the admin's announcement body text.
 

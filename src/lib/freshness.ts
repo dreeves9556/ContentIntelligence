@@ -130,7 +130,7 @@ function classifyArchetype(text: string): ContentArchetype {
   return "Other";
 }
 
-function classifyPost(post: ArchivePostForFreshness): ContentArchetype {
+export function classifyPost(post: ArchivePostForFreshness): ContentArchetype {
   const hookArchetype = classifyArchetype(post.hook);
   if (hookArchetype !== "Other") return hookArchetype;
   const titleArchetype = classifyArchetype(post.title);
@@ -203,9 +203,15 @@ export function buildUsedHooksBlock(posts: ArchivePostForFreshness[], maxHooks: 
   return `<used_hooks>\nRecently used opening hooks. Do NOT repeat these opening patterns, sentence structures, or phrasings. The goal is not just different words but different APPROACHES to opening a post:\n${list}\n</used_hooks>`;
 }
 
-export function buildArchetypeHistoryBlock(posts: ArchivePostForFreshness[]): string {
-  if (posts.length < 3) return "";
+export interface ArchetypeAnalysis {
+  counts: Map<ContentArchetype, number>;
+  sorted: [ContentArchetype, number][];
+  total: number;
+  overused: [ContentArchetype, number][];
+  underused: ContentArchetype[];
+}
 
+export function analyzeArchetypes(posts: ArchivePostForFreshness[]): ArchetypeAnalysis {
   const counts = new Map<ContentArchetype, number>();
   for (const post of posts) {
     const archetype = classifyPost(post);
@@ -215,18 +221,28 @@ export function buildArchetypeHistoryBlock(posts: ArchivePostForFreshness[]): st
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   const total = posts.length;
 
-  const overused = sorted.filter(([, c]) => c / total > 0.35 && ("," as ContentArchetype) !== "Other");
-  const underused: ContentArchetype[] = [];
+  const overused = sorted.filter(
+    ([archetype, c]) => archetype !== "Other" && c / total > 0.35,
+  );
   const allArchetypes: ContentArchetype[] = [
     "Listicle", "Question Hook", "Bold Statement", "Story / Anecdote",
     "Myth-Bust", "Behind-the-Scenes", "How-To / Educational",
     "Contrarian / Hot Take", "Direct Address", "Comparison / Vs",
   ];
+  const underused: ContentArchetype[] = [];
   for (const a of allArchetypes) {
     if (!counts.has(a) || (counts.get(a) ?? 0) / total < 0.1) {
       underused.push(a);
     }
   }
+
+  return { counts, sorted, total, overused, underused };
+}
+
+export function buildArchetypeHistoryBlock(posts: ArchivePostForFreshness[]): string {
+  if (posts.length < 3) return "";
+
+  const { sorted, total, overused, underused } = analyzeArchetypes(posts);
 
   const lines = sorted.map(([archetype, count]) => {
     const pct = ((count / total) * 100).toFixed(0);
@@ -332,7 +348,12 @@ const CREATIVE_CONSTRAINTS_POOL: string[] = [
   "Use a 'common question, uncommon answer' structure for at least one post.",
 ];
 
-export function buildCreativeConstraintsBlock(seed?: number): string {
+export function buildCreativeConstraintsBlock(seed?: number, dynamicConstraints?: string[]): string {
+  if (dynamicConstraints && dynamicConstraints.length > 0) {
+    const block = formatDynamicConstraintsBlock(dynamicConstraints);
+    if (block) return block;
+  }
+
   // Deterministic-ish shuffle using seed if provided, otherwise Math.random
   const constraints = [...CREATIVE_CONSTRAINTS_POOL];
   const rng = seed !== undefined ? mulberry32(seed) : Math.random;
@@ -393,6 +414,84 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
+// ─── Level 3: Dynamic LLM-Generated Constraints for Power Users ────
+
+export const DYNAMIC_CONSTRAINTS_THRESHOLD = 8;
+
+export interface DynamicConstraintsPrompt {
+  system: string;
+  user: string;
+}
+
+export function buildDynamicConstraintsPrompt(
+  posts: ArchivePostForFreshness[],
+  generationCount: number,
+): DynamicConstraintsPrompt | null {
+  if (posts.length < 8) return null;
+
+  const { sorted, total, overused, underused } = analyzeArchetypes(posts);
+  const themes = extractThemes(posts, 15);
+  const recentTitles = posts.slice(0, 15).map((p) => `- "${p.title}"`).join("\n");
+
+  const archetypeLines = sorted
+    .map(([archetype, count]) => `- ${archetype}: ${count} (${((count / total) * 100).toFixed(0)}%)`)
+    .join("\n");
+
+  const overusedStr = overused.length > 0
+    ? overused.map(([a]) => a).join(", ")
+    : "None currently overused";
+  const underusedStr = underused.length > 0
+    ? underused.join(", ")
+    : "All archetypes well-represented";
+  const themesStr = themes.length > 0
+    ? themes.join(", ")
+    : "No strong recurring themes";
+
+  const system = `You are a creative content strategist for a social media creator who has been generating content for many weeks. Your job is to propose 4 creative constraints that will push them into genuinely UNEXPLORED territory — not generic advice, but specific directives based on what they have NOT done yet.
+
+You will receive:
+- Their archetype history (which structural approaches they've used and how often)
+- Overused and underused archetypes
+- Recurring themes/keywords in their recent content
+- Their recent post titles
+
+Propose 4 constraints. Each must be:
+1. Specific to this creator's gaps — reference what they haven't tried or what they over-rely on
+2. Actionable and concrete — phrased as "Include at least one post that..." or "Try a [specific approach] for at least one post"
+3. Different from generic advice — no "use a question hook" unless there's a specific reason tied to their history
+4. Push toward unexplored archetypes, themes, or structural approaches
+
+Return ONLY a numbered list (1-4), one constraint per line. No preamble, no explanation, no markdown.`;
+
+  const user = `CREATOR CONTEXT (approximately their ${ordinal(generationCount)} calendar generation):
+
+ARCHETYPE BREAKDOWN (last ${total} posts):
+${archetypeLines}
+
+OVERUSED ARCHETYPES (avoid pushing more of these): ${overusedStr}
+UNDERUSED ARCHETYPES (prime territory to explore): ${underusedStr}
+
+RECURRING THEMES (already explored, find different angles): ${themesStr}
+
+RECENT POST TITLES:
+${recentTitles}
+
+Propose 4 creative constraints that push this creator into genuinely fresh territory. Return only the numbered list.`;
+
+  return { system, user };
+}
+
+export function formatDynamicConstraintsBlock(constraints: string[]): string {
+  const cleaned = constraints
+    .map((c) => c.replace(/^\d+[.)\]]?\s*/, "").trim())
+    .filter((c) => c.length > 10)
+    .slice(0, 4);
+
+  if (cleaned.length === 0) return "";
+
+  return `<creative_constraints>\nThis week, incorporate at least 2 of these 4 creative constraints. These were generated specifically for this creator based on their content history — they target unexplored archetypes, themes, and structural approaches to push into genuinely fresh territory:\n${cleaned.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n</creative_constraints>`;
+}
+
 // ─── #2: Anecdote Cooldown ──────────────────────────────────────────
 
 export interface QuestionnaireMaterial {
@@ -449,6 +548,11 @@ export function buildAnecdoteCooldownBlock(
 
   if (used.length === 0 && fresh.length === 0) return "";
 
+  // When all anecdotes have been used, switch directive from "use fresh" to "reimagine used"
+  if (fresh.length === 0 && used.length > 0) {
+    return `<anecdote_cooldown>\nALL questionnaire anecdotes have been used in previous posts. Do NOT simply repeat them. Instead, REIMAGINE each topic with a DIFFERENT approach — a different archetype, a different audience lens, or an updated perspective. For example, if a topic was covered as a listicle before, try it as a personal story. If it was told from the client's perspective, tell it from the creator's perspective. If it was a myth-bust, try it as a behind-the-scenes.\n\nREIMAGINE THESE (already used — find new angles, do not repeat the same approach):\n${used.map((u) => `- ${u.label}: "${u.snippet}..."`).join("\n")}\n</anecdote_cooldown>`;
+  }
+
   const sections: string[] = [];
 
   if (used.length > 0) {
@@ -488,7 +592,13 @@ export function buildContentGapBlock(
     }
   }
 
-  if (untapped.length === 0) return "";
+  if (untapped.length === 0) {
+    // All material has been explored — guide the AI to find new angles in familiar topics
+    if (posts.length >= 8) {
+      return `<untapped_material>\nAll questionnaire material has been explored in previous posts. Focus on finding NEW ANGLES in familiar topics — different archetypes, different perspectives, updated takes. Refer to the archetype history above to see which structural approaches haven't been combined with these topics yet. The goal is not new topics but new PERSPECTIVES on topics the audience already engaged with.\n</untapped_material>`;
+    }
+    return "";
+  }
 
   return `<untapped_material>\nThese are specific pieces of the creator's questionnaire/survey data that have NOT been explored in recent posts. They are prime material for fresh content this week:\n${untapped.map((u) => `- ${u.label}: "${u.snippet}..."`).join("\n")}\n</untapped_material>`;
 }
@@ -664,6 +774,120 @@ export function buildFreshInputBlock(
   if (parts.length === 0) return "";
 
   return `<fresh_input>\nThis is current, time-bound input from the creator, not from the original questionnaire. It represents what's happening in their life and business RIGHT NOW. Weave it into this week's content where it fits naturally. This takes priority over older questionnaire material when there's overlap.\n${parts.join("\n\n")}\n</fresh_input>`;
+}
+
+// ─── #9: Proactive Staleness Score ──────────────────────────────────
+
+export interface FreshnessScore {
+  score: number;
+  archetypeDiversity: number;
+  themeDiversity: number;
+  hookSimilarity: number;
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let common = 0;
+  for (const w of a) {
+    if (b.has(w)) common++;
+  }
+  const union = a.size + b.size - common;
+  return union > 0 ? common / union : 0;
+}
+
+function hookWordSet(hook: string): Set<string> {
+  const words = hook.toLowerCase().match(/[a-z]+/g) ?? [];
+  const set = new Set<string>();
+  for (const w of words) {
+    if (w.length >= 4 && !STOP_WORDS.has(w)) set.add(w);
+  }
+  return set;
+}
+
+export function computeFreshnessScore(posts: ArchivePostForFreshness[]): FreshnessScore | null {
+  if (posts.length < 8) return null;
+
+  // Archetype diversity: unique non-Other archetypes / total posts
+  const { sorted } = analyzeArchetypes(posts);
+  const nonOtherArchetypes = sorted.filter(([a]) => a !== "Other");
+  const archetypeDiversity = nonOtherArchetypes.length / posts.length;
+
+  // Theme diversity: unique meaningful words / total meaningful words
+  // High ratio = high diversity (every post uses different words)
+  // Low ratio = low diversity (same words repeating across posts)
+  const themeWordCounts = new Map<string, number>();
+  let totalThemeWords = 0;
+  for (const post of posts) {
+    const text = `${post.title} ${post.hook}`.toLowerCase();
+    const words = text.match(/[a-z]+/g) ?? [];
+    const seen = new Set<string>();
+    for (const word of words) {
+      if (word.length < 4 || STOP_WORDS.has(word) || seen.has(word)) continue;
+      seen.add(word);
+      themeWordCounts.set(word, (themeWordCounts.get(word) ?? 0) + 1);
+      totalThemeWords++;
+    }
+  }
+  const themeDiversity = totalThemeWords > 0
+    ? Math.min(themeWordCounts.size / totalThemeWords, 1)
+    : 0;
+
+  // Hook similarity: average pairwise Jaccard of hook word sets (pre-computed, stop words filtered)
+  const hookSets = posts
+    .map((p) => p.hook)
+    .filter((h) => h.trim().length > 0)
+    .map(hookWordSet);
+  let totalSim = 0;
+  let pairCount = 0;
+  for (let i = 0; i < hookSets.length; i++) {
+    for (let j = i + 1; j < hookSets.length; j++) {
+      totalSim += jaccardSimilarity(hookSets[i], hookSets[j]);
+      pairCount++;
+    }
+  }
+  const hookSimilarity = pairCount > 0 ? totalSim / pairCount : 0;
+
+  // Weighted score: 40% archetype diversity, 30% theme diversity, 30% hook dissimilarity
+  const hookDissimilarity = 1 - hookSimilarity;
+  const score = Math.round(
+    (archetypeDiversity * 0.4 + themeDiversity * 0.3 + hookDissimilarity * 0.3) * 100,
+  );
+
+  return { score, archetypeDiversity, themeDiversity, hookSimilarity };
+}
+
+export function buildStalenessWarningBlock(posts: ArchivePostForFreshness[]): string {
+  const result = computeFreshnessScore(posts);
+  if (!result) return "";
+
+  const STALENESS_THRESHOLD = 50;
+  if (result.score >= STALENESS_THRESHOLD) return "";
+
+  const { score, archetypeDiversity, themeDiversity, hookSimilarity } = result;
+
+  const details: string[] = [
+    `Archetype diversity: ${(archetypeDiversity * 100).toFixed(0)}% (${archetypeDiversity < 0.3 ? "LOW — too few structural approaches" : "moderate"})`,
+    `Theme diversity: ${(themeDiversity * 100).toFixed(0)}% (${themeDiversity < 0.4 ? "LOW — topics are repeating" : "moderate"})`,
+    `Hook similarity: ${(hookSimilarity * 100).toFixed(0)}% (${hookSimilarity > 0.4 ? "HIGH — hooks are too alike" : "moderate"})`,
+  ];
+
+  return `<staleness_warning>\nPROACTIVE FRESHNESS ALERT: Content variety score is ${score}/100, below the staleness threshold of ${STALENESS_THRESHOLD}. This is a LEADING indicator — engagement has not yet declined but content is becoming repetitive. Act now to prevent audience fatigue.\n\nBreakdown:\n${details.map((d) => `- ${d}`).join("\n")}\n\nACTION REQUIRED: Push harder for fresh approaches this week. Try underused archetypes (see archetype history above), explore new topics, and vary your hook structures significantly. Do not repeat the same opening patterns or topic angles from recent weeks.\n</staleness_warning>`;
+}
+
+// ─── #10: Seasonal / Cross-Year History ─────────────────────────────
+
+export function buildSeasonalHistoryBlock(posts: ArchivePostForFreshness[]): string {
+  if (posts.length === 0) return "";
+
+  const titles = posts
+    .slice(0, 10)
+    .map((p) => `- "${p.title}"`)
+    .join("\n");
+
+  const themes = extractThemes(posts, 8);
+  const themesStr = themes.length > 0 ? themes.join(", ") : "No strong themes detected";
+
+  return `<seasonal_history>\nLast year during this same season, the creator posted about:\n${titles}\n\nRecurring themes from that period: ${themesStr}\n\nFind DIFFERENT seasonal angles this year. Do NOT repeat the same seasonal topics, hooks, or angles. If a topic was covered last year, approach it from a fresh perspective or skip it entirely in favor of something new.\n</seasonal_history>`;
 }
 
 // ─── #7: Arc / Campaign Directive ───────────────────────────────────

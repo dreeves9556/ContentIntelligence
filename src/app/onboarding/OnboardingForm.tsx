@@ -10,6 +10,7 @@ const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Content Pr
 
 const INDUSTRY_OPTIONS = [
   "Real Estate",
+  "Car Sales",
   "Fitness / Personal Training",
   "Financial Services",
   "Coaching / Consulting",
@@ -93,6 +94,20 @@ const INDUSTRY_QUESTIONS: Record<string, { key: string; label: string; placehold
   "Financial Services": [
     { key: "specialization", label: "What is your financial specialization?", placeholder: "e.g. Retirement planning, tax strategy..." },
     { key: "clientFear", label: "What is your clients' biggest financial fear?", placeholder: "What keeps them up at night?" },
+  ],
+  "Car Sales": [
+    { key: "yearsInCarSales", label: "How long have you been selling cars?", placeholder: "e.g. 6 years" },
+    { key: "dealershipNiche", label: "What do you sell?", placeholder: "e.g. New Toyota, used luxury, lease returns, fleet..." },
+    {
+      key: "biggestBuyerMisconception",
+      label: "Biggest misconception car buyers have?",
+      placeholder: "What do customers get wrong most often?",
+    },
+    {
+      key: "carBrands",
+      label: "Which car brands do you focus on? (optional)",
+      placeholder: "e.g. Toyota, Honda, BMW, Ford...",
+    },
   ],
   "Coaching / Consulting": [
     { key: "transformationDelivered", label: "What transformation do you deliver?", placeholder: "Before → after for your clients..." },

@@ -35,6 +35,10 @@ const INDUSTRY_FEEDS: Record<string, RssFeedConfig[]> = {
     { name: "HousingWire", url: "https://www.housingwire.com/feed/", category: "business" },
     { name: "Realtor Magazine", url: "https://magazine.realtor/feed", category: "content_marketing" },
   ],
+  "Car Sales": [
+    { name: "Automotive News", url: "https://www.autonews.com/rss", category: "business" },
+    { name: "KBB News", url: "https://www.kbb.com/rss/", category: "content_marketing" },
+  ],
   "Fitness / Personal Training": [
     { name: "ACE Fitness Blog", url: "https://www.acefitness.org/blog/feed/", category: "content_marketing" },
     { name: "Mindbody Green", url: "https://www.mindbodygreen.com/rss/feed", category: "creator_coaching" },

@@ -15,6 +15,9 @@ const SURVEY_TYPE_TITLES: Record<string, string> = {
   TRENCH_WARFARE: "Trench Warfare",
   ORIGIN_STORY: "Origin Story",
   CLIENT_AVATAR: "Client Avatar",
+  OFFER_FUNNEL: "Offer & Funnel",
+  PROOF_BANK: "Proof Bank",
+  COMPLIANCE_GUARDRAILS: "Compliance & Brand Safety",
 };
 
 async function getUserWithSurveys(userId: string) {
