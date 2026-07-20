@@ -59,6 +59,7 @@ model User {
   resourcePosts    ResourcePost[]
   bugReports      BugReport[]
   creatorMemories CreatorMemory[]
+  calendarGenerationLogs CalendarGenerationLog[]
   notificationLogs NotificationLog[]
   notificationPreference NotificationPreference?
   scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
@@ -606,4 +607,27 @@ model ScheduledPushNotification {
 
   @@index([status, scheduledFor])
   @@map("scheduled_push_notifications")
+}
+
+model CalendarGenerationLog {
+  id                        String   @id @default(cuid())
+  userId                    String
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  success                   Boolean
+  daysGenerated             Int?
+  freshnessScore            Int?
+  archetypeDiversity        Float?
+  themeDiversity            Float?
+  hookSimilarity            Float?
+  stalenessTriggered        Boolean  @default(false)
+  audienceFatigueTriggered  Boolean  @default(false)
+  dynamicConstraintsMode    String?  // "static" | "dynamic" | "none"
+  dynamicConstraintsFallback Boolean @default(false)
+  blockMetadata             Json?    // { included: [], trimmed: [], omitted: [] } — no raw prompt content
+  errorMessage              String?
+  durationMs                Int?
+  createdAt                 DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("calendar_generation_logs")
 }

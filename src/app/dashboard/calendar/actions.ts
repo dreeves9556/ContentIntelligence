@@ -52,10 +52,12 @@ import {
   DYNAMIC_CONSTRAINTS_THRESHOLD,
   buildStalenessWarningBlock,
   buildSeasonalHistoryBlock,
+  computeFreshnessScore,
   type ArchivePostForFreshness,
   type QuestionnaireMaterial,
   type AnalyticsRowForFatigue,
 } from "@/lib/freshness";
+import { buildBudgetedPrompt, type PromptBlock, type BudgetedBlockMetadata } from "@/lib/prompt-budget";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -292,6 +294,46 @@ export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResul
   return generateCalendarStrategy(session.user.id);
 }
 
+interface GenerationLogContext {
+  userId: string;
+  success: boolean;
+  daysGenerated?: number;
+  freshnessScore?: number | null;
+  archetypeDiversity?: number | null;
+  themeDiversity?: number | null;
+  hookSimilarity?: number | null;
+  stalenessTriggered?: boolean;
+  audienceFatigueTriggered?: boolean;
+  dynamicConstraintsMode?: string;
+  dynamicConstraintsFallback?: boolean;
+  blockMetadata?: { included: BudgetedBlockMetadata[]; trimmed: BudgetedBlockMetadata[]; omitted: BudgetedBlockMetadata[] };
+  errorMessage?: string;
+  durationMs?: number;
+}
+
+function logCalendarGeneration(ctx: GenerationLogContext): void {
+  prisma.calendarGenerationLog
+    .create({
+      data: {
+        userId: ctx.userId,
+        success: ctx.success,
+        daysGenerated: ctx.daysGenerated ?? null,
+        freshnessScore: ctx.freshnessScore ?? null,
+        archetypeDiversity: ctx.archetypeDiversity ?? null,
+        themeDiversity: ctx.themeDiversity ?? null,
+        hookSimilarity: ctx.hookSimilarity ?? null,
+        stalenessTriggered: ctx.stalenessTriggered ?? false,
+        audienceFatigueTriggered: ctx.audienceFatigueTriggered ?? false,
+        dynamicConstraintsMode: ctx.dynamicConstraintsMode ?? null,
+        dynamicConstraintsFallback: ctx.dynamicConstraintsFallback ?? false,
+        blockMetadata: (ctx.blockMetadata ?? null) as unknown as Prisma.InputJsonValue,
+        errorMessage: ctx.errorMessage ?? null,
+        durationMs: ctx.durationMs ?? null,
+      },
+    })
+    .catch((err: unknown) => console.error("Calendar generation log write failed:", err));
+}
+
 export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
 
@@ -399,6 +441,8 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   // that target this creator's specific unexplored territory. Falls back to the static
   // pool on any failure.
   let dynamicConstraints: string[] | undefined;
+  let dynamicConstraintsMode: "dynamic" | "static" | "none" = "none";
+  let dynamicConstraintsFallback = false;
   if (generationCount >= DYNAMIC_CONSTRAINTS_THRESHOLD && freshnessPosts.length >= 8) {
     const constraintsPrompt = buildDynamicConstraintsPrompt(freshnessPosts, generationCount);
     if (constraintsPrompt) {
@@ -424,11 +468,21 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
             .split("\n")
             .map((line: string) => line.trim())
             .filter((line: string) => line.length > 0);
+          dynamicConstraintsMode = "dynamic";
+        } else {
+          dynamicConstraintsMode = "static";
+          dynamicConstraintsFallback = true;
         }
       } catch (err) {
         console.error("Dynamic constraints generation failed, falling back to static pool:", err);
+        dynamicConstraintsMode = "static";
+        dynamicConstraintsFallback = true;
       }
+    } else {
+      dynamicConstraintsMode = "static";
     }
+  } else {
+    dynamicConstraintsMode = "static";
   }
   const creativeConstraintsBlock = buildCreativeConstraintsBlock(undefined, dynamicConstraints);
   const variationDirectiveBlock = buildVariationDirectiveBlock(generationCount);
@@ -549,9 +603,12 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     publishedAt: r.publishedAt,
   }));
   const audienceFatigueBlock = buildAudienceFatigueBlock(fatigueRows);
+  const audienceFatigueTriggered = audienceFatigueBlock.length > 0;
 
   // #9: Proactive staleness score — leading indicator before engagement declines
   const stalenessWarningBlock = buildStalenessWarningBlock(freshnessPosts);
+  const stalenessTriggered = stalenessWarningBlock.length > 0;
+  const freshnessScoreResult = computeFreshnessScore(freshnessPosts);
 
   const matches = matchArchiveToAnalytics(recentArchived, analyticsRows);
   const contentPerformanceBlock = buildContentPerformanceBlock(matches);
@@ -581,30 +638,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
   const bucketDistStr = `- For ${daysToPost} days, aim for roughly: ${Math.ceil(daysToPost / 3)} Personal, ${Math.ceil(daysToPost / 3)} Expert, ${Math.floor(daysToPost / 3)} Local (adjust by ±1 as needed, but never skip a bucket entirely if days >= 3).\n- Personal and Expert posts should be roughly equal. Do NOT let Expert dominate the week.`;
 
-  const defaultUserPrompt = `${memoryBlock ? `${memoryBlock}\n\n` : ""}${userProfileXml}
-${usedTitlesXml ? `\n${usedTitlesXml}` : ""}
-${usedHooksBlock ? `\n${usedHooksBlock}` : ""}
-${archetypeHistoryBlock ? `\n${archetypeHistoryBlock}` : ""}
-${themesExploredBlock ? `\n${themesExploredBlock}` : ""}
-${anecdoteCooldownBlock ? `\n${anecdoteCooldownBlock}` : ""}
-${contentGapBlock ? `\n${contentGapBlock}` : ""}
-${variationDirectiveBlock ? `\n${variationDirectiveBlock}` : ""}
-${creativeConstraintsBlock ? `\n${creativeConstraintsBlock}` : ""}
-${temporalContextBlock ? `\n${temporalContextBlock}` : ""}
-${seasonalHistoryBlock ? `\n${seasonalHistoryBlock}` : ""}
-${arcDirectiveBlock ? `\n${arcDirectiveBlock}` : ""}
-${audienceFatigueBlock ? `\n${audienceFatigueBlock}` : ""}
-${stalenessWarningBlock ? `\n${stalenessWarningBlock}` : ""}
-${bestTimesBlock ? `\n${bestTimesBlock}` : ""}
-${demographicsBlock ? `\n${demographicsBlock}` : ""}
-${performanceBlock ? `\n${performanceBlock}` : ""}
-${contentPerformanceBlock ? `\n${contentPerformanceBlock}` : ""}
-${followerTrendBlock ? `\n${followerTrendBlock}` : ""}
-${cadenceBlock ? `\n${cadenceBlock}` : ""}
-${feedbackBlock ? `\n${feedbackBlock}` : ""}
-${trendingTopicsBlock ? `\n${trendingTopicsBlock}` : ""}
-
-<generation_instructions>
+  const generationInstructions = `<generation_instructions>
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
 The days must be, in order: ${targetDays.join(", ")}. Post 1 is ${targetDays[0]}${targetDays.length > 1 ? `, post 2 is ${targetDays[1]}` : ""}, and so on. Any day-of-week or "today" reference inside a post's copy (hook, body, cta, caption) MUST match that post's assigned day. For example, the ${targetDays[0]} post must never say it is ${DAY_NAMES[(currentDayIdx + 1) % 7].charAt(0) + DAY_NAMES[(currentDayIdx + 1) % 7].slice(1).toLowerCase()} or any other weekday.
@@ -618,6 +652,40 @@ Days must be one of: ${targetDays.join(", ")}.
 
 MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Carousel, or Static). The creator overlays music on all their posts using Instagram's music sticker, so always pick a real, recognizable song with artist name that fits the mood.
 </generation_instructions>`;
+
+  // Assemble prompt blocks with priorities for budget management.
+  // CRITICAL blocks (memory, user profile with compliance guardrails, generation instructions)
+  // are always preserved regardless of budget pressure.
+  const promptBlocks: PromptBlock[] = [
+    { id: "creator_memory", content: memoryBlock, priority: "CRITICAL" },
+    { id: "user_profile", content: userProfileXml, priority: "CRITICAL" },
+    { id: "generation_instructions", content: generationInstructions, priority: "CRITICAL" },
+    { id: "used_titles", content: usedTitlesXml, priority: "HIGH" },
+    { id: "used_hooks", content: usedHooksBlock, priority: "HIGH" },
+    { id: "archetype_history", content: archetypeHistoryBlock, priority: "HIGH" },
+    { id: "staleness_warning", content: stalenessWarningBlock, priority: "HIGH" },
+    { id: "audience_fatigue", content: audienceFatigueBlock, priority: "HIGH" },
+    { id: "creative_constraints", content: creativeConstraintsBlock, priority: "HIGH" },
+    { id: "variation_directive", content: variationDirectiveBlock, priority: "HIGH" },
+    { id: "themes_explored", content: themesExploredBlock, priority: "MEDIUM" },
+    { id: "anecdote_cooldown", content: anecdoteCooldownBlock, priority: "MEDIUM" },
+    { id: "untapped_material", content: contentGapBlock, priority: "MEDIUM" },
+    { id: "temporal_context", content: temporalContextBlock, priority: "MEDIUM" },
+    { id: "seasonal_history", content: seasonalHistoryBlock, priority: "MEDIUM" },
+    { id: "content_arc", content: arcDirectiveBlock, priority: "MEDIUM" },
+    { id: "best_posting_times", content: bestTimesBlock, priority: "MEDIUM" },
+    { id: "audience_demographics", content: demographicsBlock, priority: "MEDIUM" },
+    { id: "performance_signals", content: performanceBlock, priority: "LOW", trimStrategy: "omit_if_over" },
+    { id: "content_performance", content: contentPerformanceBlock, priority: "LOW", trimStrategy: "omit_if_over" },
+    { id: "follower_trend", content: followerTrendBlock, priority: "LOW", trimStrategy: "omit_if_over" },
+    { id: "cadence_insights", content: cadenceBlock, priority: "LOW", trimStrategy: "omit_if_over" },
+    { id: "feedback", content: feedbackBlock, priority: "LOW", trimStrategy: "omit_if_over" },
+    { id: "trending_topics", content: trendingTopicsBlock, priority: "LOW", trimStrategy: "omit_if_over" },
+  ];
+
+  const budgetedPrompt = buildBudgetedPrompt(promptBlocks);
+  const defaultUserPrompt = budgetedPrompt.prompt;
+  const generationStartTime = Date.now();
 
   const systemPrompt = (config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT)
     .replace(/\{\{weekStarting\}\}/g, weekStarting)
@@ -661,6 +729,17 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     if (!response.ok) {
       const errorData = await response.json();
       console.error("Anthropic API error:", errorData);
+      logCalendarGeneration({
+        userId: session.user.id,
+        success: false,
+        stalenessTriggered,
+        audienceFatigueTriggered,
+        dynamicConstraintsMode,
+        dynamicConstraintsFallback,
+        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
+        errorMessage: `AI service error (${response.status})`,
+        durationMs: Date.now() - generationStartTime,
+      });
       return { success: false, error: "AI service error. Please try again." };
     }
 
@@ -673,6 +752,20 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       calendarData = JSON.parse(responseText);
     } catch (parseError) {
       console.error("Failed to parse Claude response:", responseText);
+      const parseErrorMsg = stopReason === "max_tokens"
+        ? "The AI response was too long and got cut off. Please try again."
+        : "Failed to parse AI response. Please try again.";
+      logCalendarGeneration({
+        userId: session.user.id,
+        success: false,
+        stalenessTriggered,
+        audienceFatigueTriggered,
+        dynamicConstraintsMode,
+        dynamicConstraintsFallback,
+        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
+        errorMessage: parseErrorMsg,
+        durationMs: Date.now() - generationStartTime,
+      });
       if (stopReason === "max_tokens") {
         return { success: false, error: "The AI response was too long and got cut off. Please try again." };
       }
@@ -681,6 +774,17 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
 
     if (!Array.isArray(calendarData.days) || calendarData.days.length < daysToPost) {
       console.error("AI returned insufficient days:", JSON.stringify(calendarData));
+      logCalendarGeneration({
+        userId: session.user.id,
+        success: false,
+        stalenessTriggered,
+        audienceFatigueTriggered,
+        dynamicConstraintsMode,
+        dynamicConstraintsFallback,
+        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
+        errorMessage: "AI returned an incomplete calendar",
+        durationMs: Date.now() - generationStartTime,
+      });
       return { success: false, error: "AI returned an incomplete calendar. Please try again." };
     }
 
@@ -727,9 +831,37 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
 
     revalidatePath("/dashboard/calendar");
     revalidatePath("/dashboard");
+
+    logCalendarGeneration({
+      userId: session.user.id,
+      success: true,
+      daysGenerated: calendarData.days.length,
+      freshnessScore: freshnessScoreResult?.score ?? null,
+      archetypeDiversity: freshnessScoreResult?.archetypeDiversity ?? null,
+      themeDiversity: freshnessScoreResult?.themeDiversity ?? null,
+      hookSimilarity: freshnessScoreResult?.hookSimilarity ?? null,
+      stalenessTriggered,
+      audienceFatigueTriggered,
+      dynamicConstraintsMode,
+      dynamicConstraintsFallback,
+      blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
+      durationMs: Date.now() - generationStartTime,
+    });
+
     return { success: true };
   } catch (error) {
     console.error("Error generating calendar:", error);
+    logCalendarGeneration({
+      userId: session.user.id,
+      success: false,
+      stalenessTriggered,
+      audienceFatigueTriggered,
+      dynamicConstraintsMode,
+      dynamicConstraintsFallback,
+      blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      durationMs: Date.now() - generationStartTime,
+    });
     return { success: false, error: "Failed to generate calendar. Please try again." };
   }
 }

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { FileText, CalendarDays, Share2, Users, Crown, UserPlus, Settings2, Filter, X } from "lucide-react";
+import { FileText, CalendarDays, Share2, Users, Crown, UserPlus, Settings2, Filter, X, Activity } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, UserRole } from "@/lib/account-access";
@@ -344,6 +344,13 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/admin/clients/${user.id}/freshness`}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 transition-colors"
+                        title="Freshness Debug"
+                      >
+                        <Activity className="h-4 w-4" />
+                      </Link>
                       <button
                         onClick={() => setModalUser(user)}
                         className="p-1.5 rounded-lg text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 transition-colors"
@@ -384,6 +391,13 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
                   <p className="font-medium text-text-primary truncate">{user.name || "Unnamed User"}</p>
                   <p className="text-xs text-text-muted truncate">{user.email ?? "—"}</p>
                 </div>
+                <Link
+                  href={`/admin/clients/${user.id}/freshness`}
+                  className="p-2 rounded-lg text-text-muted hover:text-accent-primary hover:bg-accent-primary/10"
+                  title="Freshness Debug"
+                >
+                  <Activity className="h-4 w-4" />
+                </Link>
                 <button
                   onClick={() => setModalUser(user)}
                   className="p-2 rounded-lg text-text-muted hover:text-accent-primary hover:bg-accent-primary/10"

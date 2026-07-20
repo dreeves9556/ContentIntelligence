@@ -155,7 +155,7 @@ const STOP_WORDS = new Set([
   "three", "post", "reel", "carousel", "static", "content", "video",
 ]);
 
-function extractThemes(posts: ArchivePostForFreshness[], maxThemes: number = 12): string[] {
+export function extractThemes(posts: ArchivePostForFreshness[], maxThemes: number = 12): string[] {
   const themeCounts = new Map<string, number>();
 
   for (const post of posts) {
@@ -525,6 +525,29 @@ function phraseInPosts(phrase: string, posts: ArchivePostForFreshness[]): boolea
   return false;
 }
 
+export interface MaterialUsageItem {
+  label: string;
+  snippet: string;
+  status: "used" | "fresh";
+}
+
+export function analyzeMaterialUsage(
+  material: QuestionnaireMaterial[],
+  posts: ArchivePostForFreshness[],
+): MaterialUsageItem[] {
+  if (posts.length < 5 || material.length === 0) return [];
+
+  const items: MaterialUsageItem[] = [];
+  for (const item of material) {
+    if (!item.value || item.value.trim().length < 10) continue;
+    const phrases = extractKeyPhrases(item.value);
+    const isUsed = phrases.some((p) => phraseInPosts(p, posts));
+    const snippet = item.value.trim().slice(0, 80);
+    items.push({ label: item.label, snippet, status: isUsed ? "used" : "fresh" });
+  }
+  return items;
+}
+
 export function buildAnecdoteCooldownBlock(
   material: QuestionnaireMaterial[],
   posts: ArchivePostForFreshness[],
@@ -547,8 +570,6 @@ export function buildAnecdoteCooldownBlock(
   }
 
   if (used.length === 0 && fresh.length === 0) return "";
-
-  // When all anecdotes have been used, switch directive from "use fresh" to "reimagine used"
   if (fresh.length === 0 && used.length > 0) {
     return `<anecdote_cooldown>\nALL questionnaire anecdotes have been used in previous posts. Do NOT simply repeat them. Instead, REIMAGINE each topic with a DIFFERENT approach — a different archetype, a different audience lens, or an updated perspective. For example, if a topic was covered as a listicle before, try it as a personal story. If it was told from the client's perspective, tell it from the creator's perspective. If it was a myth-bust, try it as a behind-the-scenes.\n\nREIMAGINE THESE (already used — find new angles, do not repeat the same approach):\n${used.map((u) => `- ${u.label}: "${u.snippet}..."`).join("\n")}\n</anecdote_cooldown>`;
   }
