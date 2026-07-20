@@ -1,24 +1,27 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { Check, ChevronsUpDown, Loader2, Shield, Users } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Shield, Users, UserCog } from "lucide-react";
 import { updateUserRole } from "../actions";
 
-const ROLES = ["USER", "ADMIN"] as const;
+const ROLES = ["USER", "TEAM_ADMIN", "ADMIN"] as const;
 type Role = (typeof ROLES)[number];
 
 const ROLE_LABELS: Record<Role, string> = {
   USER: "Client",
+  TEAM_ADMIN: "Team Admin",
   ADMIN: "Admin",
 };
 
 const ROLE_STYLES: Record<Role, string> = {
   USER: "text-text-muted bg-background-secondary border-border-primary",
+  TEAM_ADMIN: "text-blue-400 bg-blue-500/10 border-blue-500/20",
   ADMIN: "text-accent-primary bg-accent-primary/10 border-[#c8952a]/20",
 };
 
 const ROLE_ICONS: Record<Role, React.ReactNode> = {
   USER: <Users className="w-3 h-3" />,
+  TEAM_ADMIN: <UserCog className="w-3 h-3" />,
   ADMIN: <Shield className="w-3 h-3" />,
 };
 

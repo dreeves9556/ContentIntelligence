@@ -18,6 +18,7 @@ import {
   Shield,
   Lock,
   ClipboardList,
+  UserCog,
 } from "lucide-react";
 import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ function getNavItems(plan: UserPlan) {
 }
 
 const adminNavItem = { name: "Admin", href: "/admin", icon: Shield };
+const teamAdminNavItem = { name: "Team Roster", href: "/dashboard/team", icon: UserCog };
 
 export default function DashboardLayout({
   children,
@@ -144,6 +146,21 @@ export default function DashboardLayout({
               </Link>
             );
           })}
+          {session?.user?.role === "TEAM_ADMIN" && (
+            <Link
+              href={teamAdminNavItem.href}
+              onClick={() => setMobileMenuOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                pathname === teamAdminNavItem.href
+                  ? "bg-accent-primary/10 text-accent-primary"
+                  : "text-text-primary hover:text-accent-primary hover:bg-accent-primary/10"
+              )}
+            >
+              <UserCog className="h-5 w-5" />
+              {teamAdminNavItem.name}
+            </Link>
+          )}
           {session?.user?.role === "ADMIN" && (
             <Link
               href={adminNavItem.href}
@@ -221,6 +238,20 @@ export default function DashboardLayout({
                 </Link>
               );
             })}
+            {session?.user?.role === "TEAM_ADMIN" && (
+              <Link
+                href={teamAdminNavItem.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                  pathname === teamAdminNavItem.href
+                    ? "bg-accent-primary/10 text-accent-primary"
+                    : "text-text-primary hover:text-accent-primary hover:bg-accent-primary/10"
+                )}
+              >
+                <UserCog className="h-5 w-5" />
+                {teamAdminNavItem.name}
+              </Link>
+            )}
             {session?.user?.role === "ADMIN" && (
               <Link
                 href={adminNavItem.href}

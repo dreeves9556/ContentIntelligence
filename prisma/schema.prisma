@@ -23,6 +23,8 @@ model User {
   authorImage        String?  // URL to headshot
   authorOrganization String?  // Optional org/title shown under name
   authorContactEmail String?  // Optional contact email shown as mailto link in byline
+  organizationId       String?
+  organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   questionnaires Questionnaire[]
@@ -161,6 +163,11 @@ model InviteToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   plan      UserPlan @default(CALENDAR_ONLY)
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedByUserId  String?
+  inviteSource     String?  // "ADMIN" | "TEAM_ADMIN"
+  inviteRole       UserRole @default(USER) // Role the registering user should receive
 
   @@map("invite_tokens")
 }
@@ -178,6 +185,7 @@ model PasswordResetToken {
 
 enum UserRole {
   USER
+  TEAM_ADMIN
   ADMIN
 }
 
@@ -520,6 +528,31 @@ model NotificationLog {
   @@index([userId, read])
   @@index([userId, type])
   @@map("notification_logs")
+}
+
+model Organization {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String?  @unique
+
+  seatLimit          Int      @default(1)
+  seatPlan           UserPlan @default(CALENDAR_ONLY)
+
+  // Stripe-ready fields — populated by future Stripe webhook integration
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  stripeStatus           String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members            User[]
+  teamInvites        InviteToken[]
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@map("organizations")
 }
 
 model ScheduledPushNotification {

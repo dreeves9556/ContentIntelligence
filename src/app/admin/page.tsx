@@ -16,7 +16,7 @@ interface UserWithStats {
   id: string;
   email: string | null;
   name: string | null;
-  role: "USER" | "ADMIN";
+  role: "USER" | "TEAM_ADMIN" | "ADMIN";
   plan: UserPlan;
   createdAt: Date;
   status: "ACTIVE" | "PENDING";

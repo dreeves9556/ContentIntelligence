@@ -47,7 +47,7 @@ export const authConfig = {
           } as typeof session;
         }
 
-        session.user.role = token.role as "USER" | "ADMIN";
+        session.user.role = token.role as "USER" | "TEAM_ADMIN" | "ADMIN";
         (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }
       return session;

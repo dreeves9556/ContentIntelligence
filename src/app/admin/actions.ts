@@ -142,22 +142,51 @@ export async function updateUserPlan(
 
 export async function updateUserRole(
   userId: string,
-  role: "USER" | "ADMIN"
+  role: "USER" | "TEAM_ADMIN" | "ADMIN"
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { success: false, error: "Unauthorized" };
   }
 
-  try {
+  // Fetch the user's current state to validate role transition rules
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { organizationId: true, role: true },
+  });
+
+  if (!targetUser) {
+    return { success: false, error: "User not found." };
+  }
+
+  // TEAM_ADMIN requires an organization — without one, the user would be
+  // stuck in a broken state (team page redirects, no org to manage).
+  if (role === "TEAM_ADMIN" && !targetUser.organizationId) {
+    return {
+      success: false,
+      error: "User must be assigned to an organization before being promoted to Team Admin.",
+    };
+  }
+
+  // When promoting to ADMIN (global admin), clear organizationId.
+  // Global admins should not be tied to a specific org.
+  if (role === "ADMIN" && targetUser.organizationId) {
     await prisma.user.update({
       where: { id: userId },
-      data: { role },
+      data: { role, organizationId: null },
     });
     return { success: true };
-  } catch {
-    return { success: false, error: "Failed to update role" };
   }
+
+  // Demoting TEAM_ADMIN → USER: keep organizationId intact.
+  // The user remains an org member but loses admin privileges (can't invite,
+  // can't manage roster). This is intentional — the admin can separately
+  // remove them from the org if needed.
+  await prisma.user.update({
+    where: { id: userId },
+    data: { role },
+  });
+  return { success: true };
 }
 
 export interface PendingInvite {
