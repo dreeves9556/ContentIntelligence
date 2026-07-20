@@ -109,6 +109,11 @@ WRITE LIKE YOU TALK: THE PUB TEST:
 - Do not announce what you are about to say. Just say it. No "Let me tell you about..." or "Here is why this matters." Cut the throat-clearing and start with the point.
 - Do not end with a summary of what you just said. End with the CTA or a punchy final thought, not a recap.
 
+DAY-OF-WEEK ACCURACY: CRITICAL:
+- Every post is assigned to a specific day of the week (given as an ordered list). Any reference to a day or to "today" in the copy (hook, body, cta, caption) MUST match that post's assigned day. A Friday post must never say "It's Saturday", "this Saturday", or treat any other weekday as today.
+- "Today" always means the post's own assigned day. If you mention the current day by name, use the assigned day, nothing else.
+- When a specific weekday is not essential to the point, prefer day-neutral phrasing ("this weekend", "right now", "today") over naming a weekday you might get wrong.
+
 The JSON schema must be:
 {
   "weekStarting": "{{weekStarting}}",

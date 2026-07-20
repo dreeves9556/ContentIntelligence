@@ -416,11 +416,16 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
       ? parsedDaysToPost
       : 3;
 
-  const today = new Date();
-  const currentDay = today.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+  // Compute the user's LOCAL "today" from their timezone offset (local = UTC + offsetHours),
+  // so currentDay, targetDays, and weekStarting all agree regardless of the server's timezone.
+  // Without this, a late-evening generation west of UTC stores tomorrow's UTC date as
+  // weekStarting while targetDays is derived from the local weekday — shifting the calendar a day.
+  const localNow = new Date(Date.now() + timezoneOffsetHours * 60 * 60 * 1000);
   const DAY_NAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
-  const targetDays = Array.from({ length: daysToPost }, (_, i) => DAY_NAMES[(today.getDay() + i) % 7]);
-  const weekStarting = today.toISOString().split('T')[0];
+  const currentDayIdx = localNow.getUTCDay();
+  const currentDay = DAY_NAMES[currentDayIdx];
+  const targetDays = Array.from({ length: daysToPost }, (_, i) => DAY_NAMES[(currentDayIdx + i) % 7]);
+  const weekStarting = `${localNow.getUTCFullYear()}-${String(localNow.getUTCMonth() + 1).padStart(2, "0")}-${String(localNow.getUTCDate()).padStart(2, "0")}`;
 
   // Fetch best-time-to-post heatmaps for connected platforms
   const bestTimeRows = await prisma.bestTimeToPost.findMany({
@@ -533,7 +538,7 @@ ${trendingTopicsBlock ? `\n${trendingTopicsBlock}` : ""}
 <generation_instructions>
 Generate a ${daysToPost}-day content calendar starting today, which is ${currentDay}, and running for the next ${daysToPost} consecutive days.
 
-The days must be, in order: ${targetDays.join(", ")}.
+The days must be, in order: ${targetDays.join(", ")}. Post 1 is ${targetDays[0]}${targetDays.length > 1 ? `, post 2 is ${targetDays[1]}` : ""}, and so on. Any day-of-week or "today" reference inside a post's copy (hook, body, cta, caption) MUST match that post's assigned day. For example, the ${targetDays[0]} post must never say it is ${DAY_NAMES[(currentDayIdx + 1) % 7].charAt(0) + DAY_NAMES[(currentDayIdx + 1) % 7].slice(1).toLowerCase()} or any other weekday.
 
 The mix must be: ${formatMixStr}. You MUST return your response as raw, valid JSON only matching the exact schema we use for our Calendar UI. Do not include markdown formatting or backticks.
 

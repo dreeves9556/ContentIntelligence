@@ -140,6 +140,16 @@ export function formatHourShort(hour: number): string {
   return `${hour - 12}p`;
 }
 
+/**
+ * Parses a "YYYY-MM-DD" date string as a LOCAL date (midnight local time).
+ * Avoids the JS pitfall where `new Date("2026-07-19")` is interpreted as UTC
+ * midnight, which shifts to the previous day when formatted west of UTC.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function dayNameToIndex(dayName: string): number {
   const upper = dayName.toUpperCase();
   return DAY_NAMES.findIndex((d) => d === upper);

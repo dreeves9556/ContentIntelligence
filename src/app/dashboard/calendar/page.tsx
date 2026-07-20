@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { autoSyncAnalyticsIfNeeded } from "../integrations/actions";
+import { parseLocalDate } from "@/lib/best-time";
 import {
   Sparkles,
   Video,
@@ -78,7 +79,7 @@ export default async function CalendarPage() {
           <div className="flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-background-card rounded-lg border border-border-primary">
             <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
             <span className="text-sm sm:text-base text-text-primary font-medium">
-              Week of {new Date(calendar.weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              Week of {parseLocalDate(calendar.weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             </span>
           </div>
           <GenerateButton regenerate />

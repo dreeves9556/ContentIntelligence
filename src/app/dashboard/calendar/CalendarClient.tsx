@@ -10,6 +10,7 @@ import {
   dayNameToIndex,
   heatmapToLocalTime,
   getTimezoneOffsetHours,
+  parseLocalDate,
   type HeatmapData,
 } from "@/lib/best-time";
 import {
@@ -264,7 +265,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
   const hasRealData = realTimeSlots.length > 0;
   const fallbackSlots = bestTimesByFormatAndDay[day.format][day.day as DayOfWeek];
 
-  const dateForDay = new Date(weekStarting);
+  const dateForDay = parseLocalDate(weekStarting);
   dateForDay.setDate(dateForDay.getDate() + dayIndex);
   const dateline = dateForDay.toLocaleDateString("en-US", {
     weekday: "long",
@@ -570,7 +571,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
   const [showRegenModal, setShowRegenModal] = useState(false);
   const activeDay = days[activeIndex];
 
-  const baseDate = new Date(weekStarting);
+  const baseDate = parseLocalDate(weekStarting);
   const postedKey = `calendar-posted-${weekStarting}`;
   const feedbackKey = `calendar-feedback-${weekStarting}`;
 
@@ -701,7 +702,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
         <div className="flex items-center gap-3 mt-1">
           <span className="h-px flex-1 bg-border-primary" />
           <span className="text-xs font-semibold tracking-[0.15em] text-text-muted uppercase">
-            {new Date(weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            {parseLocalDate(weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
           </span>
           <span className="h-px flex-1 bg-border-primary" />
         </div>
