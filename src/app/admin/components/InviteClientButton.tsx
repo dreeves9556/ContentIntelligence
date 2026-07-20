@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, X, Link2, Copy, Check, Loader2, Mail, MailCheck } from "lucide-react";
-import { createClientProfile } from "../actions";
+import { UserPlus, X, Link2, Copy, Check, Loader2, Mail, MailCheck, Tag } from "lucide-react";
+import { createClientProfile, type CreateClientOptions } from "../actions";
+import { ACCOUNT_PRESETS } from "@/lib/account-access";
 
 export function InviteClientButton() {
   const [showModal, setShowModal] = useState(false);
@@ -13,6 +14,7 @@ export function InviteClientButton() {
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [emailSent, setEmailSent] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string>("");
   const router = useRouter();
 
   function handleClose() {
@@ -21,13 +23,28 @@ export function InviteClientButton() {
     setGeneratedPassword(null);
     setError(null);
     setCopied(false);
+    setSelectedPreset("");
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await createClientProfile(email);
+      const options: CreateClientOptions | undefined = selectedPreset
+        ? (() => {
+            const preset = ACCOUNT_PRESETS.find((p) => p.key === selectedPreset);
+            if (!preset) return undefined;
+            return {
+              plan: preset.plan,
+              internalTag: preset.internalTag,
+              accountStatus: preset.accountStatus,
+              isComped: preset.isComped,
+              compReason: preset.compReason,
+              expirationAction: preset.expirationAction,
+            };
+          })()
+        : undefined;
+      const result = await createClientProfile(email, options);
       if ("password" in result) {
         setGeneratedPassword(result.password);
         setEmailSent(!result.error);
@@ -111,6 +128,32 @@ export function InviteClientButton() {
                         className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-primary/50 transition-colors text-sm"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                      Account Preset
+                    </label>
+                    <div className="relative">
+                      <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                      <select
+                        value={selectedPreset}
+                        onChange={(e) => setSelectedPreset(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-border-primary rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/50 transition-colors text-sm appearance-none cursor-pointer"
+                      >
+                        <option value="">No preset (default account)</option>
+                        {ACCOUNT_PRESETS.map((preset) => (
+                          <option key={preset.key} value={preset.key}>
+                            {preset.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {selectedPreset && (
+                      <p className="text-xs text-text-muted mt-2">
+                        {ACCOUNT_PRESETS.find((p) => p.key === selectedPreset)?.description}
+                      </p>
+                    )}
                   </div>
 
                   {error && (

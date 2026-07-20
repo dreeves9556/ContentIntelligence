@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { UserPlan } from "@/lib/tiers";
+import type { AccountStatus, ExpirationAction } from "@/lib/account-access";
 
 function generateRandomPassword(): string {
   const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -76,7 +77,20 @@ async function sendOnboardingEmail(email: string): Promise<boolean> {
   }
 }
 
-export async function createClientProfile(email: string, plan?: UserPlan): Promise<{ password: string; error?: string } | { error: string }> {
+export interface CreateClientOptions {
+  plan?: UserPlan;
+  internalTag?: string;
+  accountStatus?: AccountStatus;
+  isComped?: boolean;
+  compReason?: string;
+  accessExpiresAt?: Date;
+  expirationAction?: ExpirationAction;
+}
+
+export async function createClientProfile(
+  email: string,
+  options?: CreateClientOptions
+): Promise<{ password: string; error?: string } | { error: string }> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { error: "Unauthorized" };
@@ -87,7 +101,7 @@ export async function createClientProfile(email: string, plan?: UserPlan): Promi
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const invitePlan = plan ?? "CALENDAR_ONLY";
+  const invitePlan = options?.plan ?? "CALENDAR_ONLY";
 
   const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existingUser) {
@@ -104,6 +118,12 @@ export async function createClientProfile(email: string, plan?: UserPlan): Promi
         password: hashedPassword,
         role: "USER",
         plan: invitePlan,
+        internalTag: options?.internalTag ?? null,
+        accountStatus: options?.accountStatus ?? "ACTIVE",
+        isComped: options?.isComped ?? false,
+        compReason: options?.compReason ?? null,
+        accessExpiresAt: options?.accessExpiresAt ?? null,
+        expirationAction: options?.expirationAction ?? "NONE",
       },
     });
   } catch {

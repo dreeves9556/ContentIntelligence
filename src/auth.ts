@@ -70,6 +70,7 @@ export const {
           image: user.image,
           role: user.role,
           plan: user.plan,
+          accountStatus: user.accountStatus,
           sessionExpiry,
           tokenVersion: user.tokenVersion,
         };
@@ -83,6 +84,7 @@ export const {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
         token.plan = (user as { plan?: string }).plan as "CALENDAR_ONLY" | "CREATOR" | "PRO" | undefined;
+        token.accountStatus = (user as { accountStatus?: string }).accountStatus as string | undefined;
         token.sessionExpiry = (user as { sessionExpiry?: number }).sessionExpiry;
         token.tokenVersion = (user as { tokenVersion?: number }).tokenVersion;
       }
@@ -96,7 +98,7 @@ export const {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, plan: true, tokenVersion: true },
+            select: { role: true, plan: true, tokenVersion: true, accountStatus: true },
           });
           if (dbUser) {
             // Invalidate token if tokenVersion has changed (e.g. password reset)
@@ -106,6 +108,7 @@ export const {
             token.role = dbUser.role;
             token.plan = dbUser.plan;
             token.tokenVersion = dbUser.tokenVersion;
+            token.accountStatus = dbUser.accountStatus;
           }
         } catch {
           // silently fail — keep existing token values
@@ -129,6 +132,7 @@ export const {
         session.user.id = token.id as string;
         session.user.role = token.role as "USER" | "TEAM_ADMIN" | "ADMIN";
         session.user.plan = (token.plan ?? "CALENDAR_ONLY") as "CALENDAR_ONLY" | "CREATOR" | "PRO";
+        session.user.accountStatus = token.accountStatus as string;
         (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }
       return session;

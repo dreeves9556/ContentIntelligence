@@ -27,6 +27,8 @@ import {
 } from "./actions";
 import { PLAN_LABELS, ROLE_LABELS } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
+import { TagBadge, StatusBadge, CompedBadge } from "@/app/admin/components/AccountBadges";
+import type { AccountStatus } from "@/lib/account-access";
 
 interface TeamRosterClientProps {
   initialData: TeamRosterData;
@@ -316,6 +318,9 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <TagBadge tag={member.internalTag} />
+                    <StatusBadge status={member.accountStatus as AccountStatus} />
+                    <CompedBadge isComped={member.isComped} />
                     <span className="px-2 py-0.5 rounded-md border border-border-primary bg-background-secondary text-text-muted">
                       {PLAN_LABELS[member.plan as UserPlan]}
                     </span>
@@ -381,9 +386,14 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
                         <p className="text-sm text-text-muted">{member.email ?? "—"}</p>
                       </td>
                       <td className="py-4 px-6">
-                        <span className="text-sm text-text-primary">
-                          {ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] ?? member.role}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm text-text-primary">
+                            {ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] ?? member.role}
+                          </span>
+                          <TagBadge tag={member.internalTag} />
+                          <StatusBadge status={member.accountStatus as AccountStatus} />
+                          <CompedBadge isComped={member.isComped} />
+                        </div>
                       </td>
                       <td className="py-4 px-6">
                         <span className="text-sm text-text-muted">

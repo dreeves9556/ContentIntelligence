@@ -25,6 +25,21 @@ model User {
   authorContactEmail String?  // Optional contact email shown as mailto link in byline
   organizationId       String?
   organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Account cohort & access management (pre-Stripe)
+  accountStatus      AccountStatus    @default(ACTIVE)
+  internalTag        String?
+  isComped           Boolean          @default(false)
+  compReason         String?
+  accessExpiresAt    DateTime?
+  expirationAction   ExpirationAction @default(NONE)
+  lastAccessCheckAt  DateTime?
+
+  // Stripe placeholder fields — populated by future Stripe webhook integration
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripeStatus           String?
+
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   questionnaires Questionnaire[]
@@ -50,6 +65,10 @@ model User {
   accounts      Account[]
   sessions      Session[]
 
+  @@index([internalTag])
+  @@index([accountStatus])
+  @@index([accessExpiresAt])
+  @@index([stripeCustomerId])
   @@map("users")
 }
 
@@ -193,6 +212,21 @@ enum UserPlan {
   CALENDAR_ONLY
   CREATOR
   PRO
+}
+
+enum AccountStatus {
+  ACTIVE
+  TRIAL
+  COMPED
+  EXPIRED
+  PAST_DUE
+  CANCELED
+}
+
+enum ExpirationAction {
+  NONE
+  DOWNGRADE_TO_CALENDAR_ONLY
+  DISABLE_ACCESS
 }
 
 model SocialProfile {

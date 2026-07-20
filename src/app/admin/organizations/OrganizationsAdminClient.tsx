@@ -28,6 +28,8 @@ import {
 } from "./actions";
 import { PLAN_LABELS, ROLE_LABELS } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
+import { TagBadge, StatusBadge, CompedBadge } from "@/app/admin/components/AccountBadges";
+import type { AccountStatus } from "@/lib/account-access";
 
 interface OrganizationsAdminClientProps {
   initialOrgs: AdminOrgData[];
@@ -434,7 +436,10 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
                               </p>
                               <p className="text-xs text-text-muted truncate">{member.email ?? "—"}</p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                              <TagBadge tag={member.internalTag} />
+                              <StatusBadge status={member.accountStatus as AccountStatus} />
+                              <CompedBadge isComped={member.isComped} />
                               <span className="text-xs text-text-muted">
                                 {ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] ?? member.role}
                               </span>

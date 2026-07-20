@@ -16,6 +16,9 @@ export interface AdminOrgMember {
   role: string;
   plan: UserPlan;
   createdAt: Date;
+  accountStatus: string;
+  internalTag: string | null;
+  isComped: boolean;
 }
 
 export interface AdminOrgData {
@@ -49,6 +52,9 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
           role: true,
           plan: true,
           createdAt: true,
+          accountStatus: true,
+          internalTag: true,
+          isComped: true,
         },
         orderBy: { createdAt: "desc" },
       },
@@ -87,6 +93,9 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
             role: teamAdmin.role,
             plan: (teamAdmin.plan ?? "CALENDAR_ONLY") as UserPlan,
             createdAt: teamAdmin.createdAt,
+            accountStatus: teamAdmin.accountStatus,
+            internalTag: teamAdmin.internalTag,
+            isComped: teamAdmin.isComped,
           }
         : null,
       members: org.members.map((m) => ({
@@ -96,6 +105,9 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
         role: m.role,
         plan: (m.plan ?? "CALENDAR_ONLY") as UserPlan,
         createdAt: m.createdAt,
+        accountStatus: m.accountStatus,
+        internalTag: m.internalTag,
+        isComped: m.isComped,
       })),
     };
   });

@@ -23,6 +23,9 @@ export interface TeamMember {
   plan: UserPlan;
   createdAt: Date;
   onboardingComplete: boolean;
+  accountStatus: string;
+  internalTag: string | null;
+  isComped: boolean;
 }
 
 export interface TeamPendingInvite {
@@ -85,6 +88,9 @@ export async function getTeamRoster(): Promise<{ data?: TeamRosterData; error?: 
         role: true,
         plan: true,
         createdAt: true,
+        accountStatus: true,
+        internalTag: true,
+        isComped: true,
         questionnaires: { select: { id: true }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
@@ -116,6 +122,9 @@ export async function getTeamRoster(): Promise<{ data?: TeamRosterData; error?: 
         plan: (m.plan ?? "CALENDAR_ONLY") as UserPlan,
         createdAt: m.createdAt,
         onboardingComplete: m.questionnaires.length > 0,
+        accountStatus: m.accountStatus,
+        internalTag: m.internalTag,
+        isComped: m.isComped,
       })),
       pendingInvites: pendingInvitesRaw.map((i) => ({
         id: i.id,
