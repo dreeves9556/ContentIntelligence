@@ -63,6 +63,7 @@ model User {
   notificationLogs NotificationLog[]
   notificationPreference NotificationPreference?
   scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
+  memberGrowthBaselines MemberGrowthBaseline[]
   accounts      Account[]
   sessions      Session[]
 
@@ -677,4 +678,23 @@ model StripeEvent {
   processedAt  DateTime @default(now())
 
   @@map("stripe_events")
+}
+
+model MemberGrowthBaseline {
+  id                     String   @id @default(cuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform               String
+  baselineDate           DateTime
+  baselineFollowerCount  Int?
+  baselineEngagementRate Float?
+  baselineAvgViews       Float?
+  baselineAvgInteractions Float?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([userId, platform])
+  @@index([platform])
+  @@index([baselineDate])
+  @@map("member_growth_baselines")
 }

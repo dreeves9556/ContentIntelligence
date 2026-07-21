@@ -13,7 +13,7 @@ import {
   SOLO_ANNUAL_CENTS,
 } from "@/lib/pricing";
 
-const SOLO_FEATURES = [
+const SOLO_FEATURES: (string | { text: string; emphasized?: boolean })[] = [
   "Full AI content calendar",
   "Weekly content generation",
   "Brand Brain memory system",
@@ -22,6 +22,7 @@ const SOLO_FEATURES = [
   "Analytics dashboard",
   "Social media integrations",
   "Members-only community access",
+  { text: "Bi-Weekly Coaching Calls", emphasized: true },
 ];
 
 const COMMUNITY_FEATURES = [
@@ -170,12 +171,21 @@ export function PricingSection() {
             </div>
 
             <ul className="space-y-2 mb-8 flex-1">
-              {SOLO_FEATURES.map((feature) => (
-                <li key={feature} className="flex items-start gap-2 text-sm text-text-muted">
-                  <Check className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
-                  {feature}
-                </li>
-              ))}
+              {SOLO_FEATURES.map((feature) => {
+                const text = typeof feature === "string" ? feature : feature.text;
+                const emphasized = typeof feature === "object" && feature.emphasized;
+                return (
+                  <li
+                    key={text}
+                    className={`flex items-start gap-2 text-sm ${
+                      emphasized ? "font-semibold text-text-primary" : "text-text-muted"
+                    }`}
+                  >
+                    <Check className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
+                    {text}
+                  </li>
+                );
+              })}
             </ul>
 
             <button
