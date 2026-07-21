@@ -433,7 +433,13 @@ export default function LoginPage() {
         )}
 
         <p className="text-center text-sm text-text-muted" style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
-          Invite-only access for The Local Post community
+          New here?{" "}
+          <a
+            href="/#pricing"
+            className="text-accent-primary hover:text-accent-primary/80 transition-colors font-medium"
+          >
+            Subscribe and create your account
+          </a>
         </p>
         </div>
       </div>
