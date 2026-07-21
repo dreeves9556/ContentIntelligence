@@ -567,6 +567,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
   const [activeIndex, setActiveIndex] = useState(0);
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
   const [feedbackState, setFeedbackState] = useState<("up" | "down" | null)[]>(Array(days.length).fill(null));
+  const [storageLoaded, setStorageLoaded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [showRegenModal, setShowRegenModal] = useState(false);
   const activeDay = days[activeIndex];
@@ -575,71 +576,70 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
   const postedKey = `calendar-posted-${weekStarting}`;
   const feedbackKey = `calendar-feedback-${weekStarting}`;
 
-  // On mount, jump to today's card if within range, or last day + regen prompt if past
+  // Initialize date position and browser-persisted state after hydration.
   useEffect(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const timeout = setTimeout(() => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const startDate = new Date(baseDate);
-    startDate.setHours(0, 0, 0, 0);
+      const startDate = parseLocalDate(weekStarting);
+      startDate.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(baseDate);
-    endDate.setDate(endDate.getDate() + days.length - 1);
-    endDate.setHours(23, 59, 59, 999);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + days.length - 1);
+      endDate.setHours(23, 59, 59, 999);
 
-    if (today >= startDate && today <= endDate) {
-      const diffDays = Math.round((today.getTime() - startDate.getTime()) / 86400000);
-      setActiveIndex(Math.min(Math.max(diffDays, 0), days.length - 1));
-    } else if (today > endDate) {
-      setActiveIndex(days.length - 1);
-      setShowRegenModal(true);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(postedKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === days.length) {
-          setPosted(parsed);
-        }
+      if (days.length > 0 && today >= startDate && today <= endDate) {
+        const diffDays = Math.round((today.getTime() - startDate.getTime()) / 86400000);
+        setActiveIndex(Math.min(Math.max(diffDays, 0), days.length - 1));
+      } else if (days.length > 0 && today > endDate) {
+        setActiveIndex(days.length - 1);
+        setShowRegenModal(true);
       }
-    } catch {
-      // ignore localStorage errors
-    }
-  }, [postedKey, days.length]);
+
+      try {
+        const savedPosted = localStorage.getItem(postedKey);
+        if (savedPosted) {
+          const parsed = JSON.parse(savedPosted);
+          if (Array.isArray(parsed) && parsed.length === days.length) {
+            setPosted(parsed);
+          }
+        }
+
+        const savedFeedback = localStorage.getItem(feedbackKey);
+        if (savedFeedback) {
+          const parsed = JSON.parse(savedFeedback);
+          if (Array.isArray(parsed) && parsed.length === days.length) {
+            setFeedbackState(parsed);
+          }
+        }
+      } catch {
+        // ignore localStorage errors
+      }
+
+      setStorageLoaded(true);
+    }, 0);
+
+    return () => clearTimeout(timeout);
+  }, [days.length, feedbackKey, postedKey, weekStarting]);
 
   useEffect(() => {
+    if (!storageLoaded) return;
     try {
       localStorage.setItem(postedKey, JSON.stringify(posted));
     } catch {
       // ignore localStorage errors
     }
-  }, [posted, postedKey]);
+  }, [posted, postedKey, storageLoaded]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(feedbackKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === days.length) {
-          setFeedbackState(parsed);
-        }
-      }
-    } catch {
-      // ignore localStorage errors
-    }
-  }, [feedbackKey, days.length]);
-
-  useEffect(() => {
+    if (!storageLoaded) return;
     try {
       localStorage.setItem(feedbackKey, JSON.stringify(feedbackState));
     } catch {
       // ignore localStorage errors
     }
-  }, [feedbackState, feedbackKey]);
+  }, [feedbackState, feedbackKey, storageLoaded]);
 
   const togglePosted = (index: number) => {
     const next = [...posted];
@@ -681,7 +681,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
               Your Calendar Has Expired
             </h2>
             <p className="text-text-muted text-sm">
-              This calendar's date range has passed. Generate a new calendar to get fresh content recommendations for the coming week.
+              This calendar&apos;s date range has passed. Generate a new calendar to get fresh content recommendations for the coming week.
             </p>
             <GenerateButton regenerate />
             <button

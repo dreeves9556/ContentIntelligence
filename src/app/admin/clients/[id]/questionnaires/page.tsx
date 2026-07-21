@@ -47,7 +47,7 @@ function formatLabel(key: string): string {
     .replace(/_/g, " ");
 }
 
-function renderValue(value: any): React.ReactNode {
+function renderValue(value: unknown): React.ReactNode {
   if (value === null || value === undefined) {
     return <span className="text-text-muted italic">Not answered</span>;
   }
@@ -86,7 +86,7 @@ function renderValue(value: any): React.ReactNode {
   return <span className="text-text-primary">{String(value)}</span>;
 }
 
-function QuestionnaireAnswers({ content }: { content: any }) {
+function QuestionnaireAnswers({ content }: { content: unknown }) {
   if (!content || typeof content !== "object") {
     return (
       <div className="bg-background-secondary rounded-lg p-4 border border-border-primary">
@@ -113,7 +113,11 @@ function QuestionnaireAnswers({ content }: { content: any }) {
   );
 }
 
-function QuestionnaireCard({ questionnaire }: { questionnaire: any }) {
+type UserWithSurveys = NonNullable<Awaited<ReturnType<typeof getUserWithSurveys>>>;
+type QuestionnaireRecord = UserWithSurveys["questionnaires"][number];
+type ProfileSurveyRecord = UserWithSurveys["profileSurveys"][number];
+
+function QuestionnaireCard({ questionnaire }: { questionnaire: QuestionnaireRecord }) {
   // Parse the JSON content if it's a string, otherwise use as-is
   const content = typeof questionnaire.content === "string" 
     ? JSON.parse(questionnaire.content) 
@@ -156,7 +160,7 @@ function QuestionnaireCard({ questionnaire }: { questionnaire: any }) {
   );
 }
 
-function ProfileSurveyCard({ survey }: { survey: any }) {
+function ProfileSurveyCard({ survey }: { survey: ProfileSurveyRecord }) {
   const answers = typeof survey.answersJson === "string"
     ? JSON.parse(survey.answersJson)
     : survey.answersJson;

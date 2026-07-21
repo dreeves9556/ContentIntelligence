@@ -145,7 +145,7 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
   }
 
   let totalFollowersGained = 0;
-  let growthPercents: number[] = [];
+  const growthPercents: number[] = [];
   let accountsWithValidBaseline = 0;
   let accountsMissingBaseline = 0;
 

@@ -28,15 +28,9 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
   const [statusLabel, setStatusLabel] = useState<string>("");
 
   useEffect(() => {
-    if (!isLoading) {
-      setProgress(0);
-      setStatusLabel("");
-      return;
-    }
+    if (!isLoading) return;
 
     let currentStep = 0;
-    setProgress(statusSteps[0].progress);
-    setStatusLabel(statusSteps[0].label);
 
     const interval = setInterval(() => {
       currentStep = Math.min(currentStep + 1, statusSteps.length - 1);
@@ -50,7 +44,8 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
   async function handleGenerate() {
     setIsLoading(true);
     setError(null);
-    setProgress(0);
+    setProgress(statusSteps[0].progress);
+    setStatusLabel(statusSteps[0].label);
 
     try {
       const result = await generateWeeklyCalendar(getTimezoneOffsetHours());
@@ -70,10 +65,12 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
           // ignore localStorage errors
         }
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred");
     } finally {
       setIsLoading(false);
+      setProgress(0);
+      setStatusLabel("");
     }
   }
 

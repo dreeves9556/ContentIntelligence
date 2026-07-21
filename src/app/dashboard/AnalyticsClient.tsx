@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp,
   Users,
@@ -1032,7 +1032,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [seeding, setSeeding] = useState(false);
   const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(true);
   const [aiError, setAiError] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string>("ALL");
   const [insightExpanded, setInsightExpanded] = useState(false);
@@ -1070,27 +1070,27 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
     return deepAnalytics.filter((d) => d.platform.toUpperCase() === activePlatform || d.platform === "ALL");
   }, [deepAnalytics, activePlatform]);
 
-  const fetchInsight = useCallback(async () => {
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const result = await getCachedInsight();
+  useEffect(() => {
+    let cancelled = false;
+
+    getCachedInsight().then((result) => {
+      if (cancelled) return;
       if (result.success && result.insight) {
         setAiInsight(result.insight);
       } else {
         setAiError(result.error || "Unable to load insight");
       }
-    } catch (e) {
-      console.error("AI Insight fetch error:", e);
+    }).catch((error) => {
+      if (cancelled) return;
+      console.error("AI Insight fetch error:", error);
       setAiError("Failed to load insight");
-    } finally {
+    }).finally(() => {
+      if (cancelled) return;
       setAiLoading(false);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    fetchInsight();
-  }, [fetchInsight]);
+    return () => { cancelled = true; };
+  }, []);
 
   const trendData = buildTrendData(filteredPosts);
 

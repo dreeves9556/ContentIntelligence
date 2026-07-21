@@ -85,7 +85,7 @@ export function NotificationSettings() {
       </div>
 
       <p className="text-text-muted text-sm mb-4">
-        Choose which notifications you want to receive. Toggle off any type you don't need.
+        Choose which notifications you want to receive. Toggle off any type you don&apos;t need.
       </p>
 
       <div className="space-y-1">

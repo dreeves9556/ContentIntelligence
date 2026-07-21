@@ -6,6 +6,7 @@ import { Newspaper, Mail, Lock, AlertCircle, Eye, EyeOff, CheckCircle2, ArrowLef
 import { requestPasswordReset } from "./password-reset-actions";
 import { RotatingTagline } from "@/components/RotatingTagline";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -20,13 +21,14 @@ export default function LoginPage() {
   const [today, setToday] = useState("");
 
   useEffect(() => {
-    setToday(
-      new Date().toLocaleDateString("en-US", {
+    const timeout = setTimeout(() => {
+      setToday(new Date().toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
         day: "numeric",
-      })
-    );
+      }));
+    }, 0);
+    return () => clearTimeout(timeout);
   }, []);
 
   async function handleResetRequest(e: React.FormEvent) {
@@ -434,12 +436,12 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-text-muted" style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
           New here?{" "}
-          <a
+          <Link
             href="/#pricing"
             className="text-accent-primary hover:text-accent-primary/80 transition-colors font-medium"
           >
             Subscribe and create your account
-          </a>
+          </Link>
         </p>
         </div>
       </div>

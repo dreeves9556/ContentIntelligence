@@ -35,14 +35,16 @@ export function NotificationHistory() {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  const load = async () => {
-    const data = await fetchNotifications();
-    setNotifications(data.notifications);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    load();
+    let cancelled = false;
+
+    fetchNotifications().then((data) => {
+      if (cancelled) return;
+      setNotifications(data.notifications);
+      setLoading(false);
+    });
+
+    return () => { cancelled = true; };
   }, []);
 
   const handleDismiss = (id: string) => {

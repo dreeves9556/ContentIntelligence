@@ -592,7 +592,7 @@ export default function SettingsForm({
           />
         </div>
         <div>
-          <FieldLabel>Paste 1-3 posts or captions you've written that feel most "you"</FieldLabel>
+          <FieldLabel>{`Paste 1-3 posts or captions you've written that feel most "you"`}</FieldLabel>
           <p className="text-xs text-text-muted mb-3">The single most powerful way to calibrate your voice — paste real examples</p>
           <textarea
             rows={6}
@@ -652,7 +652,7 @@ export default function SettingsForm({
           />
         </div>
         <div>
-          <FieldLabel>Anything you DON'T want to show or talk about?</FieldLabel>
+          <FieldLabel>{`Anything you DON'T want to show or talk about?`}</FieldLabel>
           <p className="text-xs text-text-muted mb-3">Content boundaries — prevents unusable suggestions</p>
           <textarea
             rows={2}
@@ -663,7 +663,7 @@ export default function SettingsForm({
           />
         </div>
         <div>
-          <FieldLabel>Anything about your life outside work you're comfortable sharing?</FieldLabel>
+          <FieldLabel>{`Anything about your life outside work you're comfortable sharing?`}</FieldLabel>
           <p className="text-xs text-text-muted mb-3">Fuels authentic Personal bucket content</p>
           <textarea
             rows={2}
@@ -685,7 +685,7 @@ export default function SettingsForm({
           />
         </div>
         <div>
-          <FieldLabel>What's a controversial opinion in your industry you're willing to stake your name on?</FieldLabel>
+          <FieldLabel>{`What's a controversial opinion in your industry you're willing to stake your name on?`}</FieldLabel>
           <p className="text-xs text-text-muted mb-3">Hot takes drive engagement</p>
           <textarea
             rows={2}

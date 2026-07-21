@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import { Bug, X, CheckCircle2, AlertCircle, Send } from "lucide-react";
 import { submitBugReport } from "./actions";
@@ -20,13 +20,11 @@ export default function BugReportButton() {
   const [deviceInfo, setDeviceInfo] = useState<"mobile" | "browser">("browser");
   const [description, setDescription] = useState("");
 
-  // useSession() resolves asynchronously (often after mount, especially on
-  // mobile), so seed the identity fields once it arrives — but never overwrite
-  // whatever the user has already typed.
-  useEffect(() => {
-    if (session?.user?.name) setName((prev) => prev || session.user!.name!);
-    if (session?.user?.email) setEmail((prev) => prev || session.user!.email!);
-  }, [session?.user?.name, session?.user?.email]);
+  function handleOpen() {
+    if (!name && session?.user?.name) setName(session.user.name);
+    if (!email && session?.user?.email) setEmail(session.user.email);
+    setOpen(true);
+  }
 
   const handleSubmit = () => {
     if (!description.trim()) {
@@ -53,7 +51,7 @@ export default function BugReportButton() {
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-text-muted hover:text-text-primary hover:bg-background-card transition-colors w-full"
       >
         <Bug className="h-5 w-5" />

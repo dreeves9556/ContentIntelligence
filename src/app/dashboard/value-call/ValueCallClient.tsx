@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 interface ValueCallSettingsProps {
   title: string;
@@ -46,16 +46,15 @@ function getCountdown(target: number): Countdown {
 
 export default function ValueCallClient({ settings, display }: Props) {
   const [now, setNow] = useState<number | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    setNow(Date.now());
-    intervalRef.current = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
+    const updateNow = () => setNow(Date.now());
+    const timeout = setTimeout(updateNow, 0);
+    const interval = setInterval(updateNow, 1000);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      clearTimeout(timeout);
+      clearInterval(interval);
     };
   }, []);
 

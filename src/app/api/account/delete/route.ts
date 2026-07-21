@@ -64,7 +64,7 @@ export async function POST() {
   // Only cancel the org subscription if the user is a TEAM_ADMIN.
   // Regular community members (USER role) just get their account deleted —
   // the org subscription stays active for remaining members.
-  let subscriptionId = user.stripeSubscriptionId;
+  const subscriptionId = user.stripeSubscriptionId;
 
   // Regular community members: don't touch the org subscription.
   // TEAM_ADMIN users are blocked above, so only USER role reaches here.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Mail,
@@ -41,12 +41,8 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
   const [selectedPlan, setSelectedPlan] = useState<UserPlan>("PRO");
   const [results, setResults] = useState<BulkInviteResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [invites, setInvites] = useState<PendingInvite[]>(initialInvites);
+  const invites = initialInvites;
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setInvites(initialInvites);
-  }, [initialInvites]);
 
   function handleBulkInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -67,16 +63,14 @@ export default function InvitesClient({ initialInvites }: InvitesClientProps) {
   function handlePlanChange(inviteId: string, plan: UserPlan) {
     startTransition(async () => {
       await updateInvitePlan(inviteId, plan);
-      setInvites((prev) =>
-        prev.map((i) => (i.id === inviteId ? { ...i, plan } : i))
-      );
+      router.refresh();
     });
   }
 
   function handleDelete(inviteId: string) {
     startTransition(async () => {
       await deleteInvite(inviteId);
-      setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+      router.refresh();
     });
   }
 
@@ -387,21 +381,22 @@ function InvitePlanDropdown({
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (open && buttonRef.current) {
+  function handleToggle() {
+    if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setDropdownPos({
         top: rect.bottom + window.scrollY + 4,
         left: rect.left + window.scrollX,
       });
     }
-  }, [open]);
+    setOpen((current) => !current);
+  }
 
   return (
     <div className="relative inline-block">
       <button
         ref={buttonRef}
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
         disabled={disabled}
         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${PLAN_STYLES[currentPlan]} hover:opacity-80 disabled:opacity-50`}
       >

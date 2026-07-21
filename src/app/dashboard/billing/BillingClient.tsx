@@ -530,7 +530,7 @@ export default function BillingClient({
                 Cancel Subscription
               </p>
               <p className="text-xs text-text-muted mt-1">
-                Cancel at the end of your current billing period. You won't be charged again and will keep access until then. Your data is preserved and your account will be locked when the period ends.
+                Cancel at the end of your current billing period. You won&apos;t be charged again and will keep access until then. Your data is preserved and your account will be locked when the period ends.
               </p>
               {isCancelScheduled && (
                 <p className="text-xs text-yellow-400 mt-2">
@@ -581,7 +581,7 @@ export default function BillingClient({
               </h3>
             </div>
             <p className="text-sm text-text-muted">
-              Your subscription will be canceled at the end of your current billing period. You'll keep full access until then, and you won't be charged again.
+              Your subscription will be canceled at the end of your current billing period. You&apos;ll keep full access until then, and you won&apos;t be charged again.
             </p>
             <p className="text-sm text-text-muted">
               When the period ends, your account will be archived. Your data will be preserved in case you want to come back later.

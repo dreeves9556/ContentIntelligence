@@ -96,6 +96,7 @@ function DeleteConfirmModal({
   onDelete,
 }: DeleteConfirmModalProps) {
   const [sliderProgress, setSliderProgress] = useState(0);
+  const [maxDistance, setMaxDistance] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
   const [completed, setCompleted] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -113,7 +114,9 @@ function DeleteConfirmModal({
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       if (trackRef.current) {
-        maxDistanceRef.current = trackRef.current.offsetWidth - KNOB_WIDTH;
+        const nextMaxDistance = trackRef.current.offsetWidth - KNOB_WIDTH;
+        maxDistanceRef.current = nextMaxDistance;
+        setMaxDistance(nextMaxDistance);
       }
       setIsSliding(true);
       startedAtXRef.current = e.clientX;
@@ -154,7 +157,7 @@ function DeleteConfirmModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [completed, isPending, onClose]);
 
-  const knobTranslate = `translateX(${sliderProgress * maxDistanceRef.current}px)`;
+  const knobTranslate = `translateX(${sliderProgress * maxDistance}px)`;
 
   return (
     <div

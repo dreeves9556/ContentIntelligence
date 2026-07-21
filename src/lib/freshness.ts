@@ -658,7 +658,7 @@ function getUpcomingHolidays(withinDays: number = 14): string[] {
   const results: string[] = [];
   for (const holiday of US_HOLIDAYS) {
     const [month, day] = holiday.date.split("-").map(Number);
-    let year = now.getFullYear();
+    const year = now.getFullYear();
     let holidayDate = new Date(year, month - 1, day);
     if (holidayDate < now) {
       holidayDate = new Date(year + 1, month - 1, day);

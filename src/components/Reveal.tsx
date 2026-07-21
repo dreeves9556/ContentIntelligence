@@ -24,8 +24,8 @@ export function Reveal({
       "(prefers-reduced-motion: reduce)"
     ).matches;
     if (prefersReduced) {
-      setVisible(true);
-      return;
+      const timeout = setTimeout(() => setVisible(true), 0);
+      return () => clearTimeout(timeout);
     }
 
     const node = ref.current;

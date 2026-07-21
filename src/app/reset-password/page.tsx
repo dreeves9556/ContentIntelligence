@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Lock, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { resetPassword } from "@/app/login/password-reset-actions";
@@ -18,11 +18,9 @@ function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    if (!token) {
-      setError("Invalid reset link. Please request a new password reset.");
-    }
-  }, [token]);
+  const visibleError = error ?? (!token
+    ? "Invalid reset link. Please request a new password reset."
+    : null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,10 +95,10 @@ function ResetPasswordForm() {
                 </p>
               </div>
 
-              {error && (
+              {visibleError && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  <span>{error}</span>
+                  <span>{visibleError}</span>
                 </div>
               )}
 

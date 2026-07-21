@@ -49,7 +49,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
   const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
   const [copiedStat, setCopiedStat] = useState<string | null>(null);
   const [aiInsight, setAiInsight] = useState<string>("");
-  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [insightExpanded, setInsightExpanded] = useState(false);
@@ -57,26 +57,26 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
   const { overview, timeSeries, engagementTimeSeries, memberRows,
     platformBreakdown, cohortBreakdown, usageCorrelation, dataQuality } = data;
 
-  const fetchInsight = useCallback(async () => {
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const result = await getCachedImpactInsight();
+  useEffect(() => {
+    let cancelled = false;
+
+    getCachedImpactInsight().then((result) => {
+      if (cancelled) return;
       if (result.success && result.insight) {
         setAiInsight(result.insight);
       } else if (result.error) {
         setAiError(result.error);
       }
-    } catch (e) {
+    }).catch(() => {
+      if (cancelled) return;
       setAiError("Failed to load insight");
-    } finally {
+    }).finally(() => {
+      if (cancelled) return;
       setAiLoading(false);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    fetchInsight();
-  }, [fetchInsight]);
+    return () => { cancelled = true; };
+  }, []);
 
   const handleGenerateInsight = useCallback(async () => {
     setAiGenerating(true);
@@ -221,7 +221,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
             )}
             {!aiLoading && !aiError && !aiInsight && (
               <p className="text-text-muted leading-relaxed">
-                No insight generated yet. Click "Generate" to create advertisement-ready analytics copy from real platform data.
+                No insight generated yet. Click &quot;Generate&quot; to create advertisement-ready analytics copy from real platform data.
               </p>
             )}
             {aiInsight && !aiLoading && (

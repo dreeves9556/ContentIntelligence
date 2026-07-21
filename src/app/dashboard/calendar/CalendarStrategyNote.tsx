@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, Loader2, ChevronUp, ChevronDown } from "lucide-react";
 import { getCachedCalendarStrategy } from "./actions";
 
@@ -55,31 +55,31 @@ function escapeRegExp(str: string) {
 
 export default function CalendarStrategyNote() {
   const [insight, setInsight] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [insightExpanded, setInsightExpanded] = useState(false);
 
-  const fetchStrategy = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getCachedCalendarStrategy();
+  useEffect(() => {
+    let cancelled = false;
+
+    getCachedCalendarStrategy().then((result) => {
+      if (cancelled) return;
       if (result.success && result.insight) {
         setInsight(result.insight);
       } else {
         setError(result.error || "Unable to load strategy note");
       }
-    } catch (e) {
-      console.error("Calendar strategy fetch error:", e);
+    }).catch((fetchError) => {
+      if (cancelled) return;
+      console.error("Calendar strategy fetch error:", fetchError);
       setError("Failed to load strategy note");
-    } finally {
+    }).finally(() => {
+      if (cancelled) return;
       setLoading(false);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    fetchStrategy();
-  }, [fetchStrategy]);
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
