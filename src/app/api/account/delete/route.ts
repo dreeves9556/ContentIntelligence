@@ -66,16 +66,9 @@ export async function POST() {
   // the org subscription stays active for remaining members.
   let subscriptionId = user.stripeSubscriptionId;
 
-  if (!subscriptionId && user.organizationId) {
-    if (user.role === "TEAM_ADMIN") {
-      const org = await prisma.organization.findUnique({
-        where: { id: user.organizationId },
-        select: { stripeSubscriptionId: true },
-      });
-      subscriptionId = org?.stripeSubscriptionId ?? null;
-    }
-    // Regular members: don't touch the org subscription
-  }
+  // Regular community members: don't touch the org subscription.
+  // TEAM_ADMIN users are blocked above, so only USER role reaches here.
+  // Their stripeSubscriptionId is already captured above (if any).
 
   const stripe = getStripe();
 
