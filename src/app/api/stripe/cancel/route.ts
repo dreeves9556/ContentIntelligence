@@ -72,7 +72,7 @@ export async function POST() {
     if (isOrgSubscription) {
       // Org subscription
       await prisma.organization.update({
-        where: { stripeSubscriptionId: subscriptionId },
+        where: { id: user.organizationId! },
         data: { stripeStatus: "cancel_at_period_end" },
       });
     } else {
