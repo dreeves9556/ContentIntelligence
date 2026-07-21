@@ -162,6 +162,16 @@ h1, h2, h3, h4, h5, h6 {
   animation: fade-in 0.4s ease-in-out both;
 }
 
+/* Accessibility: honor reduced-motion preference by disabling entrance animations. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-fade-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* Tiptap placeholder */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

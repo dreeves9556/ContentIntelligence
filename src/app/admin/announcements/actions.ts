@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getAnthropicApiKey, getAnthropicModel } from "@/lib/platform-config";
 import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
-export type EmailSegment = "all" | "CALENDAR_ONLY" | "CREATOR" | "PRO" | "connected" | "unconnected";
+export type EmailSegment = "all" | "CALENDAR_ONLY" | "PRO" | "connected" | "unconnected";
 
 export interface BroadcastResult {
   success: boolean;

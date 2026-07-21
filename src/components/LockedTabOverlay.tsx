@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import { PLAN_LABELS, type UserPlan } from "@/lib/tiers";
+import type { UserPlan } from "@/lib/tiers";
 
 interface LockedTabOverlayProps {
   requiredPlan: UserPlan;
@@ -43,17 +43,15 @@ export default function LockedTabOverlay({
           </p>
           <div className="mb-4 px-3 py-1.5 bg-accent-primary/10 rounded-full inline-block">
             <span className="text-xs font-semibold text-accent-primary uppercase tracking-wider">
-              Available on {PLAN_LABELS[requiredPlan]}
+              Available with Full Access
             </span>
           </div>
-          <button
-            onClick={() => {
-              /* TODO: wire to subscription upgrade flow */
-            }}
-            className="w-full py-3 px-6 rounded-xl text-sm font-bold transition-all hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
+          <a
+            href="/dashboard/billing"
+            className="block w-full py-3 px-6 rounded-xl text-sm font-bold transition-all hover:opacity-90 bg-accent-primary text-white hover:bg-accent-primary/90"
           >
-            Upgrade Your Plan
-          </button>
+            Get Full Access
+          </a>
         </div>
       </div>
     </div>

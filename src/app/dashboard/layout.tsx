@@ -40,6 +40,7 @@ export default async function DashboardLayout({
   };
 
   if (shouldBlockDashboardAccess(accessUser)) {
+    const isLocked = user.accountStatus === "ARCHIVED";
     return (
       <div className="min-h-screen bg-background-secondary flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-background-card border border-border-primary rounded-xl p-8 text-center space-y-4">
@@ -62,16 +63,25 @@ export default async function DashboardLayout({
             className="text-xl font-bold text-text-primary"
             style={{ fontFamily: "var(--font-serif)" }}
           >
-            Access Inactive
+            {isLocked ? "Access Paused" : "Access Inactive"}
           </h1>
           <p className="text-sm text-text-muted leading-relaxed">
-            Your access to The Local Post is currently inactive. If you believe this is a
-            mistake, please contact our team.
+            {isLocked
+              ? "Your seat in this organization has been reduced. To continue using The Local Post, subscribe to your own membership."
+              : "Your access to The Local Post is currently inactive. If you believe this is a mistake, please contact our team."}
           </p>
+          {isLocked && (
+            <a
+              href="/dashboard/billing"
+              className="block w-full py-2.5 px-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-medium rounded-lg transition-colors text-sm"
+            >
+              Subscribe to Continue
+            </a>
+          )}
           <form action="/api/auth/signout" method="POST">
             <button
               type="submit"
-              className="w-full py-2.5 px-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-medium rounded-lg transition-colors text-sm"
+              className="w-full py-2.5 px-4 bg-background-secondary hover:bg-background-secondary/80 text-text-muted font-medium rounded-lg transition-colors text-sm border border-border-primary"
             >
               Sign Out
             </button>

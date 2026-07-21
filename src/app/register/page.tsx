@@ -14,15 +14,24 @@ export default async function RegisterPage({ searchParams }: PageProps) {
     return <InvalidLink reason="No invitation token was provided." />;
   }
 
-  const invite = await prisma.inviteToken.findUnique({ where: { token } });
+  // Check both InviteToken (admin/team invite) and PendingStripeInvite (public checkout)
+  const [invite, pendingInvite] = await Promise.all([
+    prisma.inviteToken.findUnique({ where: { token } }),
+    prisma.pendingStripeInvite.findUnique({ where: { token } }),
+  ]);
 
-  if (!invite) {
+  if (!invite && !pendingInvite) {
     return <InvalidLink reason="This invitation link is invalid or has already been used." />;
   }
 
-  if (invite.expiresAt < new Date()) {
-    return <InvalidLink reason="This invitation link has expired. Please ask your admin to send a new one." />;
+  const activeInvite = invite ?? pendingInvite!;
+
+  if (activeInvite.expiresAt < new Date()) {
+    return <InvalidLink reason="This invitation link has expired. Please request a new one." />;
   }
+
+  const isPaidRegistration = !!pendingInvite;
+  const email = activeInvite.email;
 
   return (
     <div className="min-h-screen bg-background-secondary flex items-center justify-center p-4">
@@ -49,15 +58,17 @@ export default async function RegisterPage({ searchParams }: PageProps) {
               Create Your Account
             </h1>
             <p className="text-sm text-text-muted">
-              You&apos;ve been invited to join The Local Post. Set your password to get started.
+              {isPaidRegistration
+                ? "Your membership is active. Set your password to access your account."
+                : "You've been invited to join The Local Post. Set your password to get started."}
             </p>
           </div>
 
-          <RegisterForm email={invite.email} token={token} />
+          <RegisterForm email={email} token={token} />
         </div>
 
         <p className="text-center text-xs text-text-muted mt-6">
-          This link is single-use and expires 7 days after it was issued.
+          This link is single-use and expires {isPaidRegistration ? "14" : "7"} days after it was issued.
         </p>
       </div>
     </div>

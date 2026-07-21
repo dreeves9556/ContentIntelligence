@@ -18,18 +18,17 @@ import type { UserPlan } from "@/lib/tiers";
 /**
  * Map a Stripe Price ID to a UserPlan.
  *
- * Future: read from env (e.g. STRIPE_PRICE_CALENDAR_ONLY, STRIPE_PRICE_CREATOR,
+ * Future: read from env (e.g. STRIPE_PRICE_CALENDAR_ONLY,
  * STRIPE_PRICE_PRO) or a DB-backed price→plan lookup table.
  * For now returns a default so the helper is callable without configuration.
  */
 export function mapStripePriceToUserPlan(priceId: string): UserPlan {
   const envMap: Record<string, UserPlan> = {
     [process.env.STRIPE_PRICE_CALENDAR_ONLY ?? "__unused_calendar__"]: "CALENDAR_ONLY",
-    [process.env.STRIPE_PRICE_CREATOR ?? "__unused_creator__"]: "CREATOR",
     [process.env.STRIPE_PRICE_PRO ?? "__unused_pro__"]: "PRO",
   };
 
-  return envMap[priceId] ?? "CALENDAR_ONLY";
+  return envMap[priceId] ?? "PRO";
 }
 
 /**

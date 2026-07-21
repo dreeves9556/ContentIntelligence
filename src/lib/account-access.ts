@@ -17,6 +17,7 @@ export const ACCOUNT_STATUS_VALUES: AccountStatus[] = [
   "EXPIRED",
   "PAST_DUE",
   "CANCELED",
+  "ARCHIVED",
 ];
 
 export const EXPIRATION_ACTION_VALUES: ExpirationAction[] = [
@@ -32,6 +33,7 @@ export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
   EXPIRED: "Expired",
   PAST_DUE: "Past Due",
   CANCELED: "Canceled",
+  ARCHIVED: "Archived",
 };
 
 export const EXPIRATION_ACTION_LABELS: Record<ExpirationAction, string> = {
@@ -131,7 +133,7 @@ export function getEffectiveAccountStatus(user: AccountAccessUser): AccountStatu
   if (user.role === "ADMIN") return "ACTIVE";
   if (isAccountExpired(user)) {
     if (user.expirationAction === "DISABLE_ACCESS") return "EXPIRED";
-    if (user.expirationAction === "DOWNGRADE_TO_CALENDAR_ONLY") return "EXPIRED";
+    if (user.expirationAction === "DOWNGRADE_TO_CALENDAR_ONLY") return "ARCHIVED";
   }
   return user.accountStatus;
 }
@@ -140,6 +142,8 @@ export function shouldBlockDashboardAccess(user: AccountAccessUser): boolean {
   if (user.role === "ADMIN") return false;
 
   if (user.accountStatus === "CANCELED" || user.accountStatus === "PAST_DUE") return true;
+
+  if (user.accountStatus === "ARCHIVED") return true;
 
   if (isAccountExpired(user) && user.expirationAction === "DISABLE_ACCESS") return true;
 

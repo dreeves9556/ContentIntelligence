@@ -11,22 +11,37 @@
  *
  * Plans:
  *   CALENDAR_ONLY — Content calendar only, no analytics or integrations.
- *   CREATOR       — Calendar + analytics + integrations (max 2 social accounts).
- *   PRO           — Everything unlimited.
+ *                 Admin-assigned only for special cases. Not purchasable.
+ *   PRO           — Full access: calendar + analytics + integrations (unlimited).
+ *                 The only plan available for purchase.
+ *
+ * Account status ARCHIVED: User access expired, but data still archived.
+ *                 Replaces the former LOCKED status.
  *
  * Plan inheritance: Org members inherit the org's seatPlan. When an admin
  * changes the org's seatPlan, all non-ADMIN members are updated atomically
  * in a transaction (see admin/organizations/actions.ts).
  */
 
-export type UserPlan = "CALENDAR_ONLY" | "CREATOR" | "PRO";
+export type UserPlan = "CALENDAR_ONLY" | "PRO";
 
 export type UserRole = "USER" | "TEAM_ADMIN" | "ADMIN";
 
 export const PLAN_LABELS: Record<UserPlan, string> = {
   CALENDAR_ONLY: "Calendar Only",
-  CREATOR: "Creator",
   PRO: "Pro",
+};
+
+/** Public-facing labels — hide internal tier names from users. */
+export const PUBLIC_PLAN_LABELS: Record<UserPlan, string> = {
+  CALENDAR_ONLY: "Calendar Access",
+  PRO: "Full Access",
+};
+
+/** Admin-only labels with internal context. */
+export const ADMIN_PLAN_LABELS: Record<UserPlan, string> = {
+  CALENDAR_ONLY: "Calendar Only (Admin-Assigned)",
+  PRO: "Pro (Full Access)",
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -35,7 +50,6 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "Admin",
 };
 
-export const CREATOR_ACCOUNT_LIMIT = 2;
 
 export function isAdmin(role: string | undefined | null): boolean {
   return role === "ADMIN";
@@ -46,11 +60,11 @@ export function isTeamAdmin(role: string | undefined | null): boolean {
 }
 
 export function canAccessAnalytics(plan: UserPlan): boolean {
-  return plan === "CREATOR" || plan === "PRO";
+  return plan === "PRO";
 }
 
 export function canAccessIntegrations(plan: UserPlan): boolean {
-  return plan === "CREATOR" || plan === "PRO";
+  return plan === "PRO";
 }
 
 export function hasUnlimitedAccounts(plan: UserPlan): boolean {

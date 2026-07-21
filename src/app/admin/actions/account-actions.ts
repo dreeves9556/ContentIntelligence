@@ -21,7 +21,7 @@ import {
 } from "@/lib/account-expiration";
 import { sendAccountStatusChangedEmail } from "@/lib/account-emails";
 
-const VALID_PLANS: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+const VALID_PLANS: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
 const VALID_ROLES: UserRole[] = ["USER", "TEAM_ADMIN", "ADMIN"];
 
 export interface UpdateUserAccountInput {

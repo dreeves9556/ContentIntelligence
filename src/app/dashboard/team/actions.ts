@@ -328,14 +328,65 @@ export async function removeTeamMember(
   }
 
   try {
-    // Detach from org only — keep account and data intact, free the seat
+    // Detach from org and lock the account — they must subscribe to
+    // their own membership to regain access. Clear Stripe fields since
+    // they're no longer on the org's subscription.
     await prisma.user.update({
       where: { id: userId },
-      data: { organizationId: null },
+      data: {
+        organizationId: null,
+        accountStatus: "ARCHIVED",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripeStatus: null,
+      },
     });
     return { success: true };
   } catch {
     return { success: false, error: "Failed to remove team member." };
+  }
+}
+
+export async function transferTeamAdmin(
+  targetUserId: string
+): Promise<{ success: boolean; error?: string }> {
+  const ctx = await requireTeamAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  if (ctx.user.id === targetUserId) {
+    return { success: false, error: "You cannot transfer admin to yourself." };
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, role: true, organizationId: true, accountStatus: true },
+  });
+
+  if (!target) return { success: false, error: "User not found." };
+  if (target.organizationId !== ctx.organizationId) {
+    return { success: false, error: "You can only transfer to a member of your own organization." };
+  }
+  if (target.role === "ADMIN") {
+    return { success: false, error: "You cannot transfer to a global admin." };
+  }
+  if (target.accountStatus === "ARCHIVED") {
+    return { success: false, error: "You cannot transfer to a locked member." };
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: ctx.user.id },
+        data: { role: "USER" },
+      }),
+      prisma.user.update({
+        where: { id: targetUserId },
+        data: { role: "TEAM_ADMIN" },
+      }),
+    ]);
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to transfer admin role." };
   }
 }
 

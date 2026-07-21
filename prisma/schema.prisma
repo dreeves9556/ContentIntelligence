@@ -16,7 +16,7 @@ model User {
   password      String?        // For credentials auth, nullable for OAuth
   image         String?
   role          UserRole       @default(USER)
-  plan          UserPlan       @default(CALENDAR_ONLY)
+  plan          UserPlan       @default(PRO)
   tokenVersion  Int            @default(0)  // Incremented on password reset to invalidate existing JWTs
   emailUnsubscribed Boolean     @default(false) // User opted out of broadcast emails
   authorDisplayName  String?  // Public byline name shown on articles
@@ -182,7 +182,7 @@ model InviteToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-  plan      UserPlan @default(CALENDAR_ONLY)
+  plan      UserPlan @default(PRO)
   organizationId   String?
   organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   invitedByUserId  String?
@@ -190,6 +190,29 @@ model InviteToken {
   inviteRole       UserRole @default(USER) // Role the registering user should receive
 
   @@map("invite_tokens")
+}
+
+model PendingStripeInvite {
+  id                   String   @id @default(cuid())
+  email                String
+  token                String   @unique
+  purchaseType         String   // "solo" | "community"
+  billingInterval      String   // "monthly" | "annual"
+  organizationName     String?
+  seats                Int?
+  stripeCustomerId     String
+  stripeSubscriptionId String
+  stripeStatus         String?
+  plan                 UserPlan @default(PRO)
+  inviteRole           UserRole @default(USER)
+  organizationId       String?
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+
+  @@index([email])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@map("pending_stripe_invites")
 }
 
 model PasswordResetToken {
@@ -211,7 +234,6 @@ enum UserRole {
 
 enum UserPlan {
   CALENDAR_ONLY
-  CREATOR
   PRO
 }
 
@@ -222,6 +244,7 @@ enum AccountStatus {
   EXPIRED
   PAST_DUE
   CANCELED
+  ARCHIVED
 }
 
 enum ExpirationAction {
@@ -601,7 +624,7 @@ model ScheduledPushNotification {
   sentCount     Int      @default(0)
   failedCount   Int      @default(0)
   createdBy     String
-  creator       User     @relation("ScheduledPushCreator", fields: [createdBy], references: [id])
+  creator       User     @relation("ScheduledPushCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -630,4 +653,13 @@ model CalendarGenerationLog {
 
   @@index([userId, createdAt])
   @@map("calendar_generation_logs")
+}
+
+model StripeEvent {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  eventType    String
+  processedAt  DateTime @default(now())
+
+  @@map("stripe_events")
 }

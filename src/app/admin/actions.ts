@@ -5,6 +5,8 @@ import { Resend } from "resend";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { getStripe } from "@/lib/stripe";
+import { zernio } from "@/lib/zernio";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, ExpirationAction } from "@/lib/account-access";
 
@@ -101,7 +103,7 @@ export async function createClientProfile(
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const invitePlan = options?.plan ?? "CALENDAR_ONLY";
+  const invitePlan = options?.plan ?? "PRO";
 
   const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existingUser) {
@@ -144,7 +146,7 @@ export async function updateUserPlan(
     return { success: false, error: "Unauthorized" };
   }
 
-  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
   if (!validPlans.includes(plan)) {
     return { success: false, error: "Invalid plan" };
   }
@@ -230,7 +232,7 @@ export async function getPendingInvites(): Promise<PendingInvite[]> {
   return invites.map((i) => ({
     id: i.id,
     email: i.email,
-    plan: (i.plan ?? "CALENDAR_ONLY") as UserPlan,
+    plan: (i.plan ?? "PRO") as UserPlan,
     expiresAt: i.expiresAt.toISOString(),
     createdAt: i.createdAt.toISOString(),
   }));
@@ -252,7 +254,7 @@ export async function bulkCreateInvites(
     return { results: [], error: "Unauthorized" };
   }
 
-  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
   if (!validPlans.includes(plan)) {
     return { results: [], error: "Invalid plan" };
   }
@@ -311,7 +313,7 @@ export async function updateInvitePlan(
     return { success: false, error: "Unauthorized" };
   }
 
-  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+  const validPlans: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
   if (!validPlans.includes(plan)) {
     return { success: false, error: "Invalid plan" };
   }
@@ -355,8 +357,69 @@ export async function deleteUser(
     return { success: false, error: "You cannot delete your own account." };
   }
 
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      stripeCustomerId: true,
+      stripeSubscriptionId: true,
+      organizationId: true,
+    },
+  });
+
+  if (!target) {
+    return { success: false, error: "User not found." };
+  }
+
+  // Cancel Stripe subscription (solo or org if TEAM_ADMIN)
+  let subscriptionId = target.stripeSubscriptionId;
+  if (!subscriptionId && target.organizationId && target.role === "TEAM_ADMIN") {
+    const org = await prisma.organization.findUnique({
+      where: { id: target.organizationId },
+      select: { stripeSubscriptionId: true },
+    });
+    subscriptionId = org?.stripeSubscriptionId ?? null;
+  }
+
+  if (subscriptionId) {
+    try {
+      const stripe = getStripe();
+      await stripe.subscriptions.cancel(subscriptionId);
+      console.log(`[ADMIN DELETE USER] Cancelled Stripe subscription ${subscriptionId} for user ${userId}`);
+    } catch (error) {
+      console.error("[ADMIN DELETE USER] Failed to cancel Stripe subscription:", error);
+    }
+  }
+
+  // Delete Zernio accounts on Zernio's side before DB cascade removes our records
+  const zernioAccounts = await prisma.zernioAccount.findMany({
+    where: { userId },
+    select: { zernioAccountId: true, platform: true },
+  });
+
+  for (const acc of zernioAccounts) {
+    try {
+      await zernio.accounts.delete(acc.zernioAccountId);
+      console.log(`[ADMIN DELETE USER] Deleted Zernio account ${acc.zernioAccountId} (${acc.platform}) for user ${userId}`);
+    } catch (error) {
+      console.error(`[ADMIN DELETE USER] Failed to delete Zernio account ${acc.zernioAccountId}:`, error);
+    }
+  }
+
   try {
+    // Clean up invite tokens associated with this user's email
+    if (target.email) {
+      await prisma.inviteToken.deleteMany({
+        where: { email: target.email },
+      });
+    }
+
+    // Delete the user — all Cascade relations are automatically deleted
     await prisma.user.delete({ where: { id: userId } });
+
+    console.log(`[ADMIN DELETE USER] User ${userId} (${target.email}) permanently deleted`);
     return { success: true };
   } catch (err) {
     console.error("[ADMIN DELETE USER] Error:", err);

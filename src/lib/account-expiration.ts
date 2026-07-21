@@ -95,8 +95,7 @@ export async function processExpiredAccounts(): Promise<ExpirationProcessResult>
         await prisma.user.update({
           where: { id: user.id },
           data: {
-            plan: "CALENDAR_ONLY",
-            accountStatus: "EXPIRED",
+            accountStatus: "ARCHIVED",
             lastAccessCheckAt: now,
           },
         });
@@ -149,8 +148,7 @@ export async function processExpiredAccount(userId: string): Promise<{ success: 
       await prisma.user.update({
         where: { id: userId },
         data: {
-          plan: "CALENDAR_ONLY",
-          accountStatus: "EXPIRED",
+          accountStatus: "ARCHIVED",
           lastAccessCheckAt: now,
         },
       });

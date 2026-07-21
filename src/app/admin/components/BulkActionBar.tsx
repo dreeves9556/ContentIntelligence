@@ -216,7 +216,6 @@ export default function BulkActionBar({ selectedIds, selectedNames, onClear, onC
               className="px-3 py-2 bg-background-secondary border border-border-primary rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
             >
               <option value="CALENDAR_ONLY">Calendar Only</option>
-              <option value="CREATOR">Creator</option>
               <option value="PRO">Pro</option>
             </select>
           )}

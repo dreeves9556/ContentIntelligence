@@ -6,7 +6,7 @@ import ZernioCard from "./ZernioCard";
 import FacebookInfoAccordion from "./FacebookInfoAccordion";
 import { getEnabledPlatforms } from "@/lib/platform-config";
 import LockedTabOverlay from "@/components/LockedTabOverlay";
-import { canAccessIntegrations, CREATOR_ACCOUNT_LIMIT } from "@/lib/tiers";
+import { canAccessIntegrations } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
 
 const ALL_PLATFORMS = [
@@ -140,10 +140,10 @@ export default async function IntegrationsPage() {
   if (!canAccessIntegrations(plan)) {
     return (
       <LockedTabOverlay
-        requiredPlan="CREATOR"
+        requiredPlan="PRO"
         currentPlan={plan}
         featureName="Integrations"
-        featureDescription="Upgrade to the Creator plan to connect your social media accounts and automatically sync performance data to your analytics dashboard."
+        featureDescription="Get Full Access to connect your social media accounts and automatically sync performance data to your analytics dashboard."
       >
         {mainContent}
       </LockedTabOverlay>

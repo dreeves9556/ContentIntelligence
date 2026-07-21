@@ -12,6 +12,9 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "stripe:setup-catalog": "tsx scripts/setup-stripe-catalog.ts",
+    "stripe:verify-pricing": "tsx scripts/verify-stripe-pricing.ts",
+    "stripe:check-env": "tsx scripts/check-stripe-env.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -43,6 +46,7 @@
     "recharts": "^3.8.1",
     "resend": "^6.14.0",
     "sanitize-html": "^2.17.5",
+    "stripe": "^22.3.2",
     "tailwind-merge": "^3.6.0",
     "web-push": "^3.6.7",
     "zod": "^4.4.3"

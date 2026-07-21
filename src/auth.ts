@@ -83,7 +83,7 @@ export const {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
-        token.plan = (user as { plan?: string }).plan as "CALENDAR_ONLY" | "CREATOR" | "PRO" | undefined;
+        token.plan = (user as { plan?: string }).plan as "CALENDAR_ONLY" | "PRO" | undefined;
         token.accountStatus = (user as { accountStatus?: string }).accountStatus as string | undefined;
         token.sessionExpiry = (user as { sessionExpiry?: number }).sessionExpiry;
         token.tokenVersion = (user as { tokenVersion?: number }).tokenVersion;
@@ -131,7 +131,7 @@ export const {
 
         session.user.id = token.id as string;
         session.user.role = token.role as "USER" | "TEAM_ADMIN" | "ADMIN";
-        session.user.plan = (token.plan ?? "CALENDAR_ONLY") as "CALENDAR_ONLY" | "CREATOR" | "PRO";
+        session.user.plan = (token.plan ?? "PRO") as "CALENDAR_ONLY" | "PRO";
         session.user.accountStatus = token.accountStatus as string;
         (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }

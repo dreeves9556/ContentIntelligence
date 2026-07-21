@@ -277,7 +277,7 @@ export async function sendAdminBroadcast(
 }
 
 // ─── Segment helpers ────────────────────────────────────────────────
-export type PushSegment = "all" | "CALENDAR_ONLY" | "CREATOR" | "PRO";
+export type PushSegment = "all" | "CALENDAR_ONLY" | "PRO";
 
 export async function getUsersForSegment(segment: PushSegment): Promise<{ id: string }[]> {
   if (segment === "all") {

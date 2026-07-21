@@ -25,8 +25,66 @@ export async function registerWithToken(
     return { error: "Password must include at least one letter and one number." };
   }
 
-  const invite = await prisma.inviteToken.findUnique({ where: { token } });
+  // Check both InviteToken (admin/team invite) and PendingStripeInvite (public checkout)
+  const [invite, pendingInvite] = await Promise.all([
+    prisma.inviteToken.findUnique({ where: { token } }),
+    prisma.pendingStripeInvite.findUnique({ where: { token } }),
+  ]);
 
+  if (!invite && !pendingInvite) {
+    return { error: "This invitation link is invalid or has already been used." };
+  }
+
+  // ─── PendingStripeInvite flow (public checkout) ───
+  if (pendingInvite) {
+    if (pendingInvite.expiresAt < new Date()) {
+      return { error: "This registration link has expired." };
+    }
+
+    const assignedRole = pendingInvite.inviteRole ?? "USER";
+    if (!ALLOWED_INVITE_ROLES.includes(assignedRole as typeof ALLOWED_INVITE_ROLES[number])) {
+      return { error: "This registration link is invalid." };
+    }
+
+    if (pendingInvite.organizationId) {
+      const org = await prisma.organization.findUnique({
+        where: { id: pendingInvite.organizationId },
+        select: { id: true },
+      });
+      if (!org) {
+        return { error: "This registration link is no longer valid — the organization no longer exists." };
+      }
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: pendingInvite.email } });
+    if (existingUser) {
+      return { error: "An account with this email already exists." };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    await prisma.$transaction([
+      prisma.user.create({
+        data: {
+          email: pendingInvite.email,
+          password: hashedPassword,
+          role: assignedRole,
+          plan: pendingInvite.plan ?? "PRO",
+          accountStatus: "ACTIVE",
+          isComped: false,
+          organizationId: pendingInvite.organizationId ?? null,
+          stripeCustomerId: pendingInvite.stripeCustomerId,
+          stripeSubscriptionId: pendingInvite.stripeSubscriptionId,
+          stripeStatus: pendingInvite.stripeStatus,
+        },
+      }),
+      prisma.pendingStripeInvite.delete({ where: { token } }),
+    ]);
+
+    redirect("/onboarding");
+  }
+
+  // ─── InviteToken flow (admin/team invite) ───
   if (!invite) {
     return { error: "This invitation link is invalid or has already been used." };
   }
@@ -74,7 +132,7 @@ export async function registerWithToken(
         email: invite.email,
         password: hashedPassword,
         role: assignedRole,
-        plan: invite.plan ?? "CALENDAR_ONLY",
+        plan: invite.plan ?? "PRO",
         organizationId: invite.organizationId ?? null,
       },
     }),

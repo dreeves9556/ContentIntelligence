@@ -3,14 +3,13 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { updateUserPlan } from "../actions";
-import { PLAN_LABELS } from "@/lib/tiers";
+import { ADMIN_PLAN_LABELS } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
 
-const PLANS: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+const PLANS: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
 
 const PLAN_STYLES: Record<UserPlan, string> = {
   CALENDAR_ONLY: "text-text-muted bg-background-secondary border-border-primary",
-  CREATOR: "text-blue-400 bg-blue-500/10 border-blue-500/20",
   PRO: "text-accent-primary bg-accent-primary/10 border-[#c8952a]/30",
 };
 
@@ -70,7 +69,7 @@ export default function PlanSwitcher({ userId, currentPlan }: PlanSwitcherProps)
         ) : (
           <ChevronsUpDown className="w-3 h-3" />
         )}
-        {PLAN_LABELS[plan]}
+        {ADMIN_PLAN_LABELS[plan]}
       </button>
 
       {open && (
@@ -89,7 +88,7 @@ export default function PlanSwitcher({ userId, currentPlan }: PlanSwitcherProps)
                 }`}
               >
                 <span className={`px-2 py-0.5 rounded-md border ${PLAN_STYLES[p]}`}>
-                  {PLAN_LABELS[p]}
+                  {ADMIN_PLAN_LABELS[p]}
                 </span>
                 {p === plan && <Check className="w-3 h-3 text-accent-primary" />}
               </button>

@@ -1,5 +1,10 @@
 # Account Status QA Checklist
 
+> **Reconciled July 2026** — Updated to reflect Stripe webhook hardening changes.
+> Key changes: `ARCHIVED` is the primary status for canceled subscriptions (not `DISABLED`).
+> `DISABLED` and `GRACE_PERIOD` exist in the enum but are admin-only (not set by webhooks).
+> Webhook now sets `plan: CALENDAR_ONLY` alongside `accountStatus: ARCHIVED` on downgrade.
+
 ## Prerequisites
 - [ ] Database migration applied (`npx prisma migrate dev`)
 - [ ] Prisma client regenerated (`npx prisma generate`)
@@ -82,9 +87,10 @@
 - [ ] Users with `ACTIVE` status see normal dashboard
 - [ ] Users with `TRIAL` status see normal dashboard
 
-### Expired/Disabled users
+### Expired/Archived users
 - [ ] Users with `EXPIRED` status see locked dashboard with message
-- [ ] Users with `DISABLED` status see locked dashboard with message
+- [ ] Users with `ARCHIVED` status see locked dashboard with message (set by webhook when subscription is deleted)
+- [ ] Users with `DISABLED` status see locked dashboard with message (admin-set only)
 - [ ] Locked state shows sign-out button
 - [ ] Locked state does NOT show navigation sidebar
 - [ ] Locked state does NOT allow access to any dashboard sub-routes
@@ -120,7 +126,7 @@
 
 - [ ] After login, `session.user.accountStatus` is populated
 - [ ] Changing accountStatus in admin is reflected on user's next page load (JWT refresh)
-- [ ] Disabling a user causes their next page load to show locked state
+- [ ] Disabling a user causes their next page load to show archived state
 
 ## 10. Expiration Processing
 
@@ -135,10 +141,42 @@
 - [ ] Email stubs are called (check console logs)
 - [ ] `lastAccessCheckAt` is updated after processing
 
-## 11. Edge Cases
+## 11. Stripe Webhook — Account Status Changes
+
+### Solo subscription deleted
+- [ ] User `accountStatus` set to `ARCHIVED`
+- [ ] User `plan` set to `CALENDAR_ONLY`
+- [ ] User `stripeSubscriptionId` and `stripeCustomerId` cleared
+- [ ] User `stripeStatus` set to `canceled`
+- [ ] ADMIN and comped users are NOT modified
+
+### Community subscription deleted
+- [ ] Org `stripeStatus` set to `canceled`
+- [ ] Org `stripeSubscriptionId` and `stripeCustomerId` cleared
+- [ ] All non-ADMIN, non-comped members: `accountStatus` set to `ARCHIVED`, `plan` set to `CALENDAR_ONLY`
+- [ ] ADMIN and comped members are NOT modified
+
+### Invoice payment failed
+- [ ] Solo user `accountStatus` set to `PAST_DUE`
+- [ ] Community org `stripeStatus` set to `past_due`
+- [ ] ADMIN and comped users are NOT modified
+
+### Invoice paid
+- [ ] Solo user `accountStatus` set to `ACTIVE` (via subscription status sync)
+- [ ] Community org `stripeStatus` synced to subscription status
+
+### Idempotency
+- [ ] Duplicate webhook events (same `event.id`) are skipped — `StripeEvent` record prevents reprocessing
+- [ ] First processing creates a `StripeEvent` record with `eventId` and `eventType`
+
+## 12. Edge Cases
 
 - [ ] User with no `accessExpiresAt` is never expired
 - [ ] User with `accessExpiresAt` in the future is not expired
 - [ ] User with `accountStatus=ACTIVE` and `accessExpiresAt` in the past but `expirationAction=null` is not auto-processed
 - [ ] ADMIN users are never blocked by dashboard access check
 - [ ] Organization seat count is unaffected by account status changes
+- [ ] Webhook does not fall through from community→user when org lookup fails
+- [ ] Switch-to-solo checkout abandonment leaves community untouched (no org changes until checkout completes)
+- [ ] Registration with null `invite.plan` defaults to `PRO` (admin must set plan via invite token)
+- [ ] Checkout blocked for users with active PRO subscription + `stripeSubscriptionId`

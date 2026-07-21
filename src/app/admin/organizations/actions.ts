@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { generateUniqueSlug } from "@/lib/organizations";
 import { sendTeamInviteEmail } from "@/lib/invite-email";
+import { getStripe } from "@/lib/stripe";
 import type { UserPlan } from "@/lib/tiers";
 
 const INVITE_EXPIRY_DAYS = 7;
@@ -91,7 +92,7 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
             email: teamAdmin.email,
             name: teamAdmin.name,
             role: teamAdmin.role,
-            plan: (teamAdmin.plan ?? "CALENDAR_ONLY") as UserPlan,
+            plan: (teamAdmin.plan ?? "PRO") as UserPlan,
             createdAt: teamAdmin.createdAt,
             accountStatus: teamAdmin.accountStatus,
             internalTag: teamAdmin.internalTag,
@@ -103,7 +104,7 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
         email: m.email,
         name: m.name,
         role: m.role,
-        plan: (m.plan ?? "CALENDAR_ONLY") as UserPlan,
+        plan: (m.plan ?? "PRO") as UserPlan,
         createdAt: m.createdAt,
         accountStatus: m.accountStatus,
         internalTag: m.internalTag,
@@ -303,14 +304,61 @@ export async function assignTeamAdmin(
     return { success: false, error: "This user is already a team admin for another organization." };
   }
 
+  // Target must already be a member of this organization
+  if (user.organizationId !== orgId) {
+    return { success: false, error: "The target user is not a member of this organization." };
+  }
+
+  // Find the current TEAM_ADMIN to demote them (fetch Stripe fields to clear)
+  const currentAdmin = await prisma.user.findFirst({
+    where: { organizationId: orgId, role: "TEAM_ADMIN" },
+    select: { id: true, email: true, stripeCustomerId: true, stripeSubscriptionId: true, stripeStatus: true },
+  });
+
   try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        role: "TEAM_ADMIN",
-        organizationId: orgId,
-        plan: org.seatPlan,
-      },
+    // Update Stripe customer email to the new admin BEFORE DB changes
+    // so billing receipts and portal access go to the new admin
+    if (org.stripeCustomerId && currentAdmin && currentAdmin.id !== userId) {
+      try {
+        const stripe = getStripe();
+        await stripe.customers.update(org.stripeCustomerId, {
+          email: user.email ?? undefined,
+        });
+        console.log(`[ASSIGN TEAM ADMIN] Stripe customer ${org.stripeCustomerId} email updated to ${user.email}`);
+      } catch (stripeError) {
+        console.error("[ASSIGN TEAM ADMIN] Failed to update Stripe customer email:", stripeError);
+        // Non-fatal — DB transfer still proceeds, Stripe email can be updated later
+      }
+    }
+
+    // Use sequential transaction to prevent race conditions where two
+    // concurrent transfers could result in zero or multiple TEAM_ADMINs
+    await prisma.$transaction(async (tx) => {
+      // Demote the current admin to USER and clear their Stripe fields
+      // (billing ownership moves to the new admin)
+      if (currentAdmin && currentAdmin.id !== userId) {
+        await tx.user.update({
+          where: { id: currentAdmin.id },
+          data: {
+            role: "USER",
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            stripeStatus: null,
+          },
+        });
+      }
+
+      // Promote the new admin and transfer Stripe billing ownership
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          role: "TEAM_ADMIN",
+          plan: org.seatPlan,
+          stripeCustomerId: org.stripeCustomerId ?? null,
+          stripeSubscriptionId: org.stripeSubscriptionId ?? null,
+          stripeStatus: org.stripeStatus ?? null,
+        },
+      });
     });
     return { success: true };
   } catch {

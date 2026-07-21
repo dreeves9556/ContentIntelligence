@@ -3,7 +3,7 @@ import { DefaultSession, DefaultUser } from "next-auth";
 declare module "next-auth" {
   interface User extends DefaultUser {
     role: "USER" | "TEAM_ADMIN" | "ADMIN";
-    plan: "CALENDAR_ONLY" | "CREATOR" | "PRO";
+    plan: "CALENDAR_ONLY" | "PRO";
     accountStatus: string;
   }
 
@@ -11,7 +11,7 @@ declare module "next-auth" {
     user: {
       id: string;
       role: "USER" | "TEAM_ADMIN" | "ADMIN";
-      plan: "CALENDAR_ONLY" | "CREATOR" | "PRO";
+      plan: "CALENDAR_ONLY" | "PRO";
       accountStatus: string;
     } & DefaultSession["user"];
   }
@@ -21,7 +21,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     role?: "USER" | "TEAM_ADMIN" | "ADMIN";
-    plan?: "CALENDAR_ONLY" | "CREATOR" | "PRO";
+    plan?: "CALENDAR_ONLY" | "PRO";
     accountStatus?: string;
     sessionExpiry?: number;
     tokenVersion?: number;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle, Loader2, Unplug, Lock, ArrowUpRight } from "lucide-react";
 import { disconnectZernioAccount } from "./actions";
-import { CREATOR_ACCOUNT_LIMIT, hasUnlimitedAccounts } from "@/lib/tiers";
+import { hasUnlimitedAccounts } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
 
 interface ZernioCardProps {
@@ -33,10 +33,10 @@ export default function ZernioCard({
   const [isConnected, setIsConnected] = useState(initialConnected);
   const [connectedHandle, setConnectedHandle] = useState(handle);
 
-  const isAtCreatorLimit =
+  const isAtLimit =
     !hasUnlimitedAccounts(plan) &&
     !isConnected &&
-    connectedCount >= CREATOR_ACCOUNT_LIMIT;
+    connectedCount >= 1;
 
   const handleConnect = () => {
     setLoading(true);
@@ -102,24 +102,22 @@ export default function ZernioCard({
               Disconnect
             </button>
           </div>
-        ) : isAtCreatorLimit ? (
+        ) : isAtLimit ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-background-secondary border border-background-primary">
               <Lock className="h-4 w-4 text-text-muted shrink-0" />
               <p className="text-xs text-text-muted leading-snug">
-                You&apos;ve reached the {CREATOR_ACCOUNT_LIMIT}-account limit on the Creator plan.
-                Upgrade to Pro for unlimited connections.
+                You&apos;ve reached the account limit for your current membership.
+                Get Full Access to connect unlimited accounts.
               </p>
             </div>
-            <button
-              onClick={() => {
-                /* TODO: wire to subscription upgrade flow */
-              }}
+            <a
+              href="/dashboard/billing"
               className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90 border border-accent-primary/40 text-accent-primary bg-accent-primary/10"
             >
               <ArrowUpRight className="h-4 w-4" />
-              Upgrade to Pro
-            </button>
+              Get Full Access
+            </a>
           </div>
         ) : (
           <button

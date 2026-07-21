@@ -41,7 +41,6 @@ import {
 
 const SEGMENTS: { value: EmailSegment; label: string }[] = [
   { value: "all", label: "All Users" },
-  { value: "CREATOR", label: "Creator Plan" },
   { value: "PRO", label: "Pro Plan" },
   { value: "CALENDAR_ONLY", label: "Calendar Only Plan" },
   { value: "connected", label: "Connected Social Accounts" },

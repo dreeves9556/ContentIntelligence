@@ -22,6 +22,7 @@ import {
   cancelTeamInvite,
   resendTeamInvite,
   removeTeamMember,
+  transferTeamAdmin,
   getTeamRoster,
   type TeamRosterData,
 } from "./actions";
@@ -42,6 +43,7 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [transferTarget, setTransferTarget] = useState<{ id: string; name: string; email: string } | null>(null);
 
   const { organization, usage, members, pendingInvites } = data;
   const canInvite = usage.availableSeats > 0 && !usage.isOverLimit;
@@ -96,6 +98,20 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
         refreshData();
       } else {
         setError(res.error ?? "Failed to remove member.");
+      }
+    });
+  }
+
+  function handleTransferAdmin() {
+    if (!transferTarget) return;
+    startTransition(async () => {
+      const res = await transferTeamAdmin(transferTarget.id);
+      if (res.success) {
+        setSuccess(`Admin role transferred to ${transferTarget.name || transferTarget.email}. You are now a regular member.`);
+        setTransferTarget(null);
+        refreshData();
+      } else {
+        setError(res.error ?? "Failed to transfer admin role.");
       }
     });
   }
@@ -338,14 +354,24 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
                     )}
                   </div>
                   {member.role === "USER" && (
-                    <button
-                      onClick={() => handleRemoveMember(member.id)}
-                      disabled={isPending}
-                      className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-red-400 transition-colors disabled:opacity-50"
-                    >
-                      <UserMinus className="h-3.5 w-3.5" />
-                      Remove from org
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setTransferTarget({ id: member.id, name: member.name || "Unnamed User", email: member.email ?? "" })}
+                        disabled={isPending}
+                        className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-accent-primary transition-colors disabled:opacity-50"
+                      >
+                        <UserCheck className="h-3.5 w-3.5" />
+                        Make Admin
+                      </button>
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        disabled={isPending}
+                        className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                        Remove from org
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -417,14 +443,24 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
                       </td>
                       <td className="py-4 px-6 text-right">
                         {member.role === "USER" ? (
-                          <button
-                            onClick={() => handleRemoveMember(member.id)}
-                            disabled={isPending}
-                            className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-red-400 transition-colors disabled:opacity-50"
-                          >
-                            <UserMinus className="h-3.5 w-3.5" />
-                            Remove
-                          </button>
+                          <div className="inline-flex items-center gap-3">
+                            <button
+                              onClick={() => setTransferTarget({ id: member.id, name: member.name || "Unnamed User", email: member.email ?? "" })}
+                              disabled={isPending}
+                              className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-accent-primary transition-colors disabled:opacity-50"
+                            >
+                              <UserCheck className="h-3.5 w-3.5" />
+                              Make Admin
+                            </button>
+                            <button
+                              onClick={() => handleRemoveMember(member.id)}
+                              disabled={isPending}
+                              className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                            >
+                              <UserMinus className="h-3.5 w-3.5" />
+                              Remove
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs text-text-muted/40">—</span>
                         )}
@@ -602,6 +638,43 @@ export default function TeamRosterClient({ initialData }: TeamRosterClientProps)
           </>
         )}
       </div>
+      {/* Transfer admin confirmation modal */}
+      {transferTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-background-card border border-border-primary rounded-xl p-6 max-w-md w-full space-y-4">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-accent-primary" />
+              <h3 className="text-lg font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+                Transfer Admin Role
+              </h3>
+            </div>
+            <p className="text-sm text-text-muted">
+              You are about to transfer your team admin role to{" "}
+              <span className="font-medium text-text-primary">{transferTarget.name}</span>
+              {" "}({transferTarget.email}). You will become a regular member and lose access to this team roster page.
+            </p>
+            <p className="text-sm text-text-muted">
+              This action cannot be undone from your account. The new admin will need to transfer it back if needed.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setTransferTarget(null)}
+                disabled={isPending}
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-border-primary text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTransferAdmin}
+                disabled={isPending}
+                className="px-4 py-2 rounded-lg text-sm font-bold bg-accent-primary text-white hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Transfer Admin Role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

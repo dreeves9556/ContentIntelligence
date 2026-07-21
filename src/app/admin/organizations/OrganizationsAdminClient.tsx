@@ -35,7 +35,7 @@ interface OrganizationsAdminClientProps {
   initialOrgs: AdminOrgData[];
 }
 
-const PLANS: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+const PLANS: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
 
 export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsAdminClientProps) {
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
   const [createForm, setCreateForm] = useState({
     name: "",
     seatLimit: "5",
-    seatPlan: "CREATOR" as UserPlan,
+    seatPlan: "PRO" as UserPlan,
     teamAdminEmail: "",
     teamAdminName: "",
   });
@@ -84,7 +84,7 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
       });
       if (res.success) {
         setSuccess(res.error ?? "Organization created successfully.");
-        setCreateForm({ name: "", seatLimit: "5", seatPlan: "CREATOR", teamAdminEmail: "", teamAdminName: "" });
+        setCreateForm({ name: "", seatLimit: "5", seatPlan: "PRO", teamAdminEmail: "", teamAdminName: "" });
         setShowCreateForm(false);
         refreshData();
       } else {

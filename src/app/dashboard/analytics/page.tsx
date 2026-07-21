@@ -81,10 +81,10 @@ export default async function AnalyticsPage() {
   if (!canAccessAnalytics(plan)) {
     return (
       <LockedTabOverlay
-        requiredPlan="CREATOR"
+        requiredPlan="PRO"
         currentPlan={plan}
         featureName="Analytics"
-        featureDescription="Upgrade to the Creator plan to unlock your full analytics dashboard — track views, engagement, and post performance across all your connected social accounts."
+        featureDescription="Get Full Access to unlock your analytics dashboard — track views, engagement, and post performance across all your connected social accounts."
       >
         {content}
       </LockedTabOverlay>

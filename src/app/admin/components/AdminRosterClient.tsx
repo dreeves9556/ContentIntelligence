@@ -223,7 +223,6 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
               >
                 <option value="ALL">All Plans</option>
                 <option value="CALENDAR_ONLY">Calendar Only</option>
-                <option value="CREATOR">Creator</option>
                 <option value="PRO">Pro</option>
               </select>
             </div>

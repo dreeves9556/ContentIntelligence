@@ -20,6 +20,7 @@ const STATUS_STYLES: Record<AccountStatus, string> = {
   EXPIRED: "bg-red-500/10 text-red-400 border-red-500/20",
   PAST_DUE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   CANCELED: "bg-red-500/10 text-red-400 border-red-500/20",
+  ARCHIVED: "bg-gray-500/10 text-gray-400 border-gray-500/20",
 };
 
 export function TagBadge({ tag }: { tag: string | null }) {

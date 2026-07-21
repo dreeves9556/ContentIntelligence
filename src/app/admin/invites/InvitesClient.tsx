@@ -24,11 +24,10 @@ import { PLAN_LABELS } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
 import { format, isPast } from "date-fns";
 
-const PLANS: UserPlan[] = ["CALENDAR_ONLY", "CREATOR", "PRO"];
+const PLANS: UserPlan[] = ["CALENDAR_ONLY", "PRO"];
 
 const PLAN_STYLES: Record<UserPlan, string> = {
   CALENDAR_ONLY: "text-text-muted bg-background-secondary border-border-primary",
-  CREATOR: "text-blue-400 bg-blue-500/10 border-blue-500/20",
   PRO: "text-accent-primary bg-accent-primary/10 border-[#c8952a]/30",
 };
 
@@ -39,7 +38,7 @@ interface InvitesClientProps {
 export default function InvitesClient({ initialInvites }: InvitesClientProps) {
   const router = useRouter();
   const [emails, setEmails] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState<UserPlan>("CALENDAR_ONLY");
+  const [selectedPlan, setSelectedPlan] = useState<UserPlan>("PRO");
   const [results, setResults] = useState<BulkInviteResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [invites, setInvites] = useState<PendingInvite[]>(initialInvites);

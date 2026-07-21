@@ -157,16 +157,15 @@ export default function AccountManagerModal({ user, onClose, onSaved }: Props) {
             </div>
             <div>
               <label className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
-                Plan
+                Plan (Internal)
               </label>
               <select
                 value={plan}
                 onChange={(e) => setPlan(e.target.value as UserPlan)}
                 className="w-full px-3 py-2 bg-background-secondary border border-border-primary rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
               >
-                <option value="CALENDAR_ONLY">Calendar Only</option>
-                <option value="CREATOR">Creator</option>
-                <option value="PRO">Pro</option>
+                <option value="CALENDAR_ONLY">Calendar Only (Internal)</option>
+                <option value="PRO">Pro (Full Access)</option>
               </select>
             </div>
           </div>

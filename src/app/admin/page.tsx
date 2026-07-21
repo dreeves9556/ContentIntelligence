@@ -30,7 +30,7 @@ async function getUsers(): Promise<RosterUser[]> {
     email: user.email,
     name: user.name,
     role: user.role,
-    plan: (user.plan ?? "CREATOR") as UserPlan,
+    plan: (user.plan ?? "PRO") as UserPlan,
     createdAt: user.createdAt,
     status:
       user.role === "ADMIN" ||

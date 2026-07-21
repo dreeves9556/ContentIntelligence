@@ -14,7 +14,6 @@ import {
 const SEGMENTS = [
   { value: "all", label: "All Users" },
   { value: "CALENDAR_ONLY", label: "Calendar Only" },
-  { value: "CREATOR", label: "Creator" },
   { value: "PRO", label: "Pro" },
 ] as const;
 
@@ -58,7 +57,7 @@ export function NotificationsAdminClient({
   const handleSendNow = () => {
     if (!title.trim() || !body.trim()) return;
     startTransition(async () => {
-      const result = await sendPushNow(title, body, url || undefined, segment as "all" | "CALENDAR_ONLY" | "CREATOR" | "PRO");
+      const result = await sendPushNow(title, body, url || undefined, segment as "all" | "CALENDAR_ONLY" | "PRO");
       if (result.success) {
         setMessage({ type: "success", text: `Push sent to ${result.totalUsers} users (${result.sent} delivered, ${result.failed} failed).` });
         setTitle("");
@@ -92,7 +91,7 @@ export function NotificationsAdminClient({
   const handleSchedule = () => {
     if (!title.trim() || !body.trim() || !scheduledFor) return;
     startTransition(async () => {
-      const result = await schedulePush(title, body, url || undefined, segment as "all" | "CALENDAR_ONLY" | "CREATOR" | "PRO", scheduledFor);
+      const result = await schedulePush(title, body, url || undefined, segment as "all" | "CALENDAR_ONLY" | "PRO", scheduledFor);
       if (result.success) {
         setMessage({ type: "success", text: "Push notification scheduled." });
         setTitle("");

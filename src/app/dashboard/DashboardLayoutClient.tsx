@@ -19,8 +19,9 @@ import {
   Lock,
   ClipboardList,
   UserCog,
+  CreditCard,
 } from "lucide-react";
-import { canAccessAnalytics, canAccessIntegrations, type UserPlan } from "@/lib/tiers";
+import { canAccessAnalytics, canAccessIntegrations, PUBLIC_PLAN_LABELS, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
 import BugReportButton from "./bug-report/BugReportButton";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -34,6 +35,7 @@ const ALL_NAV_ITEMS = [
   { name: "Questionnaires", href: "/dashboard/questionnaire", icon: ClipboardList, alwaysUnlocked: true },
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug, alwaysUnlocked: false },
   { name: "Profile", href: "/dashboard/profile", icon: User, alwaysUnlocked: true },
+  { name: "Billing", href: "/dashboard/billing", icon: CreditCard, alwaysUnlocked: true },
 ];
 
 function getNavItems(plan: UserPlan) {
@@ -176,8 +178,8 @@ export default function DashboardLayoutClient({
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-text-muted">Plan</p>
-              <p className="text-sm font-medium text-accent-primary">{plan.replace("_", " ")}</p>
+              <p className="text-xs text-text-muted">Membership</p>
+              <p className="text-sm font-medium text-accent-primary">{PUBLIC_PLAN_LABELS[plan]}</p>
             </div>
             <ThemeToggle />
           </div>
