@@ -186,7 +186,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
       </div>
 
       {/* AI Insight Box */}
-      <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
+      <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-4 sm:p-6">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
             {aiLoading || aiGenerating ? (
@@ -234,6 +234,18 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
                 </p>
                 {/* Desktop: always show full insight */}
                 <p className="hidden sm:block text-text-primary leading-relaxed whitespace-pre-line">{aiInsight}</p>
+                {/* Mobile expand/collapse toggle */}
+                <button
+                  onClick={() => setInsightExpanded((v) => !v)}
+                  className="sm:hidden flex items-center gap-1 text-xs text-accent-primary/70 hover:text-accent-primary transition-colors mt-2"
+                  aria-label={insightExpanded ? "Collapse insight" : "Expand insight"}
+                >
+                  {insightExpanded ? (
+                    <><ChevronUp className="h-3.5 w-3.5" /> Less</>
+                  ) : (
+                    <><ChevronDown className="h-3.5 w-3.5" /> More</>
+                  )}
+                </button>
                 {aiInsight.includes("HEADLINE:") && aiInsight.includes("COPY:") && (
                   <button
                     onClick={() => copyToClipboard(aiInsight, "ai-insight")}
@@ -490,12 +502,14 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
               Recalculate Engagement Baselines
             </button>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <span className="text-sm text-text-muted">Are you sure? This overwrites all engagement baselines.</span>
-              <button onClick={handleRecalculate} disabled={recalcLoading} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50">
-                {recalcLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Confirm
-              </button>
-              <button onClick={() => setShowRecalcConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm text-text-muted hover:text-text-primary">Cancel</button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleRecalculate} disabled={recalcLoading} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50">
+                  {recalcLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Confirm
+                </button>
+                <button onClick={() => setShowRecalcConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm text-text-muted hover:text-text-primary">Cancel</button>
+              </div>
             </div>
           )}
         </div>
