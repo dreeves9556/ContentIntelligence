@@ -19,6 +19,7 @@ import {
   Bell,
   Building2,
   UsersRound,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -33,6 +34,7 @@ const adminNavItems = [
   { name: "Push Notifications", href: "/admin/notifications", icon: Bell },
   { name: "Resources", href: "/admin/resources", icon: BookOpen },
   { name: "Creator Memories", href: "/admin/memories", icon: Brain },
+  { name: "Value Call", href: "/admin/value-call", icon: Radio },
   { name: "Bug Reports", href: "/admin/bugs", icon: Bug },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];

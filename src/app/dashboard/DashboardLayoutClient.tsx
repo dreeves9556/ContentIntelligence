@@ -20,8 +20,9 @@ import {
   ClipboardList,
   UserCog,
   CreditCard,
+  Radio,
 } from "lucide-react";
-import { canAccessAnalytics, canAccessIntegrations, PUBLIC_PLAN_LABELS, type UserPlan } from "@/lib/tiers";
+import { canAccessAnalytics, canAccessIntegrations, canAccessValueCall, PUBLIC_PLAN_LABELS, type UserPlan } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
 import BugReportButton from "./bug-report/BugReportButton";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -36,6 +37,7 @@ const ALL_NAV_ITEMS = [
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug, alwaysUnlocked: false },
   { name: "Profile", href: "/dashboard/profile", icon: User, alwaysUnlocked: true },
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard, alwaysUnlocked: true },
+  { name: "Value Call", href: "/dashboard/value-call", icon: Radio, alwaysUnlocked: false },
 ];
 
 function getNavItems(plan: UserPlan) {
@@ -43,6 +45,7 @@ function getNavItems(plan: UserPlan) {
     if (item.alwaysUnlocked) return { ...item, locked: false };
     if (item.href === "/dashboard/analytics" && !canAccessAnalytics(plan)) return { ...item, locked: true };
     if (item.href === "/dashboard/integrations" && !canAccessIntegrations(plan)) return { ...item, locked: true };
+    if (item.href === "/dashboard/value-call" && !canAccessValueCall(plan)) return { ...item, locked: true };
     return { ...item, locked: false };
   });
 }

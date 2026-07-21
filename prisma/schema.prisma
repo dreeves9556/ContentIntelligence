@@ -655,6 +655,21 @@ model CalendarGenerationLog {
   @@map("calendar_generation_logs")
 }
 
+model ValueCallSettings {
+  id            String    @id @default("default")
+  title         String    @default("Next Value Call")
+  description   String?
+  callStartsAt  DateTime?
+  zoomUrl       String?
+  timezone      String?   @default("America/New_York")
+  isEnabled     Boolean   @default(true)
+  reminderSentAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("value_call_settings")
+}
+
 model StripeEvent {
   id           String   @id @default(cuid())
   eventId      String   @unique
