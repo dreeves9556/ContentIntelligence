@@ -12,6 +12,7 @@ import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, 
 import { runLearningPipeline } from "@/lib/memory/memory-builder";
 import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
 import { checkAndSendAnalyticsMilestone } from "@/lib/notifications";
+import { ensureBaselineForUserPlatform } from "@/lib/impact-baselines";
 
 export async function disconnectZernioAccount(platform: string) {
   const session = await auth();
@@ -199,6 +200,10 @@ async function syncSingleAccount(
   } catch (err) {
     console.error(`Failed to fetch content-decay for ${account.platform}:`, err);
   }
+
+  ensureBaselineForUserPlatform(userId, account.platform).catch((err) => {
+    console.error(`[impact] baseline creation failed for ${userId}/${account.platform}:`, err);
+  });
 
   return synced;
 }

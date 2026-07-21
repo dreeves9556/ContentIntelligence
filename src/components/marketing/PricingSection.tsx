@@ -22,7 +22,7 @@ const SOLO_FEATURES: (string | { text: string; emphasized?: boolean })[] = [
   "Analytics dashboard",
   "Social media integrations",
   "Members-only community access",
-  { text: "Bi-Weekly Coaching Calls", emphasized: true },
+  { text: "Bi-Weekly Group Coaching Calls", emphasized: true },
 ];
 
 const COMMUNITY_FEATURES = [

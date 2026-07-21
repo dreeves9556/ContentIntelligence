@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   TrendingUp, Users, UserPlus, Eye, Heart, FileText, Activity,
   AlertTriangle, Copy, Check, Loader2, RefreshCw, Database,
-  ChevronUp, ChevronDown, ArrowUpDown, ShieldAlert,
+  ChevronUp, ChevronDown, ArrowUpDown, ShieldAlert, Sparkles,
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import type { ImpactData } from "./actions";
-import { backfillBaselines, recalculateEngagementBaselinesAction } from "./actions";
+import { backfillBaselines, recalculateEngagementBaselinesAction, getCachedImpactInsight, generateImpactInsight } from "./actions";
 
 const PLATFORM_LABELS: Record<string, string> = {
   INSTAGRAM: "Instagram", TIKTOK: "TikTok", LINKEDIN: "LinkedIn",
@@ -48,9 +48,52 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
   const [recalcResult, setRecalcResult] = useState<string | null>(null);
   const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
   const [copiedStat, setCopiedStat] = useState<string | null>(null);
+  const [aiInsight, setAiInsight] = useState<string>("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [insightExpanded, setInsightExpanded] = useState(false);
 
   const { overview, timeSeries, engagementTimeSeries, memberRows,
     platformBreakdown, cohortBreakdown, usageCorrelation, dataQuality } = data;
+
+  const fetchInsight = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await getCachedImpactInsight();
+      if (result.success && result.insight) {
+        setAiInsight(result.insight);
+      } else if (result.error) {
+        setAiError(result.error);
+      }
+    } catch (e) {
+      setAiError("Failed to load insight");
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInsight();
+  }, [fetchInsight]);
+
+  const handleGenerateInsight = useCallback(async () => {
+    setAiGenerating(true);
+    setAiError(null);
+    try {
+      const result = await generateImpactInsight();
+      if (result.success && result.insight) {
+        setAiInsight(result.insight);
+      } else {
+        setAiError(result.error || "Failed to generate insight");
+      }
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "Failed to generate insight");
+    } finally {
+      setAiGenerating(false);
+    }
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -139,6 +182,73 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
         <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
           <ShieldAlert className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
           <p className="text-xs text-text-muted leading-relaxed">These stats show tracked growth and engagement trends for connected accounts. They should be used as directional evidence, not guaranteed attribution. Individual results may vary.</p>
+        </div>
+      </div>
+
+      {/* AI Insight Box */}
+      <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
+            {aiLoading || aiGenerating ? (
+              <Loader2 className="h-6 w-6 text-accent-primary animate-spin" />
+            ) : (
+              <Sparkles className="h-6 w-6 text-accent-primary" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-lg font-semibold text-accent-primary">
+                AI Marketing Insight
+              </h3>
+              <button
+                onClick={handleGenerateInsight}
+                disabled={aiGenerating || aiLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-primary/20 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/30 transition-all disabled:opacity-50 shrink-0"
+              >
+                {aiGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                {aiInsight ? "Regenerate" : "Generate"}
+              </button>
+            </div>
+            {aiLoading && (
+              <p className="text-text-muted leading-relaxed">Loading cached insight...</p>
+            )}
+            {aiError && !aiLoading && (
+              <p className="text-text-muted leading-relaxed">{aiError}</p>
+            )}
+            {!aiLoading && !aiError && !aiInsight && (
+              <p className="text-text-muted leading-relaxed">
+                No insight generated yet. Click "Generate" to create advertisement-ready analytics copy from real platform data.
+              </p>
+            )}
+            {aiInsight && !aiLoading && (
+              <>
+                {/* Mobile: collapsed shows first sentence only */}
+                <p className="sm:hidden text-text-primary leading-relaxed">
+                  {insightExpanded
+                    ? aiInsight
+                    : (aiInsight.match(/^[^.!?]+[.!?]/)?.[0] ?? aiInsight.slice(0, 120) + (aiInsight.length > 120 ? "..." : ""))}
+                </p>
+                {/* Desktop: always show full insight */}
+                <p className="hidden sm:block text-text-primary leading-relaxed whitespace-pre-line">{aiInsight}</p>
+                {aiInsight.includes("HEADLINE:") && aiInsight.includes("COPY:") && (
+                  <button
+                    onClick={() => copyToClipboard(aiInsight, "ai-insight")}
+                    className="mt-3 flex items-center gap-1.5 text-xs text-accent-primary/70 hover:text-accent-primary transition-colors"
+                  >
+                    {copiedStat === "ai-insight" ? (
+                      <><Check className="h-3.5 w-3.5" /> Copied</>
+                    ) : (
+                      <><Copy className="h-3.5 w-3.5" /> Copy to clipboard</>
+                    )}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { ensureBaselineForUserPlatform } from "@/lib/impact-baselines";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -65,6 +66,10 @@ export async function GET(req: NextRequest) {
     });
 
     revalidatePath("/dashboard/calendar");
+
+    ensureBaselineForUserPlatform(userId, platform).catch((err) => {
+      console.error(`[impact] baseline creation failed for ${userId}/${platform}:`, err);
+    });
 
     return NextResponse.redirect(
       new URL("/dashboard/integrations?connected=" + platform, req.nextUrl.origin)
