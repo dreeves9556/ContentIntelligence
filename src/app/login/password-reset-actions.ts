@@ -1,10 +1,11 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, recordFailedAttempt } from "@/lib/rate-limiter";
+import { checkActionRateLimit } from "@/lib/rate-limiter";
 
 const RESET_MAX_ATTEMPTS = 3;
 const RESET_LOCKOUT_MS = 60 * 60 * 1000; // 1 hour
@@ -17,9 +18,27 @@ export async function requestPasswordReset(
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const rateLimitKey = `reset:${normalizedEmail}`;
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const clientIdentity =
+    forwardedFor ||
+    requestHeaders.get("x-real-ip") ||
+    requestHeaders.get("user-agent") ||
+    "unknown";
 
-  const rateCheck = checkRateLimit(rateLimitKey, RESET_MAX_ATTEMPTS, RESET_LOCKOUT_MS);
+  const [accountRate, clientRate] = await Promise.all([
+    checkActionRateLimit(
+      `reset:account:${normalizedEmail}`,
+      RESET_MAX_ATTEMPTS,
+      RESET_LOCKOUT_MS
+    ),
+    checkActionRateLimit(
+      `reset:client:${clientIdentity}`,
+      10,
+      RESET_LOCKOUT_MS
+    ),
+  ]);
+  const rateCheck = !accountRate.allowed ? accountRate : clientRate;
   if (!rateCheck.allowed) {
     return {
       success: false,
@@ -33,7 +52,6 @@ export async function requestPasswordReset(
 
   // Don't reveal whether the email exists — always return success
   if (!user || !user.password) {
-    recordFailedAttempt(rateLimitKey, RESET_MAX_ATTEMPTS, RESET_LOCKOUT_MS);
     return { success: true };
   }
 

@@ -1,6 +1,5 @@
 "use server";
 
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
@@ -13,13 +12,15 @@ import { runLearningPipeline } from "@/lib/memory/memory-builder";
 import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
 import { checkAndSendAnalyticsMilestone } from "@/lib/notifications";
 import { ensureBaselineForUserPlatform } from "@/lib/impact-baselines";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export async function disconnectZernioAccount(platform: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) throw new Error(access.error);
+  const userId = access.user.id;
 
   const account = await prisma.zernioAccount.findUnique({
-    where: { userId_platform: { userId: session.user.id, platform } },
+    where: { userId_platform: { userId, platform } },
   });
 
   if (account) {
@@ -29,7 +30,7 @@ export async function disconnectZernioAccount(platform: string) {
       // Continue even if Zernio-side deletion fails
     }
     await prisma.zernioAccount.delete({
-      where: { userId_platform: { userId: session.user.id, platform } },
+      where: { userId_platform: { userId, platform } },
     });
   }
 
@@ -209,11 +210,12 @@ async function syncSingleAccount(
 }
 
 export async function syncAnalytics() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) throw new Error(access.error);
+  const userId = access.user.id;
 
-  const rateLimit = checkActionRateLimit(
-    `analytics_sync:${session.user.id}`,
+  const rateLimit = await checkActionRateLimit(
+    `analytics_sync:${userId}`,
     10,
     60 * 60 * 1000
   );
@@ -222,7 +224,7 @@ export async function syncAnalytics() {
   }
 
   const zernioAccounts = await prisma.zernioAccount.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
   });
 
   if (zernioAccounts.length === 0) {
@@ -239,7 +241,7 @@ export async function syncAnalytics() {
   let synced = 0;
 
   for (const account of zernioAccounts) {
-    synced += await syncSingleAccount(session.user.id, account, startStr, endStr);
+    synced += await syncSingleAccount(userId, account, startStr, endStr);
   }
 
   // Sync profile-level deep analytics (content-decay, daily-metrics, posting-frequency)
@@ -256,14 +258,14 @@ export async function syncAnalytics() {
       await prisma.deepAnalytics.upsert({
         where: {
           userId_platform_dataType: {
-            userId: session.user.id,
+            userId,
             platform: "ALL",
             dataType: cfg.dataType,
           },
         },
         update: { data: normalized as unknown as Prisma.InputJsonValue },
         create: {
-          userId: session.user.id,
+          userId,
           platform: "ALL",
           dataType: cfg.dataType,
           data: normalized as unknown as Prisma.InputJsonValue,
@@ -278,30 +280,30 @@ export async function syncAnalytics() {
   if (synced > 0) {
     // Update lastSyncAt for all user's accounts
     await prisma.zernioAccount.updateMany({
-      where: { userId: session.user.id },
+      where: { userId },
       data: { lastSyncAt: now },
     });
 
     // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics
-    runLearningPipeline(session.user.id).catch((err) =>
+    runLearningPipeline(userId).catch((err) =>
       console.error("Memory learning pipeline failed:", err)
     );
 
-    generateAIInsight(session.user.id).catch((err) =>
+    generateAIInsight(userId).catch((err) =>
       console.error("Background AI insight generation failed:", err)
     );
 
     // Check analytics milestones for recently synced posts (background, non-blocking)
     (async () => {
       const recentPosts = await prisma.postAnalytics.findMany({
-        where: { userId: session.user.id },
+        where: { userId },
         orderBy: { publishedAt: "desc" },
         take: 10,
         select: { title: true, views: true, format: true },
       });
       for (const post of recentPosts) {
         checkAndSendAnalyticsMilestone(
-          session.user.id,
+          userId,
           post.title,
           post.views,
           post.format
@@ -316,11 +318,12 @@ export async function syncAnalytics() {
 }
 
 export async function autoSyncAnalyticsIfNeeded() {
-  const session = await auth();
-  if (!session?.user?.id) return;
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return;
+  const userId = access.user.id;
 
   const zernioAccounts = await prisma.zernioAccount.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
   });
 
   if (zernioAccounts.length === 0) return;
@@ -343,16 +346,16 @@ export async function autoSyncAnalyticsIfNeeded() {
   let synced = 0;
 
   for (const account of staleAccounts) {
-    synced += await syncSingleAccount(session.user.id, account, startStr, endStr);
+    synced += await syncSingleAccount(userId, account, startStr, endStr);
     // Update lastSyncAt per account so each account gets its own 24h clock
     await prisma.zernioAccount.update({
-      where: { userId_platform: { userId: session.user.id, platform: account.platform } },
+      where: { userId_platform: { userId, platform: account.platform } },
       data: { lastSyncAt: now },
     });
   }
 
   if (synced > 0) {
-    generateAIInsight(session.user.id).catch((err) =>
+    generateAIInsight(userId).catch((err) =>
       console.error("Background AI insight generation failed:", err)
     );
     revalidatePath("/dashboard");

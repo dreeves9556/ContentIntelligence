@@ -1,12 +1,12 @@
 "use server";
 
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { generateAIInsight } from "../actions";
 import { getPlatformConfig, type PlatformConfigData } from "@/lib/platform-config";
 import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
+import { requireDashboardAccess } from "@/lib/server-access";
 import {
   buildUserProfileXml,
   buildUsedTitlesBlock,
@@ -125,14 +125,12 @@ ${lines.join("\n")}
 }
 
 export async function getWeeklyCalendar(): Promise<(WeeklyCalendar & { updatedAt: string }) | null> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return null;
-  }
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return null;
+  const userId = access.user.id;
 
   const calendar = await prisma.calendar.findFirst({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -148,10 +146,8 @@ export async function generateCalendarStrategy(
   userId: string,
   existingConfig?: PlatformConfigData,
 ): Promise<CalendarStrategyResult> {
-  const session = await auth();
-  if (!session?.user?.id || session.user.id !== userId) {
-    return { success: false, error: "Not authenticated" };
-  }
+  const access = await requireDashboardAccess({ expectedUserId: userId });
+  if (!access.allowed) return { success: false, error: access.error };
 
   const calendarRow = await prisma.calendar.findFirst({
     where: { userId },
@@ -264,11 +260,12 @@ Write the strategy note now.`;
 }
 
 export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { success: false, error: access.error };
+  const userId = access.user.id;
 
   const calendarRow = await prisma.calendar.findFirst({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -279,7 +276,7 @@ export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResul
   const calendar = calendarRow.contentJson as unknown as WeeklyCalendar;
 
   const cached = await prisma.analyticsCache.findUnique({
-    where: { key: `calendar_strategy_${session.user.id}` },
+    where: { key: `calendar_strategy_${userId}` },
   });
 
   const cachedData = cached?.data as { insight?: string; weekStarting?: string } | undefined;
@@ -291,7 +288,7 @@ export async function getCachedCalendarStrategy(): Promise<CalendarStrategyResul
     return { success: true, insight: cachedData.insight, generatedAt: cached.updatedAt.toISOString() };
   }
 
-  return generateCalendarStrategy(session.user.id);
+  return generateCalendarStrategy(userId);
 }
 
 interface GenerationLogContext {
@@ -335,14 +332,12 @@ function logCalendarGeneration(ctx: GenerationLogContext): void {
 }
 
 export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { success: false, error: access.error };
+  const userId = access.user.id;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Not authenticated" };
-  }
-
-  const rateLimit = checkActionRateLimit(
-    `calendar_gen:${session.user.id}`,
+  const rateLimit = await checkActionRateLimit(
+    `calendar_gen:${userId}`,
     5,
     10 * 60 * 1000
   );
@@ -354,7 +349,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   }
 
   const questionnaire = await prisma.questionnaire.findFirst({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -365,19 +360,19 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const answers = questionnaire.content as unknown as QuestionnaireFormData;
 
   const profileSurveys = await prisma.profileSurvey.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     select: { surveyType: true, answersJson: true },
   });
 
   // #1: Expanded lookback for power users — scale with generation count
   // First, count total archived posts to determine lookback window
   const totalArchivedCount = await prisma.contentArchive.count({
-    where: { userId: session.user.id },
+    where: { userId },
   });
   const archiveTake = Math.min(Math.max(50, Math.ceil(totalArchivedCount / 100) * 50), 200);
 
   const recentArchived = await prisma.contentArchive.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { archivedAt: "desc" },
     take: archiveTake,
     select: { title: true, format: true, bucket: true, caption: true, hook: true, weekStarting: true },
@@ -396,7 +391,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
     fetchTrendingHeadlines(answers.industry),
     prisma.contentArchive.findMany({
       where: {
-        userId: session.user.id,
+        userId,
         archivedAt: { gte: seasonalStart, lte: seasonalEnd },
       },
       orderBy: { archivedAt: "desc" },
@@ -547,7 +542,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 
   // Fetch best-time-to-post heatmaps for connected platforms
   const bestTimeRows = await prisma.bestTimeToPost.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     select: { platform: true, heatmap: true },
   });
   const bestTimesBlock = buildBestTimesBlock(
@@ -558,7 +553,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
 
   // Fetch demographics for AI content generation (e.g., "Your audience is 65% women aged 25-34")
   const demographicsRows = await prisma.deepAnalytics.findMany({
-    where: { userId: session.user.id, dataType: "demographics" },
+    where: { userId, dataType: "demographics" },
     select: { platform: true, data: true },
   });
   const demographicsSummary = summarizeDemographicsForAI(
@@ -573,19 +568,19 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [analyticsRows, followerRows, cadenceRows, feedbackRows] = await Promise.all([
     prisma.postAnalytics.findMany({
-      where: { userId: session.user.id, publishedAt: { gte: ninetyDaysAgo } },
+      where: { userId, publishedAt: { gte: ninetyDaysAgo } },
       select: { title: true, format: true, views: true, likes: true, comments: true, publishedAt: true },
     }),
     prisma.followerStats.findMany({
-      where: { userId: session.user.id, date: { gte: thirtyDaysAgo } },
+      where: { userId, date: { gte: thirtyDaysAgo } },
       select: { platform: true, date: true, followerCount: true, growthDelta: true },
     }),
     prisma.deepAnalytics.findMany({
-      where: { userId: session.user.id, dataType: { in: ["posting_frequency", "content_decay"] } },
+      where: { userId, dataType: { in: ["posting_frequency", "content_decay"] } },
       select: { platform: true, dataType: true, data: true },
     }),
     prisma.contentFeedback.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       orderBy: { updatedAt: "desc" },
       take: 30,
       select: { title: true, format: true, bucket: true, feedback: true },
@@ -632,7 +627,7 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   const cadenceBlock = buildCadenceBlock(postingFrequency, decayByPlatform, daysToPost);
 
   // Load persistent AI memories (HIGH/CRITICAL + pinned) and build memory block
-  const relevantMemories = await getRelevantMemories(session.user.id);
+  const relevantMemories = await getRelevantMemories(userId);
   const memoryBlock = summarizeMemoriesForPrompt(relevantMemories);
 
   const formatMixStr = daysToPost === 1 ? '1 Reel (only one post, make it count)' : daysToPost === 2 ? '1 Reel and 1 Carousel (maximum variety)' : `approx 60% Reels, 30% Carousels, 10% Static posts, but ensure at least one of each format if ${daysToPost} >= 3`;
@@ -730,7 +725,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       const errorData = await response.json();
       console.error("Anthropic API error:", errorData);
       logCalendarGeneration({
-        userId: session.user.id,
+        userId,
         success: false,
         stalenessTriggered,
         audienceFatigueTriggered,
@@ -756,7 +751,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
         ? "The AI response was too long and got cut off. Please try again."
         : "Failed to parse AI response. Please try again.";
       logCalendarGeneration({
-        userId: session.user.id,
+        userId,
         success: false,
         stalenessTriggered,
         audienceFatigueTriggered,
@@ -775,7 +770,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     if (!Array.isArray(calendarData.days) || calendarData.days.length < daysToPost) {
       console.error("AI returned insufficient days:", JSON.stringify(calendarData));
       logCalendarGeneration({
-        userId: session.user.id,
+        userId,
         success: false,
         stalenessTriggered,
         audienceFatigueTriggered,
@@ -795,12 +790,12 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     }));
 
     const existingCount = await prisma.calendar.count({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     await prisma.calendar.create({
       data: {
-        userId: session.user.id,
+        userId,
         weekNumber: existingCount + 1,
         contentJson: calendarData as unknown as Prisma.InputJsonValue,
       },
@@ -814,18 +809,18 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     }
 
     // Run learning pipeline in the background — may create new memories from analytics/feedback
-    runLearningPipeline(session.user.id).catch((err) =>
+    runLearningPipeline(userId).catch((err) =>
       console.error("Memory learning pipeline failed:", err)
     );
 
     // Generate AI insight in the background
-    generateAIInsight(session.user.id).catch((err) =>
+    generateAIInsight(userId).catch((err) =>
       console.error("Background AI insight generation failed:", err)
     );
 
     // Generate AI strategy note in the background — CalendarStrategyNote component
     // loads it async via getCachedCalendarStrategy(), so no need to block the response
-    generateCalendarStrategy(session.user.id, config).catch((err) =>
+    generateCalendarStrategy(userId, config).catch((err) =>
       console.error("Calendar strategy generation failed:", err)
     );
 
@@ -833,7 +828,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     revalidatePath("/dashboard");
 
     logCalendarGeneration({
-      userId: session.user.id,
+      userId,
       success: true,
       daysGenerated: calendarData.days.length,
       freshnessScore: freshnessScoreResult?.score ?? null,
@@ -852,7 +847,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
   } catch (error) {
     console.error("Error generating calendar:", error);
     logCalendarGeneration({
-      userId: session.user.id,
+      userId,
       success: false,
       stalenessTriggered,
       audienceFatigueTriggered,
@@ -871,13 +866,14 @@ export async function addToArchive(
   dayIndex: number,
   day: CalendarDay
 ): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) return;
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return;
+  const userId = access.user.id;
 
   await prisma.contentArchive.upsert({
     where: {
       userId_weekStarting_dayIndex: {
-        userId: session.user.id,
+        userId,
         weekStarting,
         dayIndex,
       },
@@ -895,7 +891,7 @@ export async function addToArchive(
       duration: day.duration,
     },
     create: {
-      userId: session.user.id,
+      userId,
       weekStarting,
       dayIndex,
       day: day.day,
@@ -918,12 +914,13 @@ export async function removeFromArchive(
   weekStarting: string,
   dayIndex: number
 ): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) return;
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return;
+  const userId = access.user.id;
 
   await prisma.contentArchive.deleteMany({
     where: {
-      userId: session.user.id,
+      userId,
       weekStarting,
       dayIndex,
     },
@@ -938,13 +935,14 @@ export async function addFeedback(
   dayContent: CalendarDay,
   feedback: "up" | "down"
 ): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  const access = await requireDashboardAccess();
+  if (!access.allowed) throw new Error(access.error);
+  const userId = access.user.id;
 
   await prisma.contentFeedback.upsert({
     where: {
       userId_weekStarting_dayIndex: {
-        userId: session.user.id,
+        userId,
         weekStarting,
         dayIndex,
       },
@@ -956,7 +954,7 @@ export async function addFeedback(
       feedback,
     },
     create: {
-      userId: session.user.id,
+      userId,
       weekStarting,
       dayIndex,
       title: dayContent.title,
@@ -967,7 +965,7 @@ export async function addFeedback(
   });
 
   // Learn from feedback — creates warning memories for thumbs-down (background)
-  learnFromFeedback(session.user.id, feedback, dayContent).catch((err) =>
+  learnFromFeedback(userId, feedback, dayContent).catch((err) =>
     console.error("Memory learning from feedback failed:", err)
   );
 

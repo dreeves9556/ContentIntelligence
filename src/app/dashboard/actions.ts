@@ -7,6 +7,7 @@ import webpush from "web-push";
 import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/platform-config";
 import { summarizeFollowerGrowth } from "@/lib/follower-stats";
 import { summarizeDemographicsForAI } from "@/lib/deep-analytics";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -122,22 +123,23 @@ export interface AIInsightResult {
 }
 
 export async function getCachedInsight(): Promise<AIInsightResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return { success: false, error: access.error };
+  const userId = access.user.id;
 
   const cached = await prisma.analyticsCache.findUnique({
-    where: { key: `ai_insight_${session.user.id}` },
+    where: { key: `ai_insight_${userId}` },
   });
 
   if (!cached) {
     // No cached insight yet — check if user has posts to generate one
     const postCount = await prisma.postAnalytics.count({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     if (postCount > 0) {
       // Generate insight on the spot (one-time catch-up)
-      return generateAIInsight(session.user.id);
+      return generateAIInsight(userId);
     }
 
     return { success: true, insight: "Connect your social accounts and sync analytics to get personalized AI insights about your content performance." };
@@ -148,10 +150,11 @@ export async function getCachedInsight(): Promise<AIInsightResult> {
 }
 
 export async function generateAIInsight(userId: string): Promise<AIInsightResult> {
-  const session = await auth();
-  if (!session?.user?.id || session.user.id !== userId) {
-    return { success: false, error: "Not authenticated" };
-  }
+  const access = await requireDashboardAccess({
+    expectedUserId: userId,
+    requiredPlan: "PRO",
+  });
+  if (!access.allowed) return { success: false, error: access.error };
 
   const posts = await prisma.postAnalytics.findMany({
     where: { userId },

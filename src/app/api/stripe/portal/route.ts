@@ -46,10 +46,28 @@ export async function POST() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { stripeCustomerId: true },
+    select: {
+      stripeCustomerId: true,
+      organizationId: true,
+      role: true,
+    },
   });
 
-  if (!user?.stripeCustomerId) {
+  let stripeCustomerId = user?.stripeCustomerId ?? null;
+
+  if (
+    !stripeCustomerId &&
+    user?.organizationId &&
+    (user.role === "TEAM_ADMIN" || user.role === "ADMIN")
+  ) {
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { stripeCustomerId: true },
+    });
+    stripeCustomerId = organization?.stripeCustomerId ?? null;
+  }
+
+  if (!stripeCustomerId) {
     return NextResponse.json(
       { error: "No active subscription found. Upgrade first to manage billing." },
       { status: 400 }
@@ -63,7 +81,7 @@ export async function POST() {
     const portalConfigId = await getPortalConfigId(stripe);
 
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: user.stripeCustomerId,
+      customer: stripeCustomerId,
       return_url: `${appUrl}/dashboard/billing`,
       configuration: portalConfigId,
     });

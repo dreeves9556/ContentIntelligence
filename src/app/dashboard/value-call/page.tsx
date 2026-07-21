@@ -1,18 +1,41 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getOrCreateValueCallSettings, formatValueCallDisplayDate } from "@/lib/value-call";
 import ValueCallClient from "./ValueCallClient";
 import LockedTabOverlay from "@/components/LockedTabOverlay";
 import { canAccessValueCall } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function ValueCallPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const access = await requireDashboardAccess();
+  if (!access.allowed) redirect(access.status === 401 ? "/login" : "/account-expired");
 
-  const plan = (session.user.plan ?? "CALENDAR_ONLY") as UserPlan;
+  const plan = access.user.plan as UserPlan;
+
+  if (!canAccessValueCall(plan) && access.user.role !== "ADMIN") {
+    return (
+      <LockedTabOverlay
+        requiredPlan="PRO"
+        currentPlan={plan}
+        featureName="Value Call"
+        featureDescription="Get Full Access to join the biweekly member Value Call — a group call for direction, content ideas, and staying consistent with your local brand."
+      >
+        <ValueCallClient
+          settings={{
+            title: "Next Value Call",
+            description: null,
+            callStartsAt: null,
+            zoomUrl: null,
+            timezone: "America/New_York",
+            isEnabled: false,
+          }}
+          display={null}
+        />
+      </LockedTabOverlay>
+    );
+  }
 
   const settings = await getOrCreateValueCallSettings();
   const display = formatValueCallDisplayDate(settings);
@@ -33,19 +56,6 @@ export default async function ValueCallPage() {
   const content = (
     <ValueCallClient settings={serializedSettings} display={serializedDisplay} />
   );
-
-  if (!canAccessValueCall(plan)) {
-    return (
-      <LockedTabOverlay
-        requiredPlan="PRO"
-        currentPlan={plan}
-        featureName="Value Call"
-        featureDescription="Get Full Access to join the biweekly member Value Call — a group call for direction, content ideas, and staying consistent with your local brand."
-      >
-        {content}
-      </LockedTabOverlay>
-    );
-  }
 
   return content;
 }

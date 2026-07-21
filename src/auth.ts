@@ -34,7 +34,7 @@ export const {
         const email = credentials.email as string;
         const rateLimitKey = `login:${email.toLowerCase()}`;
 
-        const rateCheck = checkRateLimit(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MS);
+        const rateCheck = await checkRateLimit(rateLimitKey);
         if (!rateCheck.allowed) {
           throw new Error(`Too many login attempts. Try again in ${formatRetryTime(rateCheck.retryAfterMs!)}.`);
         }
@@ -44,7 +44,7 @@ export const {
         });
 
         if (!user || !user.password) {
-          recordFailedAttempt(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MS);
+          await recordFailedAttempt(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MS);
           return null;
         }
 
@@ -54,11 +54,11 @@ export const {
         );
 
         if (!isPasswordValid) {
-          recordFailedAttempt(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MS);
+          await recordFailedAttempt(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MS);
           return null;
         }
 
-        clearRateLimit(rateLimitKey);
+        await clearRateLimit(rateLimitKey);
 
         const rememberMe = credentials?.rememberMe === "true";
         const sessionExpiry = Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);

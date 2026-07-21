@@ -1,109 +1,147 @@
-interface RateLimitEntry {
-  count: number;
-  firstAttempt: number;
-  lockedUntil?: number;
+import { createHash } from "crypto";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+
+const MAX_SERIALIZABLE_RETRIES = 3;
+
+function storageKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
 }
 
-const store = new Map<string, RateLimitEntry>();
-
-const CLEANUP_INTERVAL = 5 * 60 * 1000;
-let lastCleanup = Date.now();
-
-function cleanup() {
-  const now = Date.now();
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
-  lastCleanup = now;
-  for (const [key, entry] of store) {
-    if (entry.lockedUntil && entry.lockedUntil < now) {
-      store.delete(key);
-    } else if (!entry.lockedUntil && now - entry.firstAttempt > 60 * 60 * 1000) {
-      store.delete(key);
+async function serializableTransaction<T>(
+  operation: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  for (let attempt = 0; attempt < MAX_SERIALIZABLE_RETRIES; attempt++) {
+    try {
+      return await prisma.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      const retryable =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P2034" || error.code === "P2002");
+      if (!retryable || attempt === MAX_SERIALIZABLE_RETRIES - 1) throw error;
     }
   }
+  throw new Error("Rate-limit transaction retry exhausted");
 }
 
-export function checkRateLimit(
-  key: string,
-  maxAttempts: number,
-  lockoutMs: number
-): { allowed: boolean; retryAfterMs?: number } {
-  cleanup();
-  const now = Date.now();
-  const entry = store.get(key);
+export async function checkRateLimit(
+  key: string
+): Promise<{ allowed: boolean; retryAfterMs?: number }> {
+  const now = new Date();
+  const entry = await prisma.rateLimitBucket.findUnique({
+    where: { key: storageKey(key) },
+    select: { lockedUntil: true },
+  });
 
   if (entry?.lockedUntil && entry.lockedUntil > now) {
-    return { allowed: false, retryAfterMs: entry.lockedUntil - now };
-  }
-
-  if (entry?.lockedUntil && entry.lockedUntil <= now) {
-    store.delete(key);
+    return {
+      allowed: false,
+      retryAfterMs: entry.lockedUntil.getTime() - now.getTime(),
+    };
   }
 
   return { allowed: true };
 }
 
-export function recordFailedAttempt(
+export async function recordFailedAttempt(
   key: string,
   maxAttempts: number,
   lockoutMs: number
-): { lockedOut: boolean; retryAfterMs?: number } {
-  cleanup();
-  const now = Date.now();
-  const entry = store.get(key);
+): Promise<{ lockedOut: boolean; retryAfterMs?: number }> {
+  const hashedKey = storageKey(key);
 
-  if (!entry) {
-    store.set(key, { count: 1, firstAttempt: now });
-    return { lockedOut: false };
-  }
+  return serializableTransaction(async (tx) => {
+    const now = new Date();
+    const entry = await tx.rateLimitBucket.findUnique({
+      where: { key: hashedKey },
+    });
 
-  entry.count += 1;
+    if (entry?.lockedUntil && entry.lockedUntil > now) {
+      return {
+        lockedOut: true,
+        retryAfterMs: entry.lockedUntil.getTime() - now.getTime(),
+      };
+    }
 
-  if (entry.count >= maxAttempts) {
-    entry.lockedUntil = now + lockoutMs;
-    return { lockedOut: true, retryAfterMs: lockoutMs };
-  }
+    const windowExpired =
+      !entry || now.getTime() - entry.windowStart.getTime() >= lockoutMs;
+    const count = windowExpired ? 1 : entry.count + 1;
+    const lockedUntil =
+      count >= maxAttempts ? new Date(now.getTime() + lockoutMs) : null;
 
-  return { lockedOut: false };
+    await tx.rateLimitBucket.upsert({
+      where: { key: hashedKey },
+      create: {
+        key: hashedKey,
+        count,
+        windowStart: now,
+        lockedUntil,
+      },
+      update: {
+        count,
+        windowStart: windowExpired ? now : entry.windowStart,
+        lockedUntil,
+      },
+    });
+
+    return lockedUntil
+      ? { lockedOut: true, retryAfterMs: lockoutMs }
+      : { lockedOut: false };
+  });
 }
 
-export function clearRateLimit(key: string) {
-  store.delete(key);
+export async function clearRateLimit(key: string): Promise<void> {
+  await prisma.rateLimitBucket.deleteMany({
+    where: { key: storageKey(key) },
+  });
 }
 
-interface ActionRateEntry {
-  count: number;
-  windowStart: number;
-}
-
-const actionStore = new Map<string, ActionRateEntry>();
-
-export function checkActionRateLimit(
+export async function checkActionRateLimit(
   key: string,
   maxRequests: number,
   windowMs: number
-): { allowed: boolean; retryAfterMs?: number } {
-  cleanup();
-  const now = Date.now();
-  const entry = actionStore.get(key);
+): Promise<{ allowed: boolean; retryAfterMs?: number }> {
+  const hashedKey = storageKey(key);
 
-  if (!entry) {
-    actionStore.set(key, { count: 1, windowStart: now });
+  return serializableTransaction(async (tx) => {
+    const now = new Date();
+    const entry = await tx.rateLimitBucket.findUnique({
+      where: { key: hashedKey },
+    });
+
+    const windowExpired =
+      !entry || now.getTime() - entry.windowStart.getTime() >= windowMs;
+    const count = windowExpired ? 1 : entry.count + 1;
+    const windowStart = windowExpired ? now : entry.windowStart;
+
+    await tx.rateLimitBucket.upsert({
+      where: { key: hashedKey },
+      create: {
+        key: hashedKey,
+        count,
+        windowStart,
+      },
+      update: {
+        count,
+        windowStart,
+        lockedUntil: null,
+      },
+    });
+
+    if (count > maxRequests) {
+      return {
+        allowed: false,
+        retryAfterMs: Math.max(
+          0,
+          windowMs - (now.getTime() - windowStart.getTime())
+        ),
+      };
+    }
+
     return { allowed: true };
-  }
-
-  if (now - entry.windowStart > windowMs) {
-    entry.count = 1;
-    entry.windowStart = now;
-    return { allowed: true };
-  }
-
-  entry.count += 1;
-
-  if (entry.count > maxRequests) {
-    return { allowed: false, retryAfterMs: windowMs - (now - entry.windowStart) };
-  }
-
-  return { allowed: true };
+  });
 }
 
 export function formatRetryTime(ms: number): string {

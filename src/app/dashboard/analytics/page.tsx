@@ -1,22 +1,21 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import AnalyticsClient from "../AnalyticsClient";
 import LockedTabOverlay from "@/components/LockedTabOverlay";
 import { canAccessAnalytics } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export default async function AnalyticsPage() {
-  const session = await auth();
+  const access = await requireDashboardAccess();
+  if (!access.allowed) redirect(access.status === 401 ? "/login" : "/account-expired");
 
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const plan = access.user.plan as UserPlan;
+  const hasAnalyticsAccess = canAccessAnalytics(plan) || access.user.role === "ADMIN";
+  const userId = access.user.id;
 
-  const plan = (session.user.plan ?? "CALENDAR_ONLY") as UserPlan;
-
-  const posts = await prisma.postAnalytics.findMany({
-    where: { userId: session.user.id },
+  const posts = hasAnalyticsAccess ? await prisma.postAnalytics.findMany({
+    where: { userId },
     orderBy: { publishedAt: "desc" },
     select: {
       id: true,
@@ -28,26 +27,26 @@ export default async function AnalyticsPage() {
       comments: true,
       postUrl: true,
     },
-  });
+  }) : [];
 
   // Fetch best-time-to-post heatmaps for connected platforms
-  const bestTimeRows = await prisma.bestTimeToPost.findMany({
-    where: { userId: session.user.id },
+  const bestTimeRows = hasAnalyticsAccess ? await prisma.bestTimeToPost.findMany({
+    where: { userId },
     select: { platform: true, heatmap: true, updatedAt: true },
-  });
+  }) : [];
 
   // Fetch follower stats for connected platforms
-  const followerStatsRows = await prisma.followerStats.findMany({
-    where: { userId: session.user.id },
+  const followerStatsRows = hasAnalyticsAccess ? await prisma.followerStats.findMany({
+    where: { userId },
     orderBy: { date: "asc" },
     select: { platform: true, date: true, followerCount: true, growthDelta: true, growthPercent: true },
-  });
+  }) : [];
 
   // Fetch deep analytics for connected platforms
-  const deepAnalyticsRows = await prisma.deepAnalytics.findMany({
-    where: { userId: session.user.id },
+  const deepAnalyticsRows = hasAnalyticsAccess ? await prisma.deepAnalytics.findMany({
+    where: { userId },
     select: { platform: true, dataType: true, data: true, updatedAt: true },
-  });
+  }) : [];
 
   // Serialize dates to ISO strings for the client component
   const serializedPosts = posts.map((p) => ({

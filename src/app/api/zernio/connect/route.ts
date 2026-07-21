@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
 import { getEnabledPlatforms } from "@/lib/platform-config";
+import { requireDashboardAccess } from "@/lib/server-access";
+import { createIntegrationConnectionState } from "@/lib/integration-state";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  const userId = access.user.id;
 
   const platform = req.nextUrl.searchParams.get("platform");
   if (!platform) {
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest) {
     let zernioProfileId: string;
 
     const existingAccount = await prisma.zernioAccount.findFirst({
-      where: { userId: session.user.id },
+      where: { userId },
       select: { zernioProfileId: true },
     });
 
@@ -37,20 +39,29 @@ export async function GET(req: NextRequest) {
     } else {
       // Create a new Zernio profile named after the user
       const dbUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: userId },
         select: { name: true, email: true },
       });
-      const profileName = dbUser?.name ?? dbUser?.email ?? session.user.id;
+      const profileName = dbUser?.name ?? dbUser?.email ?? userId;
       const profile = await zernio.profiles.create(profileName);
       zernioProfileId = profile._id;
     }
 
-    const callbackUrl = `${process.env.NEXTAUTH_URL}/api/zernio/callback?platform=${platform}&userId=${session.user.id}&profileId=${zernioProfileId}`;
+    const state = await createIntegrationConnectionState({
+      userId,
+      platform,
+      profileId: zernioProfileId,
+    });
+    const callbackUrl = new URL(
+      "/api/zernio/callback",
+      process.env.NEXTAUTH_URL ?? req.nextUrl.origin
+    );
+    callbackUrl.searchParams.set("state", state);
 
     const { authUrl } = await zernio.connect.getConnectUrl(
       platform,
       zernioProfileId,
-      callbackUrl
+      callbackUrl.toString()
     );
 
     return NextResponse.redirect(authUrl);

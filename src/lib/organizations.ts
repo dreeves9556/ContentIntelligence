@@ -28,8 +28,8 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import type { UserPlan } from "@/lib/tiers";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export interface SeatUsage {
   activeUsers: number;
@@ -55,7 +55,12 @@ export async function getOrganizationSeatUsage(organizationId: string): Promise<
   const now = new Date();
 
   const [activeUsers, pendingInvites, org] = await Promise.all([
-    prisma.user.count({ where: { organizationId } }),
+    prisma.user.count({
+      where: {
+        organizationId,
+        accountStatus: { not: "ARCHIVED" },
+      },
+    }),
     prisma.inviteToken.count({
       where: {
         organizationId,
@@ -115,12 +120,11 @@ export async function canInviteOrganizationMember(organizationId: string): Promi
  * refreshed from the DB on every JWT callback.
  */
 export async function requireTeamAdminOrganization() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-  if (session.user.role !== "TEAM_ADMIN") return null;
+  const access = await requireDashboardAccess();
+  if (!access.allowed || access.user.role !== "TEAM_ADMIN") return null;
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: access.user.id },
     select: { id: true, organizationId: true, name: true, email: true },
   });
 

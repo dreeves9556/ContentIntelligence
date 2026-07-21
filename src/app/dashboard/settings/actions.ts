@@ -1,10 +1,10 @@
 "use server";
 
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import { validateQuestionnaire } from "@/lib/validation";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export type UpdateQuestionnaireResult =
   | { success: true }
@@ -14,11 +14,9 @@ export async function updateQuestionnaire(
   questionnaireId: string,
   data: QuestionnaireFormData
 ): Promise<UpdateQuestionnaireResult> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Not authenticated." };
-  }
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { success: false, error: access.error };
+  const userId = access.user.id;
 
   const existing = await prisma.questionnaire.findUnique({
     where: { id: questionnaireId },
@@ -29,7 +27,7 @@ export async function updateQuestionnaire(
     return { success: false, error: "Questionnaire not found." };
   }
 
-  if (existing.userId !== session.user.id) {
+  if (existing.userId !== userId) {
     return { success: false, error: "Not authorised to edit this questionnaire." };
   }
 
@@ -50,7 +48,7 @@ export async function updateQuestionnaire(
 
   if (validatedData.name) {
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { name: validatedData.name },
     });
   }

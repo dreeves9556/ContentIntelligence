@@ -1,28 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
-import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { ensureBaselineForUserPlatform } from "@/lib/impact-baselines";
+import { requireDashboardAccess } from "@/lib/server-access";
+import { consumeIntegrationConnectionState } from "@/lib/integration-state";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const platform = searchParams.get("platform");
-  const userId = searchParams.get("userId");
-  const profileId = searchParams.get("profileId");
+  const stateToken = searchParams.get("state");
 
-  if (!platform || !userId || !profileId) {
+  if (!stateToken) {
     return NextResponse.redirect(
       new URL("/dashboard/integrations?error=missing_params", req.nextUrl.origin)
     );
   }
 
-  const session = await auth();
-  if (!session?.user?.id || session.user.id !== userId) {
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) {
     return NextResponse.redirect(
       new URL("/login", req.nextUrl.origin)
     );
   }
+  const userId = access.user.id;
+
+  const state = await consumeIntegrationConnectionState(stateToken, userId);
+  if (!state) {
+    return NextResponse.redirect(
+      new URL("/dashboard/integrations?error=invalid_state", req.nextUrl.origin)
+    );
+  }
+  const { platform, profileId } = state;
 
   const existingAccount = await prisma.zernioAccount.findFirst({
     where: { userId },

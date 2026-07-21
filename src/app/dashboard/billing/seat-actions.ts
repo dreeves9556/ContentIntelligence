@@ -1,7 +1,6 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { requireTeamAdminOrganization } from "@/lib/organizations";
 
 /**
@@ -155,26 +154,71 @@ export async function unlockMember(
   const ctx = await requireTeamAdminOrganization();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
-  const target = await prisma.user.findUnique({
-    where: { id: memberId },
-    select: { id: true, organizationId: true, role: true, accountStatus: true },
-  });
-
-  if (!target) return { success: false, error: "User not found." };
-  if (target.organizationId !== ctx.user.organizationId) {
-    return { success: false, error: "You can only manage members of your own organization." };
-  }
-  if (target.role === "ADMIN") {
-    return { success: false, error: "You cannot modify admin accounts." };
-  }
-
   try {
-    await prisma.user.update({
-      where: { id: memberId },
-      data: { accountStatus: "ACTIVE" },
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const target = await tx.user.findUnique({
+          where: { id: memberId },
+          select: { id: true, organizationId: true, role: true, accountStatus: true },
+        });
+
+        if (!target) throw new Error("USER_NOT_FOUND");
+        if (target.organizationId !== ctx.user.organizationId) {
+          throw new Error("CROSS_ORG");
+        }
+        if (target.role === "ADMIN" || target.role === "TEAM_ADMIN") {
+          throw new Error("ADMIN_TARGET");
+        }
+        if (target.accountStatus !== "ARCHIVED") return;
+
+        const now = new Date();
+        const [organization, activeUsers, pendingInvites] = await Promise.all([
+          tx.organization.findUnique({
+            where: { id: ctx.organization.id },
+            select: { seatLimit: true },
+          }),
+          tx.user.count({
+            where: {
+              organizationId: ctx.user.organizationId,
+              accountStatus: { not: "ARCHIVED" },
+            },
+          }),
+          tx.inviteToken.count({
+            where: {
+              organizationId: ctx.user.organizationId,
+              expiresAt: { gt: now },
+            },
+          }),
+        ]);
+
+        if (!organization) throw new Error("ORG_NOT_FOUND");
+        if (activeUsers + pendingInvites >= organization.seatLimit) {
+          throw new Error("SEAT_LIMIT_REACHED");
+        }
+
+        await tx.user.update({
+          where: { id: memberId },
+          data: { accountStatus: "ACTIVE" },
+        });
+      },
+      { isolationLevel: "Serializable" }
+    );
     return { success: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return { success: false, error: "User not found." };
+      }
+      if (error.message === "CROSS_ORG") {
+        return { success: false, error: "You can only manage members of your own organization." };
+      }
+      if (error.message === "ADMIN_TARGET") {
+        return { success: false, error: "You cannot modify admin accounts." };
+      }
+      if (error.message === "SEAT_LIMIT_REACHED") {
+        return { success: false, error: "Add a paid seat before unlocking this member." };
+      }
+    }
     return { success: false, error: "Failed to unlock member." };
   }
 }

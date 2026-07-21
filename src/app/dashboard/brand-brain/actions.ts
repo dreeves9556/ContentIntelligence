@@ -9,18 +9,19 @@ import {
   updateMemory,
 } from "@/lib/memory/memory-service";
 import type { CreatorMemoryData } from "@/lib/memory/memory-types";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export async function getMyMemories(): Promise<CreatorMemoryData[]> {
-  const session = await auth();
-  if (!session?.user?.id) return [];
-  return getUserMemories(session.user.id);
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return [];
+  return getUserMemories(access.user.id);
 }
 
 export async function deleteMyMemory(id: string): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return { success: false, error: access.error };
 
-  const memories = await getUserMemories(session.user.id);
+  const memories = await getUserMemories(access.user.id);
   if (!memories.some((m) => m.id === id)) {
     return { success: false, error: "Memory not found" };
   }
@@ -32,10 +33,10 @@ export async function deleteMyMemory(id: string): Promise<{ success: boolean; er
 }
 
 export async function togglePinMemory(id: string): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return { success: false, error: access.error };
 
-  const memories = await getUserMemories(session.user.id);
+  const memories = await getUserMemories(access.user.id);
   const memory = memories.find((m) => m.id === id);
   if (!memory) {
     return { success: false, error: "Memory not found" };
@@ -51,10 +52,10 @@ export async function correctMemory(
   id: string,
   summary: string
 ): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return { success: false, error: access.error };
 
-  const memories = await getUserMemories(session.user.id);
+  const memories = await getUserMemories(access.user.id);
   if (!memories.some((m) => m.id === id)) {
     return { success: false, error: "Memory not found" };
   }
@@ -70,10 +71,10 @@ export async function correctMemory(
 }
 
 export async function getMyMemoriesByType(): Promise<Record<MemoryType, CreatorMemoryData[]>> {
-  const session = await auth();
-  if (!session?.user?.id) return {} as Record<MemoryType, CreatorMemoryData[]>;
+  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
+  if (!access.allowed) return {} as Record<MemoryType, CreatorMemoryData[]>;
 
-  const memories = await getUserMemories(session.user.id);
+  const memories = await getUserMemories(access.user.id);
   const grouped = {} as Record<MemoryType, CreatorMemoryData[]>;
   const types: MemoryType[] = ["IDENTITY", "VOICE", "AUDIENCE", "CONTENT", "PERFORMANCE", "STRATEGY", "PREFERENCE", "WARNING"];
   for (const type of types) {

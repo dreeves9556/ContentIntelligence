@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { getStripe, stripeStatusToAccountStatus } from "@/lib/stripe";
 import { isStripeWebhookConfigured } from "@/lib/stripe-config";
 import { prisma } from "@/lib/prisma";
@@ -52,13 +53,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // ─── Idempotency: skip if we've already processed this event ───
-  const existingEvent = await prisma.stripeEvent.findUnique({
-    where: { eventId: event.id },
-  });
-  if (existingEvent) {
+  const claim = await claimStripeEvent(event);
+  if (claim.status === "SUCCEEDED") {
     console.log(`[STRIPE WEBHOOK] Duplicate event ${event.id} (${event.type}) — skipping`);
     return NextResponse.json({ received: true });
+  }
+  if (claim.status === "BUSY") {
+    // Returning a retryable response prevents a concurrent request from
+    // acknowledging an event whose active worker could still fail.
+    return NextResponse.json({ error: "Event is already being processed" }, { status: 409 });
   }
 
   try {
@@ -88,18 +91,101 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error(`[STRIPE WEBHOOK] Failed to process ${event.type}:`, err);
+    await prisma.stripeEvent.updateMany({
+      where: {
+        eventId: event.id,
+        status: "PROCESSING",
+        claimToken: claim.claimToken,
+      },
+      data: {
+        status: "FAILED",
+        lastError: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
+      },
+    });
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
-  // Record successful processing for idempotency
-  await prisma.stripeEvent.create({
-    data: {
+  const completed = await prisma.stripeEvent.updateMany({
+    where: {
       eventId: event.id,
-      eventType: event.type,
+      status: "PROCESSING",
+      claimToken: claim.claimToken,
+    },
+    data: {
+      status: "SUCCEEDED",
+      processedAt: new Date(),
+      lastError: null,
     },
   });
 
+  if (completed.count !== 1) {
+    console.error(`[STRIPE WEBHOOK] Lost processing lease for ${event.id}`);
+    return NextResponse.json({ error: "Processing lease expired" }, { status: 409 });
+  }
+
   return NextResponse.json({ received: true });
+}
+
+const STRIPE_EVENT_LEASE_MS = 5 * 60 * 1000;
+
+async function claimStripeEvent(
+  event: Stripe.Event
+): Promise<
+  | { status: "CLAIMED"; claimToken: string }
+  | { status: "SUCCEEDED" }
+  | { status: "BUSY" }
+> {
+  const now = new Date();
+  const claimToken = randomUUID();
+
+  try {
+    await prisma.stripeEvent.create({
+      data: {
+        eventId: event.id,
+        eventType: event.type,
+        status: "PROCESSING",
+        claimToken,
+        claimedAt: now,
+      },
+    });
+    return { status: "CLAIMED", claimToken };
+  } catch (error) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002"
+    ) {
+      throw error;
+    }
+  }
+
+  const existing = await prisma.stripeEvent.findUnique({
+    where: { eventId: event.id },
+    select: { status: true },
+  });
+  if (existing?.status === "SUCCEEDED") return { status: "SUCCEEDED" };
+
+  const staleBefore = new Date(now.getTime() - STRIPE_EVENT_LEASE_MS);
+  const reclaimed = await prisma.stripeEvent.updateMany({
+    where: {
+      eventId: event.id,
+      OR: [
+        { status: "FAILED" },
+        { status: "PROCESSING", claimedAt: { lt: staleBefore } },
+      ],
+    },
+    data: {
+      status: "PROCESSING",
+      eventType: event.type,
+      claimToken,
+      claimedAt: now,
+      attempts: { increment: 1 },
+      lastError: null,
+    },
+  });
+
+  return reclaimed.count === 1
+    ? { status: "CLAIMED", claimToken }
+    : { status: "BUSY" };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

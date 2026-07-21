@@ -7,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { buildMemoriesFromSurvey } from "@/lib/memory/memory-builder";
 import { validateQuestionnaire } from "@/lib/validation";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 const VALID_SURVEY_TYPES = [
   "TRENCH_WARFARE",
@@ -33,8 +34,9 @@ export async function saveProfileSurvey(
   surveyType: string,
   answers: Record<string, string>
 ): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated." };
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { success: false, error: access.error };
+  const userId = access.user.id;
 
   if (!VALID_SURVEY_TYPES.includes(surveyType as typeof VALID_SURVEY_TYPES[number])) {
     return { success: false, error: "Invalid survey type." };
@@ -45,10 +47,10 @@ export async function saveProfileSurvey(
   }
 
   await prisma.profileSurvey.upsert({
-    where: { userId_surveyType: { userId: session.user.id, surveyType } },
+    where: { userId_surveyType: { userId, surveyType } },
     update: { answersJson: answers as unknown as Prisma.InputJsonValue },
     create: {
-      userId: session.user.id,
+      userId,
       surveyType,
       answersJson: answers as unknown as Prisma.InputJsonValue,
     },
@@ -58,7 +60,7 @@ export async function saveProfileSurvey(
   revalidatePath("/dashboard/questionnaire");
 
   // Build/update memories from survey answers (background, non-blocking)
-  buildMemoriesFromSurvey(session.user.id, surveyType, answers).catch((err) =>
+  buildMemoriesFromSurvey(userId, surveyType, answers).catch((err) =>
     console.error("Memory creation from survey failed:", err)
   );
 
@@ -68,11 +70,11 @@ export async function saveProfileSurvey(
 export async function deleteProfileSurvey(
   surveyType: string
 ): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated." };
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { success: false, error: access.error };
 
   await prisma.profileSurvey.deleteMany({
-    where: { userId: session.user.id, surveyType },
+    where: { userId: access.user.id, surveyType },
   });
 
   revalidatePath("/dashboard/profile");
@@ -83,8 +85,9 @@ export async function deleteProfileSurvey(
 export async function updateOnboarding(
   answers: Record<string, unknown>
 ): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Not authenticated." };
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { success: false, error: access.error };
+  const userId = access.user.id;
 
   const validation = validateQuestionnaire(answers);
   if (!validation.success || !validation.data) {
@@ -92,7 +95,7 @@ export async function updateOnboarding(
   }
 
   const existing = await prisma.questionnaire.findFirst({
-    where: { userId: session.user.id },
+    where: { userId },
   });
 
   if (!existing) return { success: false, error: "No onboarding record found." };
@@ -109,7 +112,7 @@ export async function updateOnboarding(
 
   if (validatedData.name) {
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { name: validatedData.name },
     });
   }

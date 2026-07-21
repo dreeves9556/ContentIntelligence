@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { validateQuestionnaire } from "@/lib/validation";
 import { buildMemoriesFromQuestionnaire } from "@/lib/memory/memory-builder";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  const access = await requireDashboardAccess();
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: access.error },
+      { status: access.status }
+    );
   }
 
   try {
@@ -20,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = validation.data;
-    const userId = session.user.id;
+    const userId = access.user.id;
 
     const title = `Brand Questionnaire — ${data.businessName || data.name || "New Client"}`;
     const existing = await prisma.questionnaire.findFirst({ where: { userId } });

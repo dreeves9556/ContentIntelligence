@@ -1,4 +1,3 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Plug, Share2, Music2, Users, PlayCircle, Zap } from "lucide-react";
@@ -8,6 +7,7 @@ import { getEnabledPlatforms } from "@/lib/platform-config";
 import LockedTabOverlay from "@/components/LockedTabOverlay";
 import { canAccessIntegrations } from "@/lib/tiers";
 import type { UserPlan } from "@/lib/tiers";
+import { requireDashboardAccess } from "@/lib/server-access";
 
 const ALL_PLATFORMS = [
   {
@@ -41,17 +41,17 @@ const ALL_PLATFORMS = [
 ];
 
 export default async function IntegrationsPage() {
-  const session = await auth();
+  const access = await requireDashboardAccess();
+  if (!access.allowed) redirect(access.status === 401 ? "/login" : "/account-expired");
 
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const plan = access.user.plan as UserPlan;
+  const hasIntegrationsAccess = canAccessIntegrations(plan) || access.user.role === "ADMIN";
 
-  const plan = (session.user.plan ?? "CALENDAR_ONLY") as UserPlan;
-
-  const zernioAccounts = await prisma.zernioAccount.findMany({
-    where: { userId: session.user.id },
-  });
+  const zernioAccounts = hasIntegrationsAccess
+    ? await prisma.zernioAccount.findMany({
+        where: { userId: access.user.id },
+      })
+    : [];
 
   const enabledPlatforms = await getEnabledPlatforms();
   const PLATFORMS = ALL_PLATFORMS.filter((p) =>
