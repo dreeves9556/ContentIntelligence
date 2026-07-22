@@ -18,11 +18,15 @@ import {
   Pencil,
   Shield,
   UserCog,
+  Crown,
+  UsersRound,
+  X,
 } from "lucide-react";
 import {
   createOrganization,
   updateOrganization,
   deleteOrganization,
+  assignTeamAdmin,
   getOrganizations,
   type AdminOrgData,
 } from "./actions";
@@ -46,6 +50,15 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [transferOrgId, setTransferOrgId] = useState<string | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState<string | null>(null);
+  const [pendingTransfer, setPendingTransfer] = useState<{
+    orgId: string;
+    orgName: string;
+    userId: string;
+    userName: string;
+    currentAdminName: string | null;
+  } | null>(null);
 
   // Create form state
   const [createForm, setCreateForm] = useState({
@@ -137,6 +150,44 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
     });
   }
 
+  function confirmTransferAdmin(
+    orgId: string,
+    orgName: string,
+    targetUserId: string,
+    targetName: string,
+    currentAdminName: string | null
+  ) {
+    setPendingTransfer({ orgId, orgName, userId: targetUserId, userName: targetName, currentAdminName });
+  }
+
+  function handleTransferAdmin() {
+    if (!pendingTransfer) return;
+    const { orgId, userId, userName } = pendingTransfer;
+    setPendingTransfer(null);
+    setTransferOrgId(orgId);
+    setTransferTargetId(userId);
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const res = await assignTeamAdmin(orgId, userId);
+      if (res.success) {
+        setSuccess(`Admin transferred to ${userName}.`);
+        setTransferOrgId(null);
+        setTransferTargetId(null);
+        refreshData();
+      } else {
+        setError(res.error ?? "Failed to transfer admin.");
+        setTransferOrgId(null);
+        setTransferTargetId(null);
+      }
+    });
+  }
+
+  const totalCommunities = orgs.length;
+  const totalMembers = orgs.reduce((sum, o) => sum + o.activeUsers, 0);
+  const totalSeats = orgs.reduce((sum, o) => sum + o.seatLimit, 0);
+  const totalAvailable = orgs.reduce((sum, o) => sum + Math.max(0, o.seatLimit - o.usedSeats), 0);
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -158,10 +209,39 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
         </button>
       </div>
 
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <UsersRound className="h-4 w-4 text-accent-primary" />
+            <p className="text-xs text-text-muted uppercase tracking-wider">Organizations</p>
+          </div>
+          <p className="text-2xl font-bold text-text-primary">{totalCommunities}</p>
+        </div>
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="h-4 w-4 text-accent-primary" />
+            <p className="text-xs text-text-muted uppercase tracking-wider">Members</p>
+          </div>
+          <p className="text-2xl font-bold text-text-primary">{totalMembers}</p>
+        </div>
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Total Seats</p>
+          <p className="text-2xl font-bold text-text-primary">{totalSeats}</p>
+        </div>
+        <div className="bg-background-card rounded-lg border border-border-primary p-4">
+          <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Available</p>
+          <p className="text-2xl font-bold text-emerald-400">{totalAvailable}</p>
+        </div>
+      </div>
+
       {error && (
         <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
           <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
           <p className="text-sm text-red-400">{error}</p>
+          <button onClick={() => setError(null)} className="ml-auto text-red-400/60 hover:text-red-400">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -169,6 +249,9 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
         <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3">
           <Check className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-sm text-emerald-400">{success}</p>
+          <button onClick={() => setSuccess(null)} className="ml-auto text-emerald-400/60 hover:text-emerald-400">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -428,32 +511,67 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
                     {/* Members */}
                     {org.members.length > 0 && (
                       <div className="divide-y divide-border-primary">
-                        {org.members.map((member) => (
-                          <div key={member.id} className="px-5 py-3 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-text-primary truncate">
-                                {member.name || "Unnamed User"}
-                              </p>
-                              <p className="text-xs text-text-muted truncate">{member.email ?? "—"}</p>
+                        {org.members.map((member) => {
+                          const isAdmin = member.role === "TEAM_ADMIN";
+                          const isTransferring = transferOrgId === org.id && transferTargetId === member.id;
+
+                          return (
+                            <div key={member.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium text-text-primary truncate">
+                                    {member.name || "Unnamed User"}
+                                  </p>
+                                  {isAdmin && (
+                                    <span className="inline-flex items-center gap-1 text-xs text-accent-primary bg-accent-primary/10 px-2 py-0.5 rounded">
+                                      <Crown className="h-3 w-3" />
+                                      Admin
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-text-muted truncate">{member.email ?? "—"}</p>
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  <TagBadge tag={member.internalTag} />
+                                  <StatusBadge status={member.accountStatus as AccountStatus} />
+                                  <CompedBadge isComped={member.isComped} />
+                                  <span className="text-xs text-text-muted">
+                                    {ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] ?? member.role}
+                                  </span>
+                                  <span className="text-xs text-text-muted">·</span>
+                                  <span className="text-xs text-text-muted">
+                                    {PLAN_LABELS[member.plan as UserPlan]}
+                                  </span>
+                                  <span className="text-xs text-text-muted">·</span>
+                                  <span className="text-xs text-text-muted">
+                                    {format(new Date(member.createdAt), "MMM d, yyyy")}
+                                  </span>
+                                </div>
+                              </div>
+                              {!isAdmin && member.role !== "ADMIN" && member.accountStatus !== "ARCHIVED" && (
+                                <button
+                                  onClick={() =>
+                                    confirmTransferAdmin(
+                                      org.id,
+                                      org.name,
+                                      member.id,
+                                      member.name || member.email || "this user",
+                                      org.teamAdmin?.name || org.teamAdmin?.email || null
+                                    )
+                                  }
+                                  disabled={isPending}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20 disabled:opacity-60 rounded-lg transition-colors shrink-0"
+                                >
+                                  {isTransferring ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <UserCog className="h-3.5 w-3.5" />
+                                  )}
+                                  Make Admin
+                                </button>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                              <TagBadge tag={member.internalTag} />
-                              <StatusBadge status={member.accountStatus as AccountStatus} />
-                              <CompedBadge isComped={member.isComped} />
-                              <span className="text-xs text-text-muted">
-                                {ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] ?? member.role}
-                              </span>
-                              <span className="text-xs text-text-muted">·</span>
-                              <span className="text-xs text-text-muted">
-                                {PLAN_LABELS[member.plan as UserPlan]}
-                              </span>
-                              <span className="text-xs text-text-muted">·</span>
-                              <span className="text-xs text-text-muted">
-                                {format(new Date(member.createdAt), "MMM d, yyyy")}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -468,6 +586,48 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Transfer admin confirmation modal */}
+      {pendingTransfer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background-card rounded-lg border border-border-primary max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-accent-primary/10 rounded-lg">
+                <UserCog className="h-5 w-5 text-accent-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+                Transfer Organization Admin
+              </h3>
+            </div>
+            <p className="text-sm text-text-muted">
+              You are about to make <span className="font-medium text-text-primary">{pendingTransfer.userName}</span> the admin of{" "}
+              <span className="font-medium text-text-primary">{pendingTransfer.orgName}</span>.
+              {pendingTransfer.currentAdminName && (
+                <>
+                  {" "}The current admin <span className="font-medium text-text-primary">{pendingTransfer.currentAdminName}</span> will be demoted to a regular member.
+                </>
+              )}
+              {" "}The new admin will take over billing responsibility for this organization, including the Stripe subscription and billing portal access.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setPendingTransfer(null)}
+                className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTransferAdmin}
+                disabled={isPending}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-60 rounded-lg transition-colors"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCog className="h-4 w-4" />}
+                Confirm Transfer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

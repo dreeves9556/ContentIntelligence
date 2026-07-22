@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { Mail } from "lucide-react";
-import Link from "next/link";
 import { InviteClientButton } from "./components/InviteClientButton";
+import BulkInviteModal from "./components/BulkInviteModal";
 import AdminRosterClient, { type RosterUser } from "./components/AdminRosterClient";
 import type { UserPlan } from "@/lib/tiers";
+import { getPendingInvites } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +54,7 @@ export default async function AdminPage() {
   const users = await getUsers();
   const session = await auth();
   const currentUserId = session?.user?.id;
+  const invites = await getPendingInvites();
 
   return (
     <div className="space-y-6">
@@ -68,13 +69,7 @@ export default async function AdminPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/admin/invites"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-background-secondary hover:bg-background-secondary text-text-primary font-medium rounded-lg transition-colors"
-          >
-            <Mail className="h-4 w-4" />
-            Bulk Invite
-          </Link>
+          <BulkInviteModal invites={invites} />
           <InviteClientButton />
         </div>
       </div>
