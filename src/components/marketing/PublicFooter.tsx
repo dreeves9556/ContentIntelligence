@@ -32,6 +32,17 @@ export function PublicFooter() {
           <p className="text-xs text-text-muted">
             © {new Date().getFullYear()} The Local Post. Your Town. Your Post.
           </p>
+          <p className="text-xs text-text-muted mt-2">
+            Powered by{" "}
+            <a
+              href="https://reevesdigital.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-muted hover:text-text-primary transition-colors underline"
+            >
+              Reeves Digital Systems
+            </a>
+          </p>
         </div>
       </div>
     </footer>
