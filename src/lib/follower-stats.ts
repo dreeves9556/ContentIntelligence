@@ -38,6 +38,15 @@ export function normalizeFollowerStatsResponse(raw: unknown, accountId?: string)
         0
     );
 
+    if (
+      !Number.isFinite(followerCount) ||
+      followerCount < 0 ||
+      !Number.isFinite(growthDelta) ||
+      !Number.isFinite(growthPercent)
+    ) {
+      return null;
+    }
+
     return {
       date: date.split("T")[0], // strip time portion if present
       followerCount,
@@ -70,9 +79,17 @@ export function normalizeFollowerStatsResponse(raw: unknown, accountId?: string)
   // stats is an object keyed by accountId, each value is an array of daily points
   if (root.stats && typeof root.stats === "object" && !Array.isArray(root.stats)) {
     const statsObj = root.stats as Record<string, unknown>;
-    const entries = accountId && statsObj[accountId]
-      ? [[accountId, statsObj[accountId]] as [string, unknown]]
-      : Object.entries(statsObj);
+    const allEntries = Object.entries(statsObj);
+    // A response containing multiple accounts must match the requested account.
+    // Falling back to every entry caused one platform's history to overwrite
+    // another platform after the date-level deduplication below.
+    const entries = accountId
+      ? statsObj[accountId]
+        ? [[accountId, statsObj[accountId]] as [string, unknown]]
+        : allEntries.length === 1
+          ? allEntries
+          : []
+      : allEntries;
     for (const [, val] of entries) {
       if (Array.isArray(val)) {
         for (const entry of val as Record<string, unknown>[]) {

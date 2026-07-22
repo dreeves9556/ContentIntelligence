@@ -1,51 +1,88 @@
-# Impact Dashboard — Formulas & Caveats
+# Impact Dashboard — Formulas, Eligibility, and Data Safety
+
+## Eligible Population
+
+Impact metrics include connected accounts owned by `USER` or `TEAM_ADMIN`
+members whose account status is `ACTIVE`, `TRIAL`, or `COMPED`.
+
+- Global `ADMIN` accounts are excluded from customer impact metrics.
+- Expired, past-due, canceled, archived, and locked accounts are excluded.
+- Posts must belong to a currently eligible connected user/platform pair.
+- Rows marked `isDemo = true` are excluded everywhere.
+
+## Post Provenance
+
+`PostAnalytics.platform` is the normalized social platform. It is separate from
+`format`, which may describe a content format such as `REEL` or `CAROUSEL`.
+
+New Zernio syncs prefer the provider's `views` value. `impressions` is used only
+when views are unavailable. The two values are never combined with `max()`.
 
 ## Engagement Rate
 
 **Formula:** `sum(likes + comments) / sum(views) * 100`
 
-- Zero-view posts are excluded from the calculation
-- This is a **weighted average** (not a simple mean of per-post rates)
-- Weighted = total interactions across all posts / total views across all posts
-- Returns `null` if all posts have 0 views or no posts exist
+- The calculation is weighted by views.
+- Zero-view posts are excluded from both numerator and denominator.
+- Every baseline and current-period query is scoped to one user and platform.
+- Current engagement uses platform-attributed posts from the last 30 days.
+- Baseline engagement uses the first 30 days beginning at the valid follower baseline.
+- Missing platform data returns `null`; another platform's posts are never substituted.
 
 ## Follower Growth
 
-**Formula:** `currentFollowers - baselineFollowers`
+**Account formula:** `currentFollowers - baselineFollowers`
 
-- `growthPercent = gained / baselineFollowers * 100`
-- Accounts with `null` or `0` baseline follower count are **excluded** from growth% averages (to avoid division by zero or infinity)
-- Total followers gained includes all accounts with valid baselines
+**Member growth percentage:**
+`(sum(currentFollowers) - sum(baselineFollowers)) / sum(baselineFollowers) * 100`
 
-## Engagement Lift
+- The overview averages member-level percentages, so members with multiple
+  accounts do not receive extra weight.
+- A baseline must be on or after the UTC day the account was connected.
+- Accounts with a zero baseline are excluded from percentage averages.
+- Histories are quarantined when two platforms for the same user have identical
+  non-zero values for their three most recent overlapping snapshots.
+- Quarantined histories are excluded until three fresh, divergent snapshots exist.
 
-**Formula:** `currentEngagementRate - baselineEngagementRate`
+## Follower Time Series
 
-- Only computed when both baseline and current engagement rates are non-null
-- Current engagement = weighted rate from posts in last 30 days
-- Baseline engagement = weighted rate from first 30 days of posts after baseline date
+The chart processes follower snapshots chronologically and carries each account's
+latest known value forward. An account no longer disappears from the total merely
+because it lacks a snapshot on a later date.
 
-## Baseline Date
+Only eligible, non-quarantined connected accounts are included.
 
-- Set to the date of the earliest `FollowerStats` record for that user/platform
-- If no follower stats exist, baseline is not created (returns `"missing_data"`)
-- The 30-day window for engagement baseline starts from `baselineDate`
+## Active Member Definition
 
-## Active User Definition
+An eligible connected member is active when either condition is true:
 
-A user is "active" if **either**:
-- They generated a calendar in the last 30 days (`Calendar.createdAt`)
-- They synced analytics in the last 30 days (`ZernioAccount.lastSyncAt`)
+- They generated a calendar in the last 30 days.
+- At least one connected account completed both analytics and follower syncs in
+  the last 30 days.
 
-## Stale Sync Definition
+Calendar users without a connected eligible account are not included.
 
-A sync is "stale" if `lastSyncAt` is more than 7 days ago, or `lastSyncAt` is null.
+## Sync Freshness
 
-## Caveats
+A sync is stale when `lastSyncAt` is null or older than seven days.
 
-1. **No guaranteed attribution**: Growth may be influenced by factors outside The Local Post (seasonal trends, viral content, external marketing, algorithm changes)
-2. **Baseline accuracy depends on data availability**: If a member connected their account after already having followers for months, the baseline captures their count at connection time, not at original account creation
-3. **Engagement baselines require post data**: If no posts were published in the first 30 days after baseline, engagement baseline is null
-4. **Backfill is create-only**: `ensureBaselineForUserPlatform` never overwrites existing baselines. Use "Recalculate Engagement Baselines" to overwrite engagement fields
-5. **Per-account post analytics query**: `getMemberGrowthRows` queries post analytics per-account in a loop. Acceptable for admin-only page with limited accounts, but should be optimized if account count grows significantly
-6. **Time series uses daily follower snapshots**: Gaps in daily data may cause stepped charts rather than smooth curves
+`lastSyncAt` is updated per account only after both the post-analytics request and
+the follower-history request succeed. Success on one account never refreshes a
+different account's timestamp.
+
+## Data Quality
+
+The dashboard reports:
+
+- Eligible users without connected accounts
+- Accounts without valid post-connection baselines
+- Accounts without recent successful syncs
+- Accounts without platform-matching post analytics
+- Suspicious duplicated follower histories
+- Accounts with valid, usable baselines
+
+## Attribution Caveat
+
+All growth figures are observed changes for connected accounts. They do not prove
+that The Local Post caused the result. Sales and AI copy must use terms such as
+"tracked net change," "observed growth," and "correlation."

@@ -108,6 +108,8 @@ export async function seedPostAnalytics() {
       ...post,
       userId: session.user!.id!,
       externalId: `ig_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      platform: null,
+      isDemo: true,
     })),
   });
 

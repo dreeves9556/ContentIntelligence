@@ -16,6 +16,8 @@ import { backfillBaselines, recalculateEngagementBaselinesAction, getCachedImpac
 const PLATFORM_LABELS: Record<string, string> = {
   INSTAGRAM: "Instagram", TIKTOK: "TikTok", LINKEDIN: "LinkedIn",
   YOUTUBE: "YouTube", FACEBOOK: "Facebook",
+  instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn",
+  youtube: "YouTube", facebook: "Facebook",
 };
 
 function formatNumber(num: number): string {
@@ -152,9 +154,9 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
   }, []);
 
   const salesStats = [
-    { id: "growth", label: "Follower Growth", text: `${overview.connectedMembers} members have tracked ${formatNumber(overview.totalFollowersGained)} followers gained across ${overview.connectedAccounts} connected social accounts since joining The Local Post. Average follower growth: ${formatPercent(overview.avgFollowerGrowth)}.` },
-    { id: "engagement", label: "Engagement Lift", text: `Members show an average engagement rate lift of ${formatPercent(overview.avgEngagementLift)} since joining, with ${formatNumber(overview.totalViewsTracked)} total views tracked across ${formatNumber(overview.totalPostsTracked)} posts.` },
-    { id: "usage", label: "Usage Correlation", text: `${overview.activeUsers} active members show ${formatPercent(usageCorrelation.activeAvgGrowth)} average follower growth, compared to ${formatPercent(usageCorrelation.inactiveAvgGrowth)} for inactive members.` },
+    { id: "growth", label: "Follower Growth", text: `${overview.connectedMembers} eligible members currently have ${overview.accountsWithValidBaseline} connected accounts with valid follower baselines. Those accounts show a tracked net change of ${formatNumber(overview.totalFollowersGained)} followers. Average member-level growth: ${formatPercent(overview.avgFollowerGrowth)}.` },
+    { id: "engagement", label: "Engagement Lift", text: `${overview.accountsWithValidEngagement} eligible accounts with valid platform-specific comparison data show an average member-level engagement-rate change of ${formatPercent(overview.avgEngagementLift)}, with ${formatNumber(overview.totalViewsTracked)} non-demo views tracked across ${formatNumber(overview.totalPostsTracked)} platform-attributed posts.` },
+    { id: "usage", label: "Usage Correlation", text: usageCorrelation.inactiveUsers > 0 ? `${usageCorrelation.activeUsers} active members show ${formatPercent(usageCorrelation.activeAvgGrowth)} average follower growth, compared with ${formatPercent(usageCorrelation.inactiveAvgGrowth)} across ${usageCorrelation.inactiveUsers} inactive members. This is correlation, not attribution.` : `No active-versus-inactive comparison is available because the eligible connected-member sample contains 0 inactive members.` },
   ];
 
   const cards = [
@@ -445,6 +447,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
                     <td className="px-4 py-3 text-sm">
                       <p className="font-medium text-text-primary truncate max-w-[150px]">{row.userName ?? "Unknown"}</p>
                       <p className="text-xs text-text-muted truncate max-w-[150px]">{row.userEmail ?? ""}</p>
+                      {!row.followerDataValid && <p className="text-xs text-yellow-500 mt-0.5">Follower data quarantined</p>}
                     </td>
                     <td className="px-4 py-3 text-sm text-text-muted whitespace-nowrap">{PLATFORM_LABELS[row.platform] ?? row.platform}</td>
                     <td className="px-4 py-3 text-xs text-text-muted whitespace-nowrap">{row.baselineDate ? formatDateShort(row.baselineDate) : "—"}</td>
@@ -477,7 +480,9 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
             { label: "Accounts without recent sync", value: dataQuality.accountsWithoutRecentSync, total: dataQuality.totalAccounts },
             { label: "Accounts without post analytics", value: dataQuality.accountsWithoutPostAnalytics, total: dataQuality.totalAccounts },
             { label: "Stale syncs (>7 days)", value: dataQuality.staleSyncCount, total: dataQuality.totalAccounts },
+            { label: "Suspicious follower histories", value: dataQuality.suspiciousFollowerAccounts, total: dataQuality.totalAccounts },
             { label: "Accounts with valid baselines", value: overview.accountsWithValidBaseline, total: dataQuality.totalAccounts },
+            { label: "Accounts with engagement comparisons", value: overview.accountsWithValidEngagement, total: dataQuality.totalAccounts },
           ].map((item) => (
             <div key={item.label} className="rounded-lg bg-background-secondary/50 border border-border-primary p-3">
               <p className="text-xs text-text-muted">{item.label}</p>
@@ -490,7 +495,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
       {/* Admin Actions */}
       <div className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary">
         <div className="flex items-center gap-2 mb-1"><RefreshCw className="h-5 w-5 text-accent-primary shrink-0" /><h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>Baseline Management</h3></div>
-        <p className="text-xs sm:text-sm text-text-muted mb-4">Backfill missing baselines or recalculate engagement baselines from post analytics data.</p>
+        <p className="text-xs sm:text-sm text-text-muted mb-4">Backfill missing baselines or rebuild follower and engagement baselines from post-connection, platform-specific data.</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={handleBackfill} disabled={backfillLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-primary text-white transition-all hover:bg-accent-primary/90 disabled:opacity-50">
             {backfillLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
@@ -499,11 +504,11 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
           {!showRecalcConfirm ? (
             <button onClick={() => setShowRecalcConfirm(true)} disabled={recalcLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-background-secondary border border-border-primary text-text-primary transition-all hover:bg-background-secondary/80 disabled:opacity-50">
               {recalcLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Recalculate Engagement Baselines
+              Rebuild Valid Baselines
             </button>
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <span className="text-sm text-text-muted">Are you sure? This overwrites all engagement baselines.</span>
+              <span className="text-sm text-text-muted">Are you sure? This replaces stored follower and engagement baselines with valid post-connection data.</span>
               <div className="flex items-center gap-2">
                 <button onClick={handleRecalculate} disabled={recalcLoading} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50">
                   {recalcLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Confirm

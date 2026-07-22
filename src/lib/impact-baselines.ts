@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { computeWeightedEngagementRate, utcStartOfDay } from "@/lib/impact-math";
 
 export interface BaselineBackfillResult {
   created: number;
@@ -28,9 +29,10 @@ export async function ensureBaselineForUserPlatform(
   });
   if (!account) return "missing_data";
 
-  // Find earliest follower stats record for this user/platform
+  // A growth baseline cannot predate the account's connection to The Local Post.
+  const connectionDay = utcStartOfDay(account.connectedAt);
   const earliestFollower = await prisma.followerStats.findFirst({
-    where: { userId, platform },
+    where: { userId, platform, date: { gte: connectionDay } },
     orderBy: { date: "asc" },
   });
 
@@ -45,6 +47,8 @@ export async function ensureBaselineForUserPlatform(
   const earlyPosts = await prisma.postAnalytics.findMany({
     where: {
       userId,
+      platform: platform.toLowerCase(),
+      isDemo: false,
       publishedAt: {
         gte: baselineDate,
         lte: windowEnd,
@@ -58,23 +62,14 @@ export async function ensureBaselineForUserPlatform(
   let baselineAvgInteractions: number | null = null;
 
   if (earlyPosts.length > 0) {
-    const totalViews = earlyPosts.reduce((s, p) => s + p.views, 0);
-    const totalInteractions = earlyPosts.reduce(
+    const postsWithViews = earlyPosts.filter((p) => p.views > 0);
+    const totalViews = postsWithViews.reduce((s, p) => s + p.views, 0);
+    const totalInteractions = postsWithViews.reduce(
       (s, p) => s + p.likes + p.comments,
       0
     );
-    const postsWithViews = earlyPosts.filter((p) => p.views > 0);
 
-    if (totalViews > 0) {
-      baselineEngagementRate = (totalInteractions / totalViews) * 100;
-    } else if (postsWithViews.length > 0) {
-      const viewSum = postsWithViews.reduce((s, p) => s + p.views, 0);
-      const interactionSum = postsWithViews.reduce(
-        (s, p) => s + p.likes + p.comments,
-        0
-      );
-      baselineEngagementRate = viewSum > 0 ? (interactionSum / viewSum) * 100 : null;
-    }
+    baselineEngagementRate = computeWeightedEngagementRate(earlyPosts);
 
     baselineAvgViews = totalViews / earlyPosts.length;
     baselineAvgInteractions = totalInteractions / earlyPosts.length;
@@ -139,52 +134,68 @@ export async function recalculateEngagementBaselines(): Promise<{
 
   for (const baseline of baselines) {
     try {
-      const windowEnd = new Date(baseline.baselineDate);
+      const account = await prisma.zernioAccount.findUnique({
+        where: {
+          userId_platform: {
+            userId: baseline.userId,
+            platform: baseline.platform,
+          },
+        },
+        select: { connectedAt: true },
+      });
+      if (!account) {
+        result.skipped++;
+        continue;
+      }
+
+      const earliestFollower = await prisma.followerStats.findFirst({
+        where: {
+          userId: baseline.userId,
+          platform: baseline.platform,
+          date: { gte: utcStartOfDay(account.connectedAt) },
+        },
+        orderBy: { date: "asc" },
+      });
+      if (!earliestFollower) {
+        result.skipped++;
+        continue;
+      }
+
+      const baselineDate = earliestFollower.date;
+      const windowEnd = new Date(baselineDate);
       windowEnd.setDate(windowEnd.getDate() + 30);
 
       const earlyPosts = await prisma.postAnalytics.findMany({
         where: {
           userId: baseline.userId,
+          platform: baseline.platform.toLowerCase(),
+          isDemo: false,
           publishedAt: {
-            gte: baseline.baselineDate,
+            gte: baselineDate,
             lte: windowEnd,
           },
         },
         select: { views: true, likes: true, comments: true },
       });
 
-      if (earlyPosts.length === 0) {
-        result.skipped++;
-        continue;
-      }
-
-      const totalViews = earlyPosts.reduce((s, p) => s + p.views, 0);
-      const totalInteractions = earlyPosts.reduce(
+      const postsWithViews = earlyPosts.filter((p) => p.views > 0);
+      const totalViews = postsWithViews.reduce((s, p) => s + p.views, 0);
+      const totalInteractions = postsWithViews.reduce(
         (s, p) => s + p.likes + p.comments,
         0
       );
-
-      let engagementRate: number | null = null;
-      if (totalViews > 0) {
-        engagementRate = (totalInteractions / totalViews) * 100;
-      } else {
-        const postsWithViews = earlyPosts.filter((p) => p.views > 0);
-        if (postsWithViews.length > 0) {
-          const viewSum = postsWithViews.reduce((s, p) => s + p.views, 0);
-          const interactionSum = postsWithViews.reduce(
-            (s, p) => s + p.likes + p.comments,
-            0
-          );
-          engagementRate = viewSum > 0 ? (interactionSum / viewSum) * 100 : null;
-        }
-      }
+      const engagementRate = computeWeightedEngagementRate(earlyPosts);
 
       await prisma.memberGrowthBaseline.update({
         where: { id: baseline.id },
         data: {
+          baselineDate,
+          baselineFollowerCount: earliestFollower.followerCount,
           baselineEngagementRate: engagementRate,
-          baselineAvgViews: totalViews / earlyPosts.length,
-          baselineAvgInteractions: totalInteractions / earlyPosts.length,
+          baselineAvgViews:
+            earlyPosts.length > 0 ? totalViews / earlyPosts.length : null,
+          baselineAvgInteractions:
+            earlyPosts.length > 0 ? totalInteractions / earlyPosts.length : null,
         },
       });
       result.updated++;

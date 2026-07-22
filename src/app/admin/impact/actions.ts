@@ -44,25 +44,20 @@ export async function getImpactData(): Promise<ImpactData | { error: string }> {
     return { error: "Unauthorized" };
   }
 
-  const [
-    overview,
-    timeSeries,
-    engagementTimeSeries,
-    memberRows,
-    platformBreakdown,
-    cohortBreakdown,
-    usageCorrelation,
-    dataQuality,
-  ] = await Promise.all([
+  const [overview, timeSeries, engagementTimeSeries, memberRows, dataQuality] =
+    await Promise.all([
     getImpactOverview(),
     getImpactTimeSeries(),
     getEngagementTimeSeries(),
     getMemberGrowthRows(),
-    getPlatformGrowthBreakdown(),
-    getCohortGrowthBreakdown(),
-    getUsageCorrelationStats(),
     getDataQualityStats(),
   ]);
+  const [platformBreakdown, cohortBreakdown, usageCorrelation] =
+    await Promise.all([
+      getPlatformGrowthBreakdown(memberRows),
+      getCohortGrowthBreakdown(memberRows),
+      getUsageCorrelationStats(memberRows),
+    ]);
 
   return {
     overview,
@@ -167,10 +162,16 @@ export async function generateImpactInsight(): Promise<ImpactInsightResult> {
     return { success: false, error: "Unauthorized" };
   }
 
-  const overview = await getImpactOverview();
-  const platformBreakdown = await getPlatformGrowthBreakdown();
-  const cohortBreakdown = await getCohortGrowthBreakdown();
-  const usageCorrelation = await getUsageCorrelationStats();
+  const [overview, memberRows] = await Promise.all([
+    getImpactOverview(),
+    getMemberGrowthRows(),
+  ]);
+  const [platformBreakdown, cohortBreakdown, usageCorrelation] =
+    await Promise.all([
+      getPlatformGrowthBreakdown(memberRows),
+      getCohortGrowthBreakdown(memberRows),
+      getUsageCorrelationStats(memberRows),
+    ]);
 
   if (overview.connectedMembers === 0) {
     return { success: false, error: "No connected members to analyze" };
@@ -206,6 +207,7 @@ PLATFORM-WIDE IMPACT DATA:
 - Total posts tracked: ${overview.totalPostsTracked}
 - Active members (last 30 days): ${overview.activeUsers}
 - Accounts with valid baselines: ${overview.accountsWithValidBaseline}
+- Accounts with valid engagement comparisons: ${overview.accountsWithValidEngagement}
 
 GROWTH BY PLATFORM:
 ${platformSummary || "No platform data"}

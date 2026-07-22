@@ -41,13 +41,21 @@ export async function disconnectZernioAccount(platform: string) {
 
 const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 hours
 
+interface AccountSyncResult {
+  syncedPosts: number;
+  analyticsSucceeded: boolean;
+  followerStatsSucceeded: boolean;
+}
+
 async function syncSingleAccount(
   userId: string,
   account: { zernioAccountId: string; platform: string; zernioProfileId: string },
   startStr: string,
   endStr: string
-): Promise<number> {
+): Promise<AccountSyncResult> {
   let synced = 0;
+  let analyticsSucceeded = false;
+  let followerStatsSucceeded = false;
 
   try {
     const analytics = await zernio.analytics.getForAccount(
@@ -58,7 +66,9 @@ async function syncSingleAccount(
 
     for (const post of analytics.posts ?? []) {
       const m = post.analytics;
-      const viewCount = Math.max(m.impressions ?? 0, m.views ?? 0);
+      // Prefer an actual view count. Some platforms only expose impressions,
+      // which remains the documented fallback rather than being mixed via max().
+      const viewCount = m.views ?? m.impressions ?? 0;
       await prisma.postAnalytics.upsert({
         where: { externalId_userId: { externalId: post._id, userId } },
         update: {
@@ -66,12 +76,18 @@ async function syncSingleAccount(
           likes: m.likes ?? 0,
           comments: m.comments ?? 0,
           postUrl: post.platformPostUrl ?? null,
+          platform: account.platform.toLowerCase(),
+          isDemo: false,
+          title: post.content.slice(0, 120),
+          publishedAt: new Date(post.publishedAt),
         },
         create: {
           userId,
           externalId: post._id,
           title: post.content.slice(0, 120),
           format: (post.platform ?? account.platform).toUpperCase(),
+          platform: account.platform.toLowerCase(),
+          isDemo: false,
           publishedAt: new Date(post.publishedAt),
           views: viewCount,
           likes: m.likes ?? 0,
@@ -81,6 +97,7 @@ async function syncSingleAccount(
       });
       synced++;
     }
+    analyticsSucceeded = true;
   } catch (err) {
     console.error(`Failed to sync analytics for ${account.platform}:`, err);
   }
@@ -134,6 +151,7 @@ async function syncSingleAccount(
         },
       });
     }
+    followerStatsSucceeded = points.length > 0;
   } catch (err) {
     console.error(`Failed to fetch follower-stats for ${account.platform}:`, err);
   }
@@ -206,7 +224,7 @@ async function syncSingleAccount(
     console.error(`[impact] baseline creation failed for ${userId}/${account.platform}:`, err);
   });
 
-  return synced;
+  return { syncedPosts: synced, analyticsSucceeded, followerStatsSucceeded };
 }
 
 export async function syncAnalytics() {
@@ -241,7 +259,14 @@ export async function syncAnalytics() {
   let synced = 0;
 
   for (const account of zernioAccounts) {
-    synced += await syncSingleAccount(userId, account, startStr, endStr);
+    const result = await syncSingleAccount(userId, account, startStr, endStr);
+    synced += result.syncedPosts;
+    if (result.analyticsSucceeded && result.followerStatsSucceeded) {
+      await prisma.zernioAccount.update({
+        where: { userId_platform: { userId, platform: account.platform } },
+        data: { lastSyncAt: now },
+      });
+    }
   }
 
   // Sync profile-level deep analytics (content-decay, daily-metrics, posting-frequency)
@@ -278,12 +303,6 @@ export async function syncAnalytics() {
 
   // Regenerate AI insight with fresh data (cheap Haiku call)
   if (synced > 0) {
-    // Update lastSyncAt for all user's accounts
-    await prisma.zernioAccount.updateMany({
-      where: { userId },
-      data: { lastSyncAt: now },
-    });
-
     // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics
     runLearningPipeline(userId).catch((err) =>
       console.error("Memory learning pipeline failed:", err)
@@ -346,12 +365,14 @@ export async function autoSyncAnalyticsIfNeeded() {
   let synced = 0;
 
   for (const account of staleAccounts) {
-    synced += await syncSingleAccount(userId, account, startStr, endStr);
-    // Update lastSyncAt per account so each account gets its own 24h clock
-    await prisma.zernioAccount.update({
-      where: { userId_platform: { userId, platform: account.platform } },
-      data: { lastSyncAt: now },
-    });
+    const result = await syncSingleAccount(userId, account, startStr, endStr);
+    synced += result.syncedPosts;
+    if (result.analyticsSucceeded && result.followerStatsSucceeded) {
+      await prisma.zernioAccount.update({
+        where: { userId_platform: { userId, platform: account.platform } },
+        data: { lastSyncAt: now },
+      });
+    }
   }
 
   if (synced > 0) {

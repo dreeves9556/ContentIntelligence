@@ -1,4 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import {
+  accountKey,
+  computeWeightedEngagementRate,
+  findDuplicatedFollowerSeries,
+  utcStartOfDay,
+} from "@/lib/impact-math";
 
 export interface ImpactOverview {
   connectedMembers: number;
@@ -10,6 +16,7 @@ export interface ImpactOverview {
   totalPostsTracked: number;
   activeUsers: number;
   accountsWithValidBaseline: number;
+  accountsWithValidEngagement: number;
   accountsMissingBaseline: number;
 }
 
@@ -45,6 +52,7 @@ export interface MemberGrowthRow {
   plan: string;
   organizationName: string | null;
   isActive: boolean;
+  followerDataValid: boolean;
 }
 
 export interface PlatformGrowthBreakdownRow {
@@ -78,88 +86,139 @@ export interface DataQualityStats {
   accountsWithoutRecentSync: number;
   accountsWithoutPostAnalytics: number;
   staleSyncCount: number;
+  suspiciousFollowerAccounts: number;
   totalUsers: number;
   totalAccounts: number;
 }
 
 const STALE_SYNC_DAYS = 7;
 const ACTIVE_DAYS = 30;
+const IMPACT_ACCOUNT_STATUSES = ["ACTIVE", "TRIAL", "COMPED"] as const;
 
-function computeWeightedEngagementRate(posts: { views: number; likes: number; comments: number }[]): number | null {
-  const postsWithViews = posts.filter((p) => p.views > 0);
-  if (postsWithViews.length === 0) return null;
-  const totalViews = postsWithViews.reduce((s, p) => s + p.views, 0);
-  const totalInteractions = postsWithViews.reduce((s, p) => s + p.likes + p.comments, 0);
-  if (totalViews <= 0) return null;
-  return (totalInteractions / totalViews) * 100;
+async function getImpactAccounts() {
+  return prisma.zernioAccount.findMany({
+    where: {
+      user: {
+        role: { not: "ADMIN" },
+        accountStatus: { in: [...IMPACT_ACCOUNT_STATUSES] },
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          plan: true,
+          organization: { select: { name: true } },
+        },
+      },
+    },
+  });
+}
+
+function baselineStartsAfterConnection(
+  baselineDate: Date,
+  connectedAt: Date
+): boolean {
+  return baselineDate >= utcStartOfDay(connectedAt);
+}
+
+function postsForAccount<T extends { userId: string; platform: string | null }>(
+  posts: T[],
+  userId: string,
+  platform: string
+): T[] {
+  const key = accountKey(userId, platform);
+  return posts.filter(
+    (post) =>
+      post.platform != null && accountKey(post.userId, post.platform) === key
+  );
 }
 
 export async function getImpactOverview(): Promise<ImpactOverview> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - ACTIVE_DAYS);
 
-  const [
-    usersWithAccounts,
-    totalAccounts,
-    allBaselines,
-    latestFollowerStats,
-    postAnalyticsAgg,
-    activeCalendarUsers,
-    activeSyncUsers,
-  ] = await Promise.all([
-    prisma.zernioAccount.findMany({
-      select: { userId: true },
-      distinct: ["userId"],
+  const accounts = await getImpactAccounts();
+  const connectedUserIds = [...new Set(accounts.map((account) => account.userId))];
+  const connectedAccountKeys = new Set(
+    accounts.map((account) => accountKey(account.userId, account.platform))
+  );
+
+  const [allBaselines, allFollowerStats, allPosts, activeCalendarUsers] =
+    await Promise.all([
+    prisma.memberGrowthBaseline.findMany({
+      where: { userId: { in: connectedUserIds } },
     }),
-    prisma.zernioAccount.count(),
-    prisma.memberGrowthBaseline.findMany(),
     prisma.followerStats.findMany({
+      where: { userId: { in: connectedUserIds } },
       orderBy: { date: "desc" },
       select: { userId: true, platform: true, followerCount: true, date: true },
     }),
-    prisma.postAnalytics.aggregate({
-      _sum: { views: true },
-      _count: true,
+    prisma.postAnalytics.findMany({
+      where: {
+        userId: { in: connectedUserIds },
+        isDemo: false,
+        platform: { not: null },
+      },
+      select: {
+        userId: true,
+        platform: true,
+        publishedAt: true,
+        views: true,
+        likes: true,
+        comments: true,
+      },
     }),
     prisma.calendar.findMany({
-      where: { createdAt: { gte: thirtyDaysAgo } },
-      select: { userId: true },
-      distinct: ["userId"],
-    }),
-    prisma.zernioAccount.findMany({
-      where: { lastSyncAt: { gte: thirtyDaysAgo } },
+      where: {
+        userId: { in: connectedUserIds },
+        createdAt: { gte: thirtyDaysAgo },
+      },
       select: { userId: true },
       distinct: ["userId"],
     }),
   ]);
 
-  const connectedMembers = usersWithAccounts.length;
-  const connectedAccounts = totalAccounts;
+  const connectedMembers = connectedUserIds.length;
+  const connectedAccounts = accounts.length;
+  const followerStats = allFollowerStats.filter((stat) =>
+    connectedAccountKeys.has(accountKey(stat.userId, stat.platform))
+  );
+  const suspiciousFollowerAccounts = findDuplicatedFollowerSeries(followerStats);
+  const posts = allPosts.filter(
+    (post) =>
+      post.platform != null &&
+      connectedAccountKeys.has(accountKey(post.userId, post.platform))
+  );
 
   const latestByAccount = new Map<string, number>();
-  for (const fs of latestFollowerStats) {
-    const key = `${fs.userId}|${fs.platform}`;
+  for (const fs of followerStats) {
+    const key = accountKey(fs.userId, fs.platform);
     if (!latestByAccount.has(key)) {
       latestByAccount.set(key, fs.followerCount);
     }
   }
 
   let totalFollowersGained = 0;
-  const growthPercents: number[] = [];
+  const growthByMember = new Map<string, { baseline: number; current: number }>();
   let accountsWithValidBaseline = 0;
   let accountsMissingBaseline = 0;
-
-  const accounts = await prisma.zernioAccount.findMany({
-    select: { userId: true, platform: true },
-  });
 
   for (const account of accounts) {
     const baseline = allBaselines.find(
       (b) => b.userId === account.userId && b.platform === account.platform
     );
-    const current = latestByAccount.get(`${account.userId}|${account.platform}`);
+    const key = accountKey(account.userId, account.platform);
+    const current = latestByAccount.get(key);
 
-    if (!baseline || baseline.baselineFollowerCount == null) {
+    if (
+      !baseline ||
+      baseline.baselineFollowerCount == null ||
+      !baselineStartsAfterConnection(baseline.baselineDate, account.connectedAt) ||
+      suspiciousFollowerAccounts.has(key)
+    ) {
       accountsMissingBaseline++;
       continue;
     }
@@ -171,39 +230,62 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
     accountsWithValidBaseline++;
 
     if (baseline.baselineFollowerCount > 0) {
-      growthPercents.push((gained / baseline.baselineFollowerCount) * 100);
+      const member = growthByMember.get(account.userId) ?? {
+        baseline: 0,
+        current: 0,
+      };
+      member.baseline += baseline.baselineFollowerCount;
+      member.current += current;
+      growthByMember.set(account.userId, member);
     }
   }
 
+  const growthPercents = [...growthByMember.values()].map(
+    (member) => ((member.current - member.baseline) / member.baseline) * 100
+  );
   const avgFollowerGrowth =
     growthPercents.length > 0
       ? growthPercents.reduce((s, v) => s + v, 0) / growthPercents.length
       : 0;
 
-  const engagementLifts: number[] = [];
-  const thirtyDaysAgoDate = new Date();
-  thirtyDaysAgoDate.setDate(thirtyDaysAgoDate.getDate() - ACTIVE_DAYS);
+  const engagementLiftsByMember = new Map<string, number[]>();
+  let accountsWithValidEngagement = 0;
 
   for (const account of accounts) {
     const baseline = allBaselines.find(
       (b) => b.userId === account.userId && b.platform === account.platform
     );
-    if (!baseline || baseline.baselineEngagementRate == null) continue;
+    if (
+      !baseline ||
+      !baselineStartsAfterConnection(baseline.baselineDate, account.connectedAt)
+    ) continue;
 
-    const recentPosts = await prisma.postAnalytics.findMany({
-      where: {
-        userId: account.userId,
-        publishedAt: { gte: thirtyDaysAgoDate },
-      },
-      select: { views: true, likes: true, comments: true },
-    });
+    const accountPosts = postsForAccount(posts, account.userId, account.platform);
+    const baselineEnd = new Date(baseline.baselineDate);
+    baselineEnd.setDate(baselineEnd.getDate() + 30);
+    const baselineEngagement = computeWeightedEngagementRate(
+      accountPosts.filter(
+        (post) =>
+          post.publishedAt >= baseline.baselineDate &&
+          post.publishedAt <= baselineEnd
+      )
+    );
+    const recentPosts = accountPosts.filter(
+      (post) => post.publishedAt >= thirtyDaysAgo
+    );
 
     const currentEngagement = computeWeightedEngagementRate(recentPosts);
-    if (currentEngagement != null) {
-      engagementLifts.push(currentEngagement - baseline.baselineEngagementRate);
+    if (currentEngagement != null && baselineEngagement != null) {
+      accountsWithValidEngagement++;
+      const memberLifts = engagementLiftsByMember.get(account.userId) ?? [];
+      memberLifts.push(currentEngagement - baselineEngagement);
+      engagementLiftsByMember.set(account.userId, memberLifts);
     }
   }
 
+  const engagementLifts = [...engagementLiftsByMember.values()].map(
+    (lifts) => lifts.reduce((sum, lift) => sum + lift, 0) / lifts.length
+  );
   const avgEngagementLift =
     engagementLifts.length > 0
       ? engagementLifts.reduce((s, v) => s + v, 0) / engagementLifts.length
@@ -211,7 +293,12 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
 
   const activeUserIds = new Set([
     ...activeCalendarUsers.map((u) => u.userId),
-    ...activeSyncUsers.map((u) => u.userId),
+    ...accounts
+      .filter(
+        (account) =>
+          account.lastSyncAt != null && account.lastSyncAt >= thirtyDaysAgo
+      )
+      .map((account) => account.userId),
   ]);
 
   return {
@@ -220,52 +307,89 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
     totalFollowersGained,
     avgFollowerGrowth,
     avgEngagementLift,
-    totalViewsTracked: postAnalyticsAgg._sum.views ?? 0,
-    totalPostsTracked: postAnalyticsAgg._count,
+    totalViewsTracked: posts.reduce((sum, post) => sum + post.views, 0),
+    totalPostsTracked: posts.length,
     activeUsers: activeUserIds.size,
     accountsWithValidBaseline,
+    accountsWithValidEngagement,
     accountsMissingBaseline,
   };
 }
 
 export async function getImpactTimeSeries(): Promise<ImpactTimeSeriesPoint[]> {
+  const accounts = await getImpactAccounts();
+  const accountKeys = new Set(
+    accounts.map((account) => accountKey(account.userId, account.platform))
+  );
   const allFollowerStats = await prisma.followerStats.findMany({
+    where: { userId: { in: [...new Set(accounts.map((a) => a.userId))] } },
     orderBy: { date: "asc" },
     select: { date: true, followerCount: true, userId: true, platform: true },
   });
+  const followerStats = allFollowerStats.filter((stat) =>
+    accountKeys.has(accountKey(stat.userId, stat.platform))
+  );
+  const suspicious = findDuplicatedFollowerSeries(followerStats);
 
-  const latestPerAccount = new Map<string, Map<string, number>>();
-
-  for (const fs of allFollowerStats) {
-    const dateKey = fs.date.toISOString().split("T")[0];
-    const accountKey = `${fs.userId}|${fs.platform}`;
-    if (!latestPerAccount.has(dateKey)) {
-      latestPerAccount.set(dateKey, new Map());
-    }
-    latestPerAccount.get(dateKey)!.set(accountKey, fs.followerCount);
+  const statsByDate = new Map<string, typeof followerStats>();
+  for (const stat of followerStats) {
+    const key = accountKey(stat.userId, stat.platform);
+    if (suspicious.has(key)) continue;
+    const dateKey = stat.date.toISOString().split("T")[0];
+    statsByDate.set(dateKey, [...(statsByDate.get(dateKey) ?? []), stat]);
   }
 
+  const latestPerAccount = new Map<string, number>();
   const result: ImpactTimeSeriesPoint[] = [];
-  for (const [dateKey, accounts] of latestPerAccount) {
-    let total = 0;
-    for (const count of accounts.values()) {
-      total += count;
+  for (const dateKey of [...statsByDate.keys()].sort()) {
+    for (const stat of statsByDate.get(dateKey) ?? []) {
+      latestPerAccount.set(
+        accountKey(stat.userId, stat.platform),
+        stat.followerCount
+      );
     }
-    result.push({ date: dateKey, totalFollowers: total });
+    result.push({
+      date: dateKey,
+      totalFollowers: [...latestPerAccount.values()].reduce(
+        (sum, count) => sum + count,
+        0
+      ),
+    });
   }
 
-  return result.sort((a, b) => a.date.localeCompare(b.date));
+  return result;
 }
 
 export async function getEngagementTimeSeries(): Promise<EngagementTimeSeriesPoint[]> {
+  const accounts = await getImpactAccounts();
+  const accountKeys = new Set(
+    accounts.map((account) => accountKey(account.userId, account.platform))
+  );
   const allPosts = await prisma.postAnalytics.findMany({
+    where: {
+      userId: { in: [...new Set(accounts.map((account) => account.userId))] },
+      isDemo: false,
+      platform: { not: null },
+    },
     orderBy: { publishedAt: "asc" },
-    select: { publishedAt: true, views: true, likes: true, comments: true },
+    select: {
+      userId: true,
+      platform: true,
+      publishedAt: true,
+      views: true,
+      likes: true,
+      comments: true,
+    },
   });
+  const posts = allPosts.filter(
+    (post) =>
+      post.platform != null &&
+      accountKeys.has(accountKey(post.userId, post.platform))
+  );
 
   const weekMap = new Map<string, { views: number; interactions: number }>();
 
-  for (const post of allPosts) {
+  for (const post of posts) {
     if (post.views <= 0) continue;
     const date = new Date(post.publishedAt);
     const weekStart = new Date(date);
@@ -289,50 +413,76 @@ export async function getEngagementTimeSeries(): Promise<EngagementTimeSeriesPoi
 }
 
 export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
-  const accounts = await prisma.zernioAccount.findMany({
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          plan: true,
-          organization: { select: { name: true } },
-        },
-      },
-    },
-  });
+  const accounts = await getImpactAccounts();
+  const connectedUserIds = [...new Set(accounts.map((account) => account.userId))];
+  const connectedAccountKeys = new Set(
+    accounts.map((account) => accountKey(account.userId, account.platform))
+  );
 
-  const baselines = await prisma.memberGrowthBaseline.findMany();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - ACTIVE_DAYS);
 
-  const allFollowerStats = await prisma.followerStats.findMany({
-    orderBy: { date: "desc" },
-    select: { userId: true, platform: true, followerCount: true, date: true },
-  });
+  const [baselines, allFollowerStats, allPosts, recentCalendars] =
+    await Promise.all([
+      prisma.memberGrowthBaseline.findMany({
+        where: { userId: { in: connectedUserIds } },
+      }),
+      prisma.followerStats.findMany({
+        where: { userId: { in: connectedUserIds } },
+        orderBy: { date: "desc" },
+        select: { userId: true, platform: true, followerCount: true, date: true },
+      }),
+      prisma.postAnalytics.findMany({
+        where: {
+          userId: { in: connectedUserIds },
+          isDemo: false,
+          platform: { not: null },
+        },
+        select: {
+          userId: true,
+          platform: true,
+          publishedAt: true,
+          views: true,
+          likes: true,
+          comments: true,
+        },
+      }),
+      prisma.calendar.findMany({
+        where: {
+          userId: { in: connectedUserIds },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        select: { userId: true },
+        distinct: ["userId"],
+      }),
+    ]);
+  const followerStats = allFollowerStats.filter((stat) =>
+    connectedAccountKeys.has(accountKey(stat.userId, stat.platform))
+  );
+  const suspiciousFollowerAccounts = findDuplicatedFollowerSeries(followerStats);
+  const posts = allPosts.filter(
+    (post) =>
+      post.platform != null &&
+      connectedAccountKeys.has(accountKey(post.userId, post.platform))
+  );
 
   const latestFollowerMap = new Map<string, number>();
-  for (const fs of allFollowerStats) {
-    const key = `${fs.userId}|${fs.platform}`;
+  for (const fs of followerStats) {
+    const key = accountKey(fs.userId, fs.platform);
     if (!latestFollowerMap.has(key)) {
       latestFollowerMap.set(key, fs.followerCount);
     }
   }
 
-  const recentCalendars = await prisma.calendar.findMany({
-    where: { createdAt: { gte: thirtyDaysAgo } },
-    select: { userId: true },
-    distinct: ["userId"],
-  });
   const activeCalendarUserIds = new Set(recentCalendars.map((c) => c.userId));
-
-  const recentSyncAccounts = await prisma.zernioAccount.findMany({
-    where: { lastSyncAt: { gte: thirtyDaysAgo } },
-    select: { userId: true },
-    distinct: ["userId"],
-  });
-  const activeSyncUserIds = new Set(recentSyncAccounts.map((a) => a.userId));
+  const activeSyncUserIds = new Set(
+    accounts
+      .filter(
+        (account) =>
+          account.lastSyncAt != null && account.lastSyncAt >= thirtyDaysAgo
+      )
+      .map((account) => account.userId)
+  );
 
   const rows: MemberGrowthRow[] = [];
 
@@ -340,11 +490,19 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
     const baseline = baselines.find(
       (b) => b.userId === account.userId && b.platform === account.platform
     );
-    const currentFollowers = latestFollowerMap.get(
-      `${account.userId}|${account.platform}`
-    );
+    const key = accountKey(account.userId, account.platform);
+    const followerDataValid = !suspiciousFollowerAccounts.has(key);
+    const baselineIsValid =
+      baseline != null &&
+      baselineStartsAfterConnection(baseline.baselineDate, account.connectedAt);
+    const currentFollowers = followerDataValid
+      ? latestFollowerMap.get(key)
+      : undefined;
 
-    const baselineFollowers = baseline?.baselineFollowerCount ?? null;
+    const baselineFollowers =
+      followerDataValid && baselineIsValid
+        ? baseline.baselineFollowerCount
+        : null;
     const followersGained =
       baselineFollowers != null && currentFollowers != null
         ? currentFollowers - baselineFollowers
@@ -354,16 +512,24 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
         ? (followersGained / baselineFollowers) * 100
         : null;
 
-    const recentPosts = await prisma.postAnalytics.findMany({
-      where: {
-        userId: account.userId,
-        publishedAt: { gte: thirtyDaysAgo },
-      },
-      select: { views: true, likes: true, comments: true },
-    });
+    const accountPosts = postsForAccount(posts, account.userId, account.platform);
+    const recentPosts = accountPosts.filter(
+      (post) => post.publishedAt >= thirtyDaysAgo
+    );
     const currentEngagement = computeWeightedEngagementRate(recentPosts);
 
-    const baselineEngagement = baseline?.baselineEngagementRate ?? null;
+    let baselineEngagement: number | null = null;
+    if (baselineIsValid) {
+      const baselineEnd = new Date(baseline.baselineDate);
+      baselineEnd.setDate(baselineEnd.getDate() + 30);
+      baselineEngagement = computeWeightedEngagementRate(
+        accountPosts.filter(
+          (post) =>
+            post.publishedAt >= baseline.baselineDate &&
+            post.publishedAt <= baselineEnd
+        )
+      );
+    }
     const engagementLift =
       baselineEngagement != null && currentEngagement != null
         ? currentEngagement - baselineEngagement
@@ -384,7 +550,7 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
       userEmail: account.user.email,
       platform: account.platform,
       handle: account.handle,
-      baselineDate: baseline?.baselineDate.toISOString() ?? null,
+      baselineDate: baselineIsValid ? baseline.baselineDate.toISOString() : null,
       baselineFollowers,
       currentFollowers: currentFollowers ?? null,
       followersGained,
@@ -398,14 +564,17 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
       plan: account.user.plan ?? "PRO",
       organizationName: account.user.organization?.name ?? null,
       isActive,
+      followerDataValid,
     });
   }
 
   return rows;
 }
 
-export async function getPlatformGrowthBreakdown(): Promise<PlatformGrowthBreakdownRow[]> {
-  const rows = await getMemberGrowthRows();
+export async function getPlatformGrowthBreakdown(
+  providedRows?: MemberGrowthRow[]
+): Promise<PlatformGrowthBreakdownRow[]> {
+  const rows = providedRows ?? (await getMemberGrowthRows());
 
   const byPlatform = new Map<string, { gained: number; percents: number[]; count: number }>();
 
@@ -432,8 +601,10 @@ export async function getPlatformGrowthBreakdown(): Promise<PlatformGrowthBreakd
   }));
 }
 
-export async function getCohortGrowthBreakdown(): Promise<CohortGrowthRow[]> {
-  const rows = await getMemberGrowthRows();
+export async function getCohortGrowthBreakdown(
+  providedRows?: MemberGrowthRow[]
+): Promise<CohortGrowthRow[]> {
+  const rows = providedRows ?? (await getMemberGrowthRows());
 
   const byCohort = new Map<
     string,
@@ -472,35 +643,80 @@ export async function getCohortGrowthBreakdown(): Promise<CohortGrowthRow[]> {
     }));
 }
 
-export async function getUsageCorrelationStats(): Promise<UsageCorrelationStats> {
-  const rows = await getMemberGrowthRows();
+export async function getUsageCorrelationStats(
+  providedRows?: MemberGrowthRow[]
+): Promise<UsageCorrelationStats> {
+  const rows = providedRows ?? (await getMemberGrowthRows());
 
   const active = rows.filter((r) => r.isActive);
   const inactive = rows.filter((r) => !r.isActive);
 
   const avgGrowth = (arr: MemberGrowthRow[]) => {
-    const valid = arr.filter((r) => r.growthPercent != null) as { growthPercent: number }[];
-    return valid.length > 0
-      ? valid.reduce((s, r) => s + r.growthPercent, 0) / valid.length
+    const byMember = new Map<string, { baseline: number; current: number }>();
+    for (const row of arr) {
+      if (row.baselineFollowers == null || row.currentFollowers == null) continue;
+      const member = byMember.get(row.userId) ?? { baseline: 0, current: 0 };
+      member.baseline += row.baselineFollowers;
+      member.current += row.currentFollowers;
+      byMember.set(row.userId, member);
+    }
+    const percentages = [...byMember.values()]
+      .filter((member) => member.baseline > 0)
+      .map(
+        (member) =>
+          ((member.current - member.baseline) / member.baseline) * 100
+      );
+    return percentages.length > 0
+      ? percentages.reduce((sum, percentage) => sum + percentage, 0) /
+          percentages.length
       : 0;
   };
 
   const avgEngagement = (arr: MemberGrowthRow[]) => {
-    const valid = arr.filter((r) => r.currentEngagement != null) as { currentEngagement: number }[];
-    return valid.length > 0
-      ? valid.reduce((s, r) => s + r.currentEngagement, 0) / valid.length
+    const byMember = new Map<string, number[]>();
+    for (const row of arr) {
+      if (row.currentEngagement == null) continue;
+      byMember.set(row.userId, [
+        ...(byMember.get(row.userId) ?? []),
+        row.currentEngagement,
+      ]);
+    }
+    const memberRates = [...byMember.values()].map(
+      (rates) => rates.reduce((sum, rate) => sum + rate, 0) / rates.length
+    );
+    return memberRates.length > 0
+      ? memberRates.reduce((sum, rate) => sum + rate, 0) / memberRates.length
       : 0;
   };
 
   const activeUserIds = new Set(active.map((r) => r.userId));
   const inactiveUserIds = new Set(inactive.map((r) => r.userId));
 
-  const activePostCount = await prisma.postAnalytics.count({
-    where: { userId: { in: Array.from(activeUserIds) } },
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - ACTIVE_DAYS);
+  const accountKeys = new Set(
+    rows.map((row) => accountKey(row.userId, row.platform))
+  );
+  const posts = await prisma.postAnalytics.findMany({
+    where: {
+      userId: { in: [...new Set(rows.map((row) => row.userId))] },
+      publishedAt: { gte: thirtyDaysAgo },
+      isDemo: false,
+      platform: { not: null },
+    },
+    select: { userId: true, platform: true },
   });
-  const inactivePostCount = await prisma.postAnalytics.count({
-    where: { userId: { in: Array.from(inactiveUserIds) } },
-  });
+  const validPosts = posts.filter(
+    (post) =>
+      post.platform != null &&
+      accountKeys.has(accountKey(post.userId, post.platform))
+  );
+  const activePostCount = validPosts.filter((post) =>
+    activeUserIds.has(post.userId)
+  ).length;
+  const inactivePostCount = validPosts.filter((post) =>
+    inactiveUserIds.has(post.userId)
+  ).length;
 
   return {
     activeUsers: activeUserIds.size,
@@ -518,49 +734,98 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
   const staleThreshold = new Date();
   staleThreshold.setDate(staleThreshold.getDate() - STALE_SYNC_DAYS);
 
-  const [
-    totalUsers,
-    totalAccounts,
-    usersWithAccounts,
-    allAccounts,
-    baselines,
-    accountsWithPosts,
-  ] = await Promise.all([
-    prisma.user.count(),
-    prisma.zernioAccount.count(),
-    prisma.zernioAccount.findMany({ select: { userId: true }, distinct: ["userId"] }),
-    prisma.zernioAccount.findMany({
-      select: { userId: true, platform: true, lastSyncAt: true },
+  const allAccounts = await getImpactAccounts();
+  const userIds = [...new Set(allAccounts.map((account) => account.userId))];
+  const accountKeys = new Set(
+    allAccounts.map((account) => accountKey(account.userId, account.platform))
+  );
+  const [totalUsers, baselines, posts, followerStats] = await Promise.all([
+    prisma.user.count({
+      where: {
+        role: { not: "ADMIN" },
+        accountStatus: { in: [...IMPACT_ACCOUNT_STATUSES] },
+      },
     }),
-    prisma.memberGrowthBaseline.findMany({ select: { userId: true, platform: true } }),
+    prisma.memberGrowthBaseline.findMany({
+      where: { userId: { in: userIds } },
+      select: {
+        userId: true,
+        platform: true,
+        baselineDate: true,
+      },
+    }),
     prisma.postAnalytics.findMany({
-      select: { userId: true },
-      distinct: ["userId"],
+      where: {
+        userId: { in: userIds },
+        isDemo: false,
+        platform: { not: null },
+      },
+      select: { userId: true, platform: true },
+    }),
+    prisma.followerStats.findMany({
+      where: { userId: { in: userIds } },
+      select: {
+        userId: true,
+        platform: true,
+        date: true,
+        followerCount: true,
+      },
     }),
   ]);
 
-  const usersWithAccountIds = new Set(usersWithAccounts.map((u) => u.userId));
+  const totalAccounts = allAccounts.length;
+  const usersWithAccountIds = new Set(allAccounts.map((account) => account.userId));
   const usersWithoutAccounts = totalUsers - usersWithAccountIds.size;
 
   const baselineKeys = new Set(
-    baselines.map((b) => `${b.userId}|${b.platform}`)
+    baselines
+      .filter((baseline) => {
+        const account = allAccounts.find(
+          (candidate) =>
+            accountKey(candidate.userId, candidate.platform) ===
+            accountKey(baseline.userId, baseline.platform)
+        );
+        return (
+          account != null &&
+          baselineStartsAfterConnection(
+            baseline.baselineDate,
+            account.connectedAt
+          )
+        );
+      })
+      .map((baseline) => accountKey(baseline.userId, baseline.platform))
   );
   const accountsWithoutBaselines = allAccounts.filter(
-    (a) => !baselineKeys.has(`${a.userId}|${a.platform}`)
+    (account) =>
+      !baselineKeys.has(accountKey(account.userId, account.platform))
   ).length;
 
   const accountsWithoutRecentSync = allAccounts.filter(
     (a) => !a.lastSyncAt || a.lastSyncAt < staleThreshold
   ).length;
 
-  const usersWithPostsSet = new Set(accountsWithPosts.map((p) => p.userId));
+  const accountsWithPostsSet = new Set(
+    posts
+      .filter(
+        (post) =>
+          post.platform != null &&
+          accountKeys.has(accountKey(post.userId, post.platform))
+      )
+      .map((post) => accountKey(post.userId, post.platform!))
+  );
   const accountsWithoutPostAnalytics = allAccounts.filter(
-    (a) => !usersWithPostsSet.has(a.userId)
+    (account) =>
+      !accountsWithPostsSet.has(accountKey(account.userId, account.platform))
   ).length;
 
   const staleSyncCount = allAccounts.filter(
     (a) => !a.lastSyncAt || a.lastSyncAt < staleThreshold
   ).length;
+  const suspiciousFollowerAccounts = findDuplicatedFollowerSeries(
+    followerStats.filter((stat) =>
+      accountKeys.has(accountKey(stat.userId, stat.platform))
+    )
+  ).size;
 
   return {
     usersWithoutAccounts,
@@ -568,6 +833,7 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
     accountsWithoutRecentSync,
     accountsWithoutPostAnalytics,
     staleSyncCount,
+    suspiciousFollowerAccounts,
     totalUsers,
     totalAccounts,
   };

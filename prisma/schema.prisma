@@ -9,63 +9,63 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String?        @unique
-  emailVerified DateTime?
-  name          String?
-  password      String?        // For credentials auth, nullable for OAuth
-  image         String?
-  role          UserRole       @default(USER)
-  plan          UserPlan       @default(PRO)
-  tokenVersion  Int            @default(0)  // Incremented on password reset to invalidate existing JWTs
-  emailUnsubscribed Boolean     @default(false) // User opted out of broadcast emails
-  authorDisplayName  String?  // Public byline name shown on articles
-  authorImage        String?  // URL to headshot
-  authorOrganization String?  // Optional org/title shown under name
-  authorContactEmail String?  // Optional contact email shown as mailto link in byline
-  organizationId       String?
-  organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  id                 String        @id @default(uuid())
+  email              String?       @unique
+  emailVerified      DateTime?
+  name               String?
+  password           String? // For credentials auth, nullable for OAuth
+  image              String?
+  role               UserRole      @default(USER)
+  plan               UserPlan      @default(PRO)
+  tokenVersion       Int           @default(0) // Incremented on password reset to invalidate existing JWTs
+  emailUnsubscribed  Boolean       @default(false) // User opted out of broadcast emails
+  authorDisplayName  String? // Public byline name shown on articles
+  authorImage        String? // URL to headshot
+  authorOrganization String? // Optional org/title shown under name
+  authorContactEmail String? // Optional contact email shown as mailto link in byline
+  organizationId     String?
+  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Account cohort & access management (pre-Stripe)
-  accountStatus      AccountStatus    @default(ACTIVE)
-  internalTag        String?
-  isComped           Boolean          @default(false)
-  compReason         String?
-  accessExpiresAt    DateTime?
-  expirationAction   ExpirationAction @default(NONE)
-  lastAccessCheckAt  DateTime?
+  accountStatus     AccountStatus    @default(ACTIVE)
+  internalTag       String?
+  isComped          Boolean          @default(false)
+  compReason        String?
+  accessExpiresAt   DateTime?
+  expirationAction  ExpirationAction @default(NONE)
+  lastAccessCheckAt DateTime?
 
   // Stripe placeholder fields — populated by future Stripe webhook integration
-  stripeCustomerId       String?
-  stripeSubscriptionId   String?
-  stripeStatus           String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripeStatus         String?
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  questionnaires Questionnaire[]
-  calendars     Calendar[]
-  socialTokens  SocialToken[]
-  adminMessages AdminMessage[]
-  socialProfiles   SocialProfile[]
-  postAnalytics    PostAnalytics[]
-  contentArchives  ContentArchive[]
-  contentFeedback  ContentFeedback[]
-  pushSubscriptions PushSubscription[]
-  profileSurveys   ProfileSurvey[]
-  zernioAccounts   ZernioAccount[]
-  bestTimeToPosts  BestTimeToPost[]
-  followerStats    FollowerStats[]
-  deepAnalytics    DeepAnalytics[]
-  resourcePosts    ResourcePost[]
-  bugReports      BugReport[]
-  creatorMemories CreatorMemory[]
-  calendarGenerationLogs CalendarGenerationLog[]
-  notificationLogs NotificationLog[]
-  notificationPreference NotificationPreference?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  questionnaires             Questionnaire[]
+  calendars                  Calendar[]
+  socialTokens               SocialToken[]
+  adminMessages              AdminMessage[]
+  socialProfiles             SocialProfile[]
+  postAnalytics              PostAnalytics[]
+  contentArchives            ContentArchive[]
+  contentFeedback            ContentFeedback[]
+  pushSubscriptions          PushSubscription[]
+  profileSurveys             ProfileSurvey[]
+  zernioAccounts             ZernioAccount[]
+  bestTimeToPosts            BestTimeToPost[]
+  followerStats              FollowerStats[]
+  deepAnalytics              DeepAnalytics[]
+  resourcePosts              ResourcePost[]
+  bugReports                 BugReport[]
+  creatorMemories            CreatorMemory[]
+  calendarGenerationLogs     CalendarGenerationLog[]
+  notificationLogs           NotificationLog[]
+  notificationPreference     NotificationPreference?
   scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
-  memberGrowthBaselines MemberGrowthBaseline[]
-  accounts      Account[]
-  sessions      Session[]
+  memberGrowthBaselines      MemberGrowthBaseline[]
+  accounts                   Account[]
+  sessions                   Session[]
 
   @@index([internalTag])
   @@index([accountStatus])
@@ -116,7 +116,7 @@ model Questionnaire {
   id          String   @id @default(uuid())
   title       String
   description String?
-  content     Json     // Store questionnaire structure as JSON
+  content     Json // Store questionnaire structure as JSON
   isPublished Boolean  @default(false)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -139,26 +139,26 @@ model Calendar {
 }
 
 model AnalyticsCache {
-  id         String   @id @default(uuid())
-  key        String   @unique
-  data       Json
-  expiresAt  DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String    @id @default(uuid())
+  key       String    @unique
+  data      Json
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@map("analytics_cache")
 }
 
 model SocialToken {
-  id           String       @id @default(uuid())
+  id           String         @id @default(uuid())
   provider     SocialProvider
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
   userId       String
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@unique([userId, provider])
   @@map("social_tokens")
@@ -178,17 +178,17 @@ model AdminMessage {
 }
 
 model InviteToken {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  plan      UserPlan @default(PRO)
-  organizationId   String?
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invitedByUserId  String?
-  inviteSource     String?  // "ADMIN" | "TEAM_ADMIN"
-  inviteRole       UserRole @default(USER) // Role the registering user should receive
+  id              String        @id @default(cuid())
+  email           String        @unique
+  token           String        @unique
+  expiresAt       DateTime
+  createdAt       DateTime      @default(now())
+  plan            UserPlan      @default(PRO)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedByUserId String?
+  inviteSource    String? // "ADMIN" | "TEAM_ADMIN"
+  inviteRole      UserRole      @default(USER) // Role the registering user should receive
 
   @@map("invite_tokens")
 }
@@ -197,8 +197,8 @@ model PendingStripeInvite {
   id                   String   @id @default(cuid())
   email                String
   token                String   @unique
-  purchaseType         String   // "solo" | "community"
-  billingInterval      String   // "monthly" | "annual"
+  purchaseType         String // "solo" | "community"
+  billingInterval      String // "monthly" | "annual"
   organizationName     String?
   seats                Int?
   stripeCustomerId     String
@@ -255,35 +255,35 @@ enum ExpirationAction {
 }
 
 model SocialProfile {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider     String   // e.g., "INSTAGRAM"
-  accountId    String   // The external ID
-  accessToken  String?
-  handle       String?
-  connectedAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String // e.g., "INSTAGRAM"
+  accountId   String // The external ID
+  accessToken String?
+  handle      String?
+  connectedAt DateTime @default(now())
 
   @@map("social_profiles")
 }
 
 model ContentArchive {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weekStarting   String
-  dayIndex       Int
-  day            String
-  format         String
-  bucket         String
-  title          String
-  hook           String
-  body           String
-  cta            String
-  caption        String
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStarting    String
+  dayIndex        Int
+  day             String
+  format          String
+  bucket          String
+  title           String
+  hook            String
+  body            String
+  cta             String
+  caption         String
   musicSuggestion String?
-  duration       String?
-  archivedAt     DateTime @default(now())
+  duration        String?
+  archivedAt      DateTime @default(now())
 
   @@unique([userId, weekStarting, dayIndex])
   @@map("content_archives")
@@ -298,7 +298,7 @@ model ContentFeedback {
   title        String
   format       String
   bucket       String
-  feedback     String   // "up" | "down"
+  feedback     String // "up" | "down"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -307,19 +307,23 @@ model ContentFeedback {
 }
 
 model PostAnalytics {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  externalId   String?  // Platform post ID from Zernio
-  title        String
-  format       String   // REEL, CAROUSEL, STATIC or platform name
-  publishedAt  DateTime
-  views        Int      @default(0)
-  likes        Int      @default(0)
-  comments     Int      @default(0)
-  postUrl      String?  // Direct URL to the post on the platform
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId  String? // Platform post ID from Zernio
+  title       String
+  format      String // REEL, CAROUSEL, STATIC or platform name
+  platform    String? // normalized social platform; null only for legacy/unattributed rows
+  isDemo      Boolean  @default(false)
+  publishedAt DateTime
+  views       Int      @default(0)
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  postUrl     String? // Direct URL to the post on the platform
 
   @@unique([externalId, userId])
+  @@index([userId, platform, publishedAt])
+  @@index([isDemo])
   @@map("post_analytics")
 }
 
@@ -363,7 +367,7 @@ model ZernioAccount {
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   zernioProfileId String
   zernioAccountId String
-  platform        String    // e.g. "instagram", "tiktok", "linkedin"
+  platform        String // e.g. "instagram", "tiktok", "linkedin"
   handle          String?
   connectedAt     DateTime  @default(now())
   lastSyncAt      DateTime?
@@ -373,17 +377,17 @@ model ZernioAccount {
 }
 
 model PlatformConfig {
-  id                          String   @id @default("default")
-  zernioApiKey                String?
-  zernioEnabledPlatforms      String[] @default(["instagram", "tiktok", "facebook", "youtube"])
-  analyticsSyncFrequencyMinutes Int    @default(60)
-  anthropicModel              String   @default("claude-opus-4-8")
-  anthropicApiKey             String?
-  insightPromptTemplate       String?
-  calendarPromptTemplate      String?
+  id                             String   @id @default("default")
+  zernioApiKey                   String?
+  zernioEnabledPlatforms         String[] @default(["instagram", "tiktok", "facebook", "youtube"])
+  analyticsSyncFrequencyMinutes  Int      @default(60)
+  anthropicModel                 String   @default("claude-opus-4-8")
+  anthropicApiKey                String?
+  insightPromptTemplate          String?
+  calendarPromptTemplate         String?
   calendarStrategyPromptTemplate String?
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
 
   @@map("platform_config")
 }
@@ -391,8 +395,8 @@ model PlatformConfig {
 model ResourcePost {
   id          String    @id @default(cuid())
   title       String
-  content     String    // HTML from Tiptap
-  category    String?   // e.g. "Strategy", "Tools", "Mindset"
+  content     String // HTML from Tiptap
+  category    String? // e.g. "Strategy", "Tools", "Mindset"
   published   Boolean   @default(false)
   publishedAt DateTime?
   authorId    String
@@ -415,7 +419,7 @@ model BugReport {
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
   email       String
-  deviceInfo  String          // "mobile" or "browser" — user-reported
+  deviceInfo  String // "mobile" or "browser" — user-reported
   description String
   status      BugReportStatus @default(OPEN)
   adminNotes  String?
@@ -429,11 +433,11 @@ model FollowerStats {
   id            String   @id @default(cuid())
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform      String   // e.g. "instagram", "tiktok", "linkedin"
+  platform      String // e.g. "instagram", "tiktok", "linkedin"
   date          DateTime // The day the follower count was recorded (date-only, stored at midnight UTC)
   followerCount Int      @default(0)
-  growthDelta   Int      @default(0)   // net new followers vs previous day
-  growthPercent Float    @default(0)   // percentage growth vs previous day
+  growthDelta   Int      @default(0) // net new followers vs previous day
+  growthPercent Float    @default(0) // percentage growth vs previous day
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -445,8 +449,8 @@ model BestTimeToPost {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform  String   // e.g. "instagram", "tiktok", "linkedin"
-  heatmap   Json     // { grid: number[7][24], bestSlots: [{day,hour,engagement}] }
+  platform  String // e.g. "instagram", "tiktok", "linkedin"
+  heatmap   Json // { grid: number[7][24], bestSlots: [{day,hour,engagement}] }
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -458,9 +462,9 @@ model DeepAnalytics {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform  String   // e.g. "instagram", "youtube", "tiktok", "linkedin", "facebook"
-  dataType  String   // e.g. "demographics", "account_insights", "retention", "channel_insights", etc.
-  data      Json     // Normalized deep analytics payload
+  platform  String // e.g. "instagram", "youtube", "tiktok", "linkedin", "facebook"
+  dataType  String // e.g. "demographics", "account_insights", "retention", "channel_insights", etc.
+  data      Json // Normalized deep analytics payload
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -497,22 +501,22 @@ enum MemorySource {
 }
 
 model CreatorMemory {
-  id          String      @id @default(cuid())
-  userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  memoryType  MemoryType
-  title       String
-  summary     String
-  evidence    String?
-  confidence  Int         @default(50) // 0-100
-  importance  Importance  @default(MEDIUM)
-  source      MemorySource @default(SYSTEM)
-  metadata    Json?
-  embedding   String?     // Nullable — reserved for future vector support (pgvector / OpenAI embeddings)
-  pinned      Boolean     @default(false) // User-pinned memories always included in prompts
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  lastUsedAt  DateTime?
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memoryType MemoryType
+  title      String
+  summary    String
+  evidence   String?
+  confidence Int          @default(50) // 0-100
+  importance Importance   @default(MEDIUM)
+  source     MemorySource @default(SYSTEM)
+  metadata   Json?
+  embedding  String? // Nullable — reserved for future vector support (pgvector / OpenAI embeddings)
+  pinned     Boolean      @default(false) // User-pinned memories always included in prompts
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  lastUsedAt DateTime?
 
   @@index([userId, memoryType])
   @@index([userId, importance])
@@ -520,34 +524,34 @@ model CreatorMemory {
 }
 
 model ScheduledBroadcast {
-  id            String   @id @default(cuid())
-  subject       String
-  htmlContent   String
-  segment       String
-  scheduledFor  DateTime
-  status        String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
-  sentCount     Int      @default(0)
-  failedCount   Int      @default(0)
-  errors        Json?
-  createdBy     String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  emails        BroadcastEmail[]
+  id           String           @id @default(cuid())
+  subject      String
+  htmlContent  String
+  segment      String
+  scheduledFor DateTime
+  status       String           @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
+  sentCount    Int              @default(0)
+  failedCount  Int              @default(0)
+  errors       Json?
+  createdBy    String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  emails       BroadcastEmail[]
 
   @@index([status, scheduledFor])
   @@map("scheduled_broadcasts")
 }
 
 model BroadcastEmail {
-  id             String   @id @default(cuid())
+  id             String             @id @default(cuid())
   broadcastId    String
   broadcast      ScheduledBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
   recipientEmail String
   resendId       String?
-  status         String   @default("sent") // sent, delivered, bounced, opened, clicked, complained, delivery_delayed
+  status         String             @default("sent") // sent, delivered, bounced, opened, clicked, complained, delivery_delayed
   errorMessage   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@index([broadcastId])
   @@index([resendId])
@@ -555,34 +559,34 @@ model BroadcastEmail {
 }
 
 model NotificationPreference {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  postingReminder     Boolean @default(true)
-  postPublished       Boolean @default(true)
-  postFailed          Boolean @default(true)
-  newComment          Boolean @default(true)
-  analyticsMilestone  Boolean @default(true)
-  streakWarning       Boolean @default(true)
-  weeklyDigest        Boolean @default(true)
-  accountDisconnected Boolean @default(true)
-  adminBroadcast      Boolean @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postingReminder     Boolean  @default(true)
+  postPublished       Boolean  @default(true)
+  postFailed          Boolean  @default(true)
+  newComment          Boolean  @default(true)
+  analyticsMilestone  Boolean  @default(true)
+  streakWarning       Boolean  @default(true)
+  weeklyDigest        Boolean  @default(true)
+  accountDisconnected Boolean  @default(true)
+  adminBroadcast      Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@map("notification_preferences")
 }
 
 model NotificationLog {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        String   // posting_reminder, post_published, post_failed, new_comment, analytics_milestone, streak_warning, weekly_digest, account_disconnected, admin_broadcast
-  title       String
-  body        String
-  url         String?
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // posting_reminder, post_published, post_failed, new_comment, analytics_milestone, streak_warning, weekly_digest, account_disconnected, admin_broadcast
+  title     String
+  body      String
+  url       String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@index([userId, read])
   @@index([userId, type])
@@ -590,24 +594,24 @@ model NotificationLog {
 }
 
 model Organization {
-  id                 String   @id @default(cuid())
-  name               String
-  slug               String?  @unique
+  id   String  @id @default(cuid())
+  name String
+  slug String? @unique
 
-  seatLimit          Int      @default(1)
-  seatPlan           UserPlan @default(CALENDAR_ONLY)
+  seatLimit Int      @default(1)
+  seatPlan  UserPlan @default(CALENDAR_ONLY)
 
   // Stripe-ready fields — populated by future Stripe webhook integration
-  stripeCustomerId       String?
-  stripeSubscriptionId   String?
-  stripePriceId          String?
-  stripeStatus           String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  stripeStatus         String?
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  members            User[]
-  teamInvites        InviteToken[]
+  members     User[]
+  teamInvites InviteToken[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -615,96 +619,96 @@ model Organization {
 }
 
 model ScheduledPushNotification {
-  id            String   @id @default(cuid())
-  title         String
-  body          String
-  url           String?
-  segment       String   @default("all") // all, CALENDAR_ONLY, CREATOR, PRO
-  scheduledFor  DateTime
-  status        String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
-  sentCount     Int      @default(0)
-  failedCount   Int      @default(0)
-  createdBy     String
-  creator       User     @relation("ScheduledPushCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  title        String
+  body         String
+  url          String?
+  segment      String   @default("all") // all, CALENDAR_ONLY, CREATOR, PRO
+  scheduledFor DateTime
+  status       String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
+  sentCount    Int      @default(0)
+  failedCount  Int      @default(0)
+  createdBy    String
+  creator      User     @relation("ScheduledPushCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([status, scheduledFor])
   @@map("scheduled_push_notifications")
 }
 
 model CalendarGenerationLog {
-  id                        String   @id @default(cuid())
-  userId                    String
-  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  success                   Boolean
-  daysGenerated             Int?
-  freshnessScore            Int?
-  archetypeDiversity        Float?
-  themeDiversity            Float?
-  hookSimilarity            Float?
-  stalenessTriggered        Boolean  @default(false)
-  audienceFatigueTriggered  Boolean  @default(false)
-  dynamicConstraintsMode    String?  // "static" | "dynamic" | "none"
-  dynamicConstraintsFallback Boolean @default(false)
-  blockMetadata             Json?    // { included: [], trimmed: [], omitted: [] } — no raw prompt content
-  errorMessage              String?
-  durationMs                Int?
-  createdAt                 DateTime @default(now())
+  id                         String   @id @default(cuid())
+  userId                     String
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  success                    Boolean
+  daysGenerated              Int?
+  freshnessScore             Int?
+  archetypeDiversity         Float?
+  themeDiversity             Float?
+  hookSimilarity             Float?
+  stalenessTriggered         Boolean  @default(false)
+  audienceFatigueTriggered   Boolean  @default(false)
+  dynamicConstraintsMode     String? // "static" | "dynamic" | "none"
+  dynamicConstraintsFallback Boolean  @default(false)
+  blockMetadata              Json? // { included: [], trimmed: [], omitted: [] } — no raw prompt content
+  errorMessage               String?
+  durationMs                 Int?
+  createdAt                  DateTime @default(now())
 
   @@index([userId, createdAt])
   @@map("calendar_generation_logs")
 }
 
 model ValueCallSettings {
-  id            String    @id @default("default")
-  title         String    @default("Next Value Call")
-  description   String?
-  callStartsAt  DateTime?
-  zoomUrl       String?
-  timezone      String?   @default("America/New_York")
-  isEnabled     Boolean   @default(true)
+  id             String    @id @default("default")
+  title          String    @default("Next Value Call")
+  description    String?
+  callStartsAt   DateTime?
+  zoomUrl        String?
+  timezone       String?   @default("America/New_York")
+  isEnabled      Boolean   @default(true)
   reminderSentAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@map("value_call_settings")
 }
 
 model StripeEvent {
-  id           String   @id @default(cuid())
-  eventId      String   @unique
-  eventType    String
-  status       String   @default("PROCESSING") // PROCESSING, SUCCEEDED, FAILED
-  attempts     Int      @default(1)
-  claimedAt    DateTime @default(now())
-  claimToken   String
-  processedAt  DateTime?
-  lastError    String?
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  eventType   String
+  status      String    @default("PROCESSING") // PROCESSING, SUCCEEDED, FAILED
+  attempts    Int       @default(1)
+  claimedAt   DateTime  @default(now())
+  claimToken  String
+  processedAt DateTime?
+  lastError   String?
 
   @@index([status, claimedAt])
   @@map("stripe_events")
 }
 
 model RateLimitBucket {
-  key          String   @id
-  count        Int      @default(0)
-  windowStart  DateTime
-  lockedUntil  DateTime?
-  updatedAt    DateTime @updatedAt
+  key         String    @id
+  count       Int       @default(0)
+  windowStart DateTime
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
 
   @@index([updatedAt])
   @@map("rate_limit_buckets")
 }
 
 model IntegrationConnectionState {
-  tokenHash   String    @id
-  userId      String
-  platform    String
-  profileId   String
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  createdAt   DateTime  @default(now())
+  tokenHash  String    @id
+  userId     String
+  platform   String
+  profileId  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
@@ -712,17 +716,17 @@ model IntegrationConnectionState {
 }
 
 model MemberGrowthBaseline {
-  id                     String   @id @default(cuid())
-  userId                 String
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform               String
-  baselineDate           DateTime
-  baselineFollowerCount  Int?
-  baselineEngagementRate Float?
-  baselineAvgViews       Float?
+  id                      String   @id @default(cuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform                String
+  baselineDate            DateTime
+  baselineFollowerCount   Int?
+  baselineEngagementRate  Float?
+  baselineAvgViews        Float?
   baselineAvgInteractions Float?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@unique([userId, platform])
   @@index([platform])
