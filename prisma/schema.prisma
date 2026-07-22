@@ -715,6 +715,33 @@ model IntegrationConnectionState {
   @@map("integration_connection_states")
 }
 
+enum ChangelogType {
+  FEATURE
+  IMPROVEMENT
+  BUGFIX
+  SECURITY
+  ANNOUNCEMENT
+}
+
+model ChangelogEntry {
+  id          String        @id @default(cuid())
+  version     String?       // e.g. "v2.4.0" — optional, groups entries by release
+  title       String
+  type        ChangelogType @default(FEATURE)
+  content     String        // Markdown or plain text description
+  published   Boolean       @default(false)
+  publishedAt DateTime?
+  gitSha      String?       @unique // GitHub commit SHA — prevents duplicate entries from webhook/backfill
+  gitAuthor   String?       // GitHub commit author name
+  gitUrl      String?       // Link to commit on GitHub
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([published, publishedAt])
+  @@index([version])
+  @@map("changelog_entries")
+}
+
 model MemberGrowthBaseline {
   id                      String   @id @default(cuid())
   userId                  String

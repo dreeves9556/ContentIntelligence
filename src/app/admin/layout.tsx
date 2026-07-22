@@ -21,6 +21,7 @@ import {
   UsersRound,
   Radio,
   TrendingUp,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -37,6 +38,7 @@ const adminNavItems = [
   { name: "Resources", href: "/admin/resources", icon: BookOpen },
   { name: "Creator Memories", href: "/admin/memories", icon: Brain },
   { name: "Value Call", href: "/admin/value-call", icon: Radio },
+  { name: "Changelog", href: "/admin/changelog", icon: ScrollText },
   { name: "Bug Reports", href: "/admin/bugs", icon: Bug },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
