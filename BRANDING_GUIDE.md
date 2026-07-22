@@ -189,7 +189,7 @@ The client specified these directions for the icon:
 
 ### Current Icon (Placeholder)
 
-The current `public/icon.svg` is a placeholder with a dark background (`#0a0a0a`) and gold circles (`#c8952a`) — this is leftover from the old CoreOS/admin branding and **must be replaced** with a The Local Post branded icon using the correct palette (`#FFFFFF` background, `#1E56D6` or `#101418` mark).
+`public/icon.svg` currently uses the lucide **`Newspaper`** mark (blue `#1E56D6`) on a white (`#FFFFFF`) rounded background — the same mark shown on the login screen — as a temporary placeholder until a custom logo is finalized. All raster assets (`icon-192.png`, `icon-512.png`, `icon-1024.png`, `apple-touch-icon.png`, `favicon-32.png`) are generated from this SVG via `sharp`. This drives the favicon and the installable PWA / save-to-home-screen icon. Replace `public/icon.svg` and re-run the sharp generation when the final logo is ready.
 
 ### Masthead Treatment
 
