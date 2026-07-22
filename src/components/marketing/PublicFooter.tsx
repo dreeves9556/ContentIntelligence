@@ -1,4 +1,4 @@
-import { Crown } from "lucide-react";
+import { Newspaper } from "lucide-react";
 
 export function PublicFooter() {
   return (
@@ -6,7 +6,7 @@ export function PublicFooter() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <Crown className="h-5 w-5 text-accent-primary" />
+            <Newspaper className="h-5 w-5 text-accent-primary" />
             <span
               className="text-lg font-bold text-text-primary"
               style={{ fontFamily: "var(--font-serif)" }}

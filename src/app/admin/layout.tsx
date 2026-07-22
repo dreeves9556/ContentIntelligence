@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users,
   Settings,
-  Crown,
+  Newspaper,
   LogOut,
   Menu,
   X,
@@ -73,7 +73,7 @@ export default function AdminLayout({
       >
         <div className="flex items-center justify-between p-4 border-b border-border-primary">
           <div className="flex items-center gap-2">
-            <Crown className="h-6 w-6 text-accent-primary" />
+            <Newspaper className="h-6 w-6 text-accent-primary" />
             <span className="font-bold text-text-primary text-lg" style={{ fontFamily: "var(--font-serif)" }}>
               The Local Post
             </span>
@@ -120,7 +120,7 @@ export default function AdminLayout({
         {/* Desktop sidebar */}
         <aside className="hidden lg:flex w-64 flex-col bg-background-card border-r border-border-primary shrink-0 overflow-y-auto">
           <div className="flex items-center gap-2 p-6 border-b border-border-primary">
-            <Crown className="h-6 w-6 text-accent-primary" />
+            <Newspaper className="h-6 w-6 text-accent-primary" />
             <div className="flex flex-col">
               <span className="font-bold text-lg text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
                 The Local Post
@@ -166,7 +166,7 @@ export default function AdminLayout({
           {/* Mobile header */}
           <header className="lg:hidden flex items-center justify-between p-4 border-b border-border-primary bg-background-card/95 backdrop-blur">
             <div className="flex items-center gap-2">
-              <Crown className="h-6 w-6 text-accent-primary" />
+              <Newspaper className="h-6 w-6 text-accent-primary" />
               <div className="flex flex-col">
                 <span className="font-bold text-text-primary text-lg" style={{ fontFamily: "var(--font-serif)" }}>
                   The Local Post

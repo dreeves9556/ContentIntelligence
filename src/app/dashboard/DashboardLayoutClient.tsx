@@ -11,7 +11,7 @@ import {
   Library,
   Plug,
   User,
-  Sparkles,
+  Newspaper,
   Menu,
   X,
   LogOut,
@@ -100,7 +100,7 @@ export default function DashboardLayoutClient({
       >
         <div className="flex items-center justify-between p-4 border-b border-background-primary">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-accent-primary" />
+            <Newspaper className="h-6 w-6 text-accent-primary" />
             <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
               The Local Post
             </span>
@@ -199,7 +199,7 @@ export default function DashboardLayoutClient({
         {/* Desktop sidebar */}
         <aside className="hidden lg:flex w-64 flex-col bg-background-card border-r border-border-primary shrink-0 overflow-y-auto">
           <div className="flex items-center gap-2 p-6 border-b border-border-primary">
-            <Sparkles className="h-6 w-6 text-accent-primary" />
+            <Newspaper className="h-6 w-6 text-accent-primary" />
             <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
               The Local Post
             </span>
@@ -289,7 +289,7 @@ export default function DashboardLayoutClient({
           {/* Mobile header */}
           <header className="lg:hidden flex items-center justify-between p-4 border-b border-border-primary bg-background-card/95 backdrop-blur">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-accent-primary" />
+              <Newspaper className="h-6 w-6 text-accent-primary" />
               <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
                 The Local Post
               </span>

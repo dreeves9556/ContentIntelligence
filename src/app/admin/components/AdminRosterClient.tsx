@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { FileText, CalendarDays, Share2, Users, Crown, UserPlus, Settings2, Filter, X, Activity } from "lucide-react";
+import { FileText, CalendarDays, Share2, Users, UserPlus, Settings2, Filter, X, Activity } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, UserRole } from "@/lib/account-access";

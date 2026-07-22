@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Crown, LogIn } from "lucide-react";
+import { Newspaper, LogIn } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function PublicHeader() {
@@ -7,7 +7,7 @@ export function PublicHeader() {
     <header className="sticky top-0 z-50 bg-background-secondary/80 backdrop-blur-md border-b border-border-primary">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <Crown className="h-6 w-6 text-accent-primary" />
+          <Newspaper className="h-6 w-6 text-accent-primary" />
           <span
             className="text-lg sm:text-xl font-bold text-text-primary"
             style={{ fontFamily: "var(--font-serif)" }}

@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sparkles, Lock, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Newspaper, Lock, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { resetPassword } from "@/app/login/password-reset-actions";
 import { RotatingTagline } from "@/components/RotatingTagline";
 
@@ -52,7 +52,7 @@ function ResetPasswordForm() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
-            <Sparkles className="h-8 w-8 text-accent-primary" />
+            <Newspaper className="h-8 w-8 text-accent-primary" />
             <h1
               className="text-3xl font-bold tracking-tight text-text-primary"
               style={{ fontFamily: "var(--font-serif)" }}

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Crown, ShieldAlert } from "lucide-react";
+import { Newspaper, ShieldAlert } from "lucide-react";
 import { RegisterForm } from "./RegisterForm";
 import { RotatingTagline } from "@/components/RotatingTagline";
 
@@ -37,7 +37,7 @@ export default async function RegisterPage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-background-secondary flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Crown className="h-7 w-7 text-accent-primary" />
+          <Newspaper className="h-7 w-7 text-accent-primary" />
           <span
             className="text-2xl font-bold text-text-primary"
             style={{ fontFamily: "var(--font-serif)" }}
@@ -80,7 +80,7 @@ function InvalidLink({ reason }: { reason: string }) {
     <div className="min-h-screen bg-background-secondary flex items-center justify-center p-4">
       <div className="w-full max-w-md text-center">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <Crown className="h-7 w-7 text-accent-primary" />
+          <Newspaper className="h-7 w-7 text-accent-primary" />
           <span
             className="text-2xl font-bold text-text-primary"
             style={{ fontFamily: "var(--font-serif)" }}
