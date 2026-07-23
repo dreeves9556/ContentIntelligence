@@ -54,6 +54,15 @@ export async function updatePlatformConfig(
     }
   }
 
+  // Validate signup notification settings
+  if (update.notifyOnSignup === true) {
+    const email = typeof update.adminNotifyEmail === "string" ? update.adminNotifyEmail.trim() : "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { success: false, error: "A valid notification email address is required when signup notifications are enabled" };
+    }
+    update.adminNotifyEmail = email;
+  }
+
   try {
     await prisma.platformConfig.upsert({
       where: { id: "default" },

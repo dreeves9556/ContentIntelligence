@@ -558,7 +558,7 @@ export default function ConfigForm({
             className="w-full max-w-md bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-accent-primary focus:outline-none"
           />
           <p className="text-xs text-text-muted/60 mt-1.5">
-            Signup notifications will be sent to this address. Leave empty to use the from-address as fallback.
+            Signup notifications will be sent to this address. Required when notifications are enabled.
           </p>
         </div>
       </section>

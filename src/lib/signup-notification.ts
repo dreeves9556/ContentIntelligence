@@ -38,6 +38,15 @@ function emailTemplate(title: string, bodyHtml: string): string {
   `;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function sourceLabel(source: SignupSource): string {
   switch (source) {
     case "self-registration":
@@ -76,7 +85,7 @@ export async function sendSignupNotification(
           <p style="margin:0 0 16px;font-size:14px;color:#5B6472;line-height:1.6;">
             A new user ${label}:
           </p>
-          <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#101418;">${email}</p>
+          <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#101418;">${escapeHtml(email)}</p>
           <p style="margin:0;font-size:12px;color:#5B6472;line-height:1.6;">
             View all users in the admin panel.
           </p>
@@ -110,7 +119,7 @@ export async function sendBulkSignupNotification(
   const emailListHtml = emails
     .map(
       (e) =>
-        `<li style="margin:0 0 6px;font-size:14px;color:#101418;">${e}</li>`
+        `<li style="margin:0 0 6px;font-size:14px;color:#101418;">${escapeHtml(e)}</li>`
     )
     .join("");
 
