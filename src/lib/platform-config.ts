@@ -12,6 +12,8 @@ export type PlatformConfigData = Pick<
   | "insightPromptTemplate"
   | "calendarPromptTemplate"
   | "calendarStrategyPromptTemplate"
+  | "notifyOnSignup"
+  | "adminNotifyEmail"
 >;
 
 const DEFAULT_CONFIG: PlatformConfigData = {
@@ -23,6 +25,8 @@ const DEFAULT_CONFIG: PlatformConfigData = {
   insightPromptTemplate: null,
   calendarPromptTemplate: null,
   calendarStrategyPromptTemplate: null,
+  notifyOnSignup: false,
+  adminNotifyEmail: null,
 };
 
 export async function getPlatformConfig(): Promise<PlatformConfigData> {
@@ -41,6 +45,8 @@ export async function getPlatformConfig(): Promise<PlatformConfigData> {
     insightPromptTemplate: row.insightPromptTemplate,
     calendarPromptTemplate: row.calendarPromptTemplate,
     calendarStrategyPromptTemplate: row.calendarStrategyPromptTemplate,
+    notifyOnSignup: row.notifyOnSignup,
+    adminNotifyEmail: row.adminNotifyEmail,
   };
 }
 

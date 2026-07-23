@@ -19,6 +19,8 @@ export async function updatePlatformConfig(
     "analyticsSyncFrequencyMinutes",
     "anthropicModel",
     "anthropicApiKey",
+    "notifyOnSignup",
+    "adminNotifyEmail",
   ];
 
   const update: Record<string, unknown> = {};
@@ -92,6 +94,8 @@ export async function getPlatformConfigForAdmin(): Promise<PlatformConfigData & 
       insightPromptTemplate: null,
       calendarPromptTemplate: null,
       calendarStrategyPromptTemplate: null,
+      notifyOnSignup: false,
+      adminNotifyEmail: null,
       _count: { zernioAccounts: count },
     };
   }
@@ -106,6 +110,8 @@ export async function getPlatformConfigForAdmin(): Promise<PlatformConfigData & 
     insightPromptTemplate: row.insightPromptTemplate,
     calendarPromptTemplate: row.calendarPromptTemplate,
     calendarStrategyPromptTemplate: row.calendarStrategyPromptTemplate,
+    notifyOnSignup: row.notifyOnSignup,
+    adminNotifyEmail: row.adminNotifyEmail,
     _count: { zernioAccounts: count },
   };
 }

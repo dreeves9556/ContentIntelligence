@@ -38,6 +38,8 @@ export default async function AdminSettingsPage() {
           insightPromptTemplate: config.insightPromptTemplate,
           calendarPromptTemplate: config.calendarPromptTemplate,
           calendarStrategyPromptTemplate: config.calendarStrategyPromptTemplate,
+          notifyOnSignup: config.notifyOnSignup,
+          adminNotifyEmail: config.adminNotifyEmail,
         }}
         envZernioKey={!!process.env.ZERNIO_API_KEY}
         envAnthropicKey={!!process.env.ANTHROPIC_API_KEY}

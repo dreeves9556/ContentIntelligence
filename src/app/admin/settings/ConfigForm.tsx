@@ -180,6 +180,8 @@ interface ConfigFormProps {
     insightPromptTemplate: string | null;
     calendarPromptTemplate: string | null;
     calendarStrategyPromptTemplate: string | null;
+    notifyOnSignup: boolean;
+    adminNotifyEmail: string | null;
   };
   envZernioKey: boolean;
   envAnthropicKey: boolean;
@@ -205,6 +207,8 @@ export default function ConfigForm({
   );
   const [showZernioKey, setShowZernioKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
+  const [notifyOnSignup, setNotifyOnSignup] = useState(initial.notifyOnSignup);
+  const [adminNotifyEmail, setAdminNotifyEmail] = useState(initial.adminNotifyEmail ?? "");
   const [status, setStatus] = useState<
     { type: "success" | "error"; message: string } | null
   >(null);
@@ -227,6 +231,8 @@ export default function ConfigForm({
         analyticsSyncFrequencyMinutes: parseInt(syncMinutes, 10) || 60,
         anthropicModel: anthropicModel.trim() || "claude-opus-4-8",
         anthropicApiKey: anthropicApiKey.trim() || null,
+        notifyOnSignup,
+        adminNotifyEmail: adminNotifyEmail.trim() || null,
       });
       if (result.success) {
         setStatus({ type: "success", message: "Settings saved successfully." });
@@ -503,6 +509,56 @@ export default function ConfigForm({
             <code className="text-accent-primary">{"{{daySummary}}"}</code>,
             <code className="text-accent-primary">{"{{primaryGoal}}"}</code>,
             <code className="text-accent-primary">{"{{antiBrandWords}}"}</code>. <a href="mailto:daniel.reevesky@gmail.com?subject=The%20Local%20Post%20Prompt%20Suggestion%3A%20Calendar%20Strategy" className="text-accent-primary hover:underline">Suggest changes to the developer</a>.
+          </p>
+        </div>
+      </section>
+
+      {/* Signup Notification Section */}
+      <section className="bg-background-card rounded-lg p-6 border border-border-primary space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
+            Signup Notifications
+          </h2>
+          <p className="text-sm text-text-muted">
+            Get an email when someone signs up or is added to The Local Post.
+            Bulk adds send one email listing everyone added.
+          </p>
+        </div>
+
+        {/* Toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setNotifyOnSignup(!notifyOnSignup)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              notifyOnSignup ? "bg-accent-primary" : "bg-background-secondary border border-border-primary"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                notifyOnSignup ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span className="text-sm text-text-primary">
+            {notifyOnSignup ? "Notifications on" : "Notifications off"}
+          </span>
+        </div>
+
+        {/* Admin Notify Email */}
+        <div>
+          <label className="block text-sm font-medium text-text-primary mb-1.5">
+            Notification Email Address
+          </label>
+          <input
+            type="email"
+            value={adminNotifyEmail}
+            onChange={(e) => setAdminNotifyEmail(e.target.value)}
+            placeholder="admin@example.com"
+            className="w-full max-w-md bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-accent-primary focus:outline-none"
+          />
+          <p className="text-xs text-text-muted/60 mt-1.5">
+            Signup notifications will be sent to this address. Leave empty to use the from-address as fallback.
           </p>
         </div>
       </section>

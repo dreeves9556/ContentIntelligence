@@ -386,6 +386,8 @@ model PlatformConfig {
   insightPromptTemplate          String?
   calendarPromptTemplate         String?
   calendarStrategyPromptTemplate String?
+  notifyOnSignup                 Boolean  @default(false)
+  adminNotifyEmail               String?
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
 

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { sendSignupNotification } from "@/lib/signup-notification";
 
 // Only USER and TEAM_ADMIN are valid roles for invite-based registration.
 // ADMIN must never be assignable via invite token — it is a global admin role
@@ -81,6 +82,10 @@ export async function registerWithToken(
       prisma.pendingStripeInvite.delete({ where: { token } }),
     ]);
 
+    sendSignupNotification(pendingInvite.email, "self-registration").catch((err) =>
+      console.error("[SIGNUP NOTIFICATION] Failed:", err)
+    );
+
     redirect("/onboarding");
   }
 
@@ -138,6 +143,10 @@ export async function registerWithToken(
     }),
     prisma.inviteToken.delete({ where: { token } }),
   ]);
+
+  sendSignupNotification(invite.email, "self-registration").catch((err) =>
+    console.error("[SIGNUP NOTIFICATION] Failed:", err)
+  );
 
   redirect("/onboarding");
 }

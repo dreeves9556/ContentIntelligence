@@ -9,6 +9,7 @@ import { getStripe } from "@/lib/stripe";
 import { zernio } from "@/lib/zernio";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, ExpirationAction } from "@/lib/account-access";
+import { sendSignupNotification, sendBulkSignupNotification } from "@/lib/signup-notification";
 
 function generateRandomPassword(): string {
   const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -133,6 +134,10 @@ export async function createClientProfile(
   }
 
   const emailSent = await sendOnboardingEmail(normalizedEmail);
+
+  sendSignupNotification(normalizedEmail, "admin-add").catch((err) =>
+    console.error("[SIGNUP NOTIFICATION] Failed:", err)
+  );
 
   return { password, error: emailSent ? undefined : "Account created, but welcome email failed to send. Share credentials manually." };
 }
@@ -269,6 +274,7 @@ export async function bulkCreateInvites(
   }
 
   const results: BulkInviteResult[] = [];
+  const addedEmails: string[] = [];
 
   for (const email of emails) {
     if (!email.includes("@") || !email.includes(".")) {
@@ -296,9 +302,16 @@ export async function bulkCreateInvites(
       });
       const emailSent = await sendOnboardingEmail(email);
       results.push({ email, success: true, password, error: emailSent ? undefined : "Welcome email failed — share credentials manually" });
+      addedEmails.push(email);
     } catch {
       results.push({ email, success: false, error: "Failed to create account" });
     }
+  }
+
+  if (addedEmails.length > 0) {
+    sendBulkSignupNotification(addedEmails, "admin-bulk-add").catch((err) =>
+      console.error("[BULK SIGNUP NOTIFICATION] Failed:", err)
+    );
   }
 
   return { results };
