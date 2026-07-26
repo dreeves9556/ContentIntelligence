@@ -27,6 +27,7 @@ const SOLO_FEATURES: (string | { text: string; emphasized?: boolean })[] = [
 ];
 
 const COMMUNITY_FEATURES = [
+  { text: "7-day free trial", emphasized: true },
   "Everything in Solo Membership",
   "Seat-based access for teams",
   "Team roster management",
@@ -218,8 +219,13 @@ export function PricingSection() {
 
           {/* Communities */}
           <div className="bg-background-secondary rounded-xl border-2 border-accent-primary/30 p-6 sm:p-8 flex flex-col relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
-              For Teams & Brokerages
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex gap-2">
+              <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                7-Day Free Trial
+              </span>
+              <span className="bg-accent-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
+                For Teams & Brokerages
+              </span>
             </div>
 
             <div className="flex items-center gap-2 mb-4">
@@ -307,12 +313,16 @@ export function PricingSection() {
             </div>
 
             <ul className="space-y-2 mb-8 flex-1">
-              {COMMUNITY_FEATURES.map((feature) => (
-                <li key={feature} className="flex items-start gap-2 text-sm text-text-muted">
-                  <Check className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
-                  {feature}
-                </li>
-              ))}
+              {COMMUNITY_FEATURES.map((feature, idx) => {
+                const text = typeof feature === "string" ? feature : feature.text;
+                const emphasized = typeof feature === "object" && feature.emphasized;
+                return (
+                  <li key={idx} className={`flex items-start gap-2 text-sm ${emphasized ? "text-text-primary font-semibold" : "text-text-muted"}`}>
+                    <Check className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
+                    {text}
+                  </li>
+                );
+              })}
             </ul>
 
             <button
@@ -326,7 +336,7 @@ export function PricingSection() {
                   Redirecting to checkout…
                 </>
               ) : (
-                "Start Communities Membership"
+                "Start 7-Day Free Trial"
               )}
             </button>
           </div>
@@ -337,7 +347,7 @@ export function PricingSection() {
         )}
 
         <p className="text-center text-xs text-text-muted mt-6">
-          Secure checkout powered by Stripe. Solo memberships include a 7-day free trial. Cancel anytime.
+          Secure checkout powered by Stripe. All memberships include a 7-day free trial. Cancel anytime.
         </p>
       </div>
     </section>

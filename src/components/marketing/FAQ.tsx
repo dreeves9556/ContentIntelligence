@@ -42,7 +42,7 @@ const FAQS = [
   {
     question: "Is there a free trial?",
     answer:
-      "Yes. Solo memberships include a 7-day free trial. You'll need to enter a card at checkout, but you won't be charged until the trial ends. Cancel anytime within the first 7 days and you won't be billed at all. One trial per person.",
+      "Yes. Both Solo and Communities memberships include a 7-day free trial. You'll need to enter a card at checkout, but you won't be charged until the trial ends. Cancel anytime within the first 7 days and you won't be billed at all. One trial per person.",
   },
   {
     question: "Can I cancel anytime?",
