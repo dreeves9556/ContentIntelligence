@@ -64,6 +64,7 @@ model User {
   notificationPreference     NotificationPreference?
   scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
   memberGrowthBaselines      MemberGrowthBaseline[]
+  loginAnnouncementDismissals LoginAnnouncementDismissal[]
   accounts                   Account[]
   sessions                   Session[]
 
@@ -761,4 +762,32 @@ model MemberGrowthBaseline {
   @@index([platform])
   @@index([baselineDate])
   @@map("member_growth_baselines")
+}
+
+model LoginAnnouncement {
+  id         String                        @id @default(cuid())
+  title      String
+  message    String // HTML content shown in the dismissable modal
+  segment    String                        @default("all") // all, PRO, CALENDAR_ONLY, connected, unconnected
+  isActive   Boolean                       @default(true)
+  createdBy  String
+  createdAt  DateTime                      @default(now())
+  updatedAt  DateTime                      @updatedAt
+  dismissals LoginAnnouncementDismissal[]
+
+  @@index([isActive])
+  @@map("login_announcements")
+}
+
+model LoginAnnouncementDismissal {
+  id            String             @id @default(cuid())
+  announcementId String
+  announcement  LoginAnnouncement  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dismissedAt   DateTime           @default(now())
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+  @@map("login_announcement_dismissals")
 }

@@ -28,6 +28,8 @@ import BugReportButton from "./bug-report/BugReportButton";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
+import { LoginAnnouncementModal } from "@/components/LoginAnnouncementModal";
+import type { LoginAnnouncementData } from "@/app/admin/announcements/login-actions";
 
 const ALL_NAV_ITEMS = [
   { name: "Content Calendar", href: "/dashboard/calendar", icon: Calendar, alwaysUnlocked: true },
@@ -55,8 +57,10 @@ const teamAdminNavItem = { name: "Team Roster", href: "/dashboard/team", icon: U
 
 export default function DashboardLayoutClient({
   children,
+  loginAnnouncements = [],
 }: {
   children: React.ReactNode;
+  loginAnnouncements?: LoginAnnouncementData[];
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -314,6 +318,10 @@ export default function DashboardLayoutClient({
       </div>
 
       <InstallPrompt />
+
+      {loginAnnouncements.length > 0 && (
+        <LoginAnnouncementModal announcements={loginAnnouncements} />
+      )}
     </div>
   );
 }

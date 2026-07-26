@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { shouldBlockDashboardAccess, type AccountAccessUser } from "@/lib/account-access";
 import { getAccessUser } from "@/lib/server-access";
+import { prisma } from "@/lib/prisma";
+import { getPendingLoginAnnouncements } from "@/app/admin/announcements/login-queries";
 import DashboardLayoutClient from "./DashboardLayoutClient";
 
 export const dynamic = "force-dynamic";
@@ -80,5 +82,20 @@ export default async function DashboardLayout({
     );
   }
 
-  return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
+  const hasConnectedAccounts = await prisma.zernioAccount
+    .count({ where: { userId: user.id } })
+    .then((c) => c > 0)
+    .catch(() => false);
+
+  const { announcements: loginAnnouncements } = await getPendingLoginAnnouncements(
+    user.id,
+    user.plan,
+    hasConnectedAccounts
+  );
+
+  return (
+    <DashboardLayoutClient loginAnnouncements={loginAnnouncements}>
+      {children}
+    </DashboardLayoutClient>
+  );
 }
