@@ -12,6 +12,15 @@ export function Hero() {
           <RotatingTagline />
         </div>
 
+        {/* Trial badge */}
+        <a
+          href="#pricing"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-6 bg-accent-primary/10 border border-accent-primary/20 rounded-full text-sm font-medium text-accent-primary hover:bg-accent-primary/15 transition-colors"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Start with a 7-day free trial
+        </a>
+
         {/* Headline */}
         <h1
           className="text-4xl sm:text-5xl md:text-6xl font-bold text-text-primary leading-tight mb-6"

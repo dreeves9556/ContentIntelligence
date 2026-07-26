@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getStripe, getAppUrl } from "@/lib/stripe";
 import { getPriceId, isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import type { PurchaseType, BillingInterval } from "@/lib/stripe-config";
+import { isTrialEligible, buildTrialSubscriptionData } from "@/lib/trial";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, email: true, stripeCustomerId: true, stripeSubscriptionId: true, plan: true, accountStatus: true, isComped: true },
+    select: { id: true, email: true, stripeCustomerId: true, stripeSubscriptionId: true, plan: true, accountStatus: true, isComped: true, hasUsedTrial: true, role: true },
   });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -108,12 +109,15 @@ export async function POST(request: Request) {
   const stripe = getStripe();
   const appUrl = getAppUrl();
 
+  const trialEligible = isTrialEligible(user);
+
   const metadata = {
     userId: user.id,
     purchaseType,
     billingInterval,
     seats: String(seats),
     appPlan: "PRO",
+    ...(trialEligible ? { trialGranted: "true" } : {}),
     ...(organizationName ? { organizationName } : {}),
   };
 
@@ -128,6 +132,7 @@ export async function POST(request: Request) {
       customer: user.stripeCustomerId ?? undefined,
       subscription_data: {
         metadata,
+        ...buildTrialSubscriptionData(trialEligible),
       },
       metadata,
       allow_promotion_codes: true,

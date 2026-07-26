@@ -35,10 +35,15 @@ model User {
   expirationAction  ExpirationAction @default(NONE)
   lastAccessCheckAt DateTime?
 
-  // Stripe placeholder fields — populated by future Stripe webhook integration
+  // Stripe fields — populated by Stripe webhook integration
   stripeCustomerId     String?
   stripeSubscriptionId String?
   stripeStatus         String?
+
+  // Trial tracking
+  hasUsedTrial             Boolean   @default(false)
+  trialEndsAt              DateTime?
+  trialWillEndNotifiedAt   DateTime?
 
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
@@ -72,6 +77,7 @@ model User {
   @@index([accountStatus])
   @@index([accessExpiresAt])
   @@index([stripeCustomerId])
+  @@index([trialEndsAt])
   @@map("users")
 }
 
@@ -205,6 +211,8 @@ model PendingStripeInvite {
   stripeCustomerId     String
   stripeSubscriptionId String
   stripeStatus         String?
+  hasUsedTrial         Boolean  @default(false)
+  trialEndsAt          DateTime?
   plan                 UserPlan @default(PRO)
   inviteRole           UserRole @default(USER)
   organizationId       String?

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendSignupNotification } from "@/lib/signup-notification";
+import { stripeStatusToAccountStatus } from "@/lib/stripe";
+import type Stripe from "stripe";
 
 // Only USER and TEAM_ADMIN are valid roles for invite-based registration.
 // ADMIN must never be assignable via invite token — it is a global admin role
@@ -71,12 +73,14 @@ export async function registerWithToken(
           password: hashedPassword,
           role: assignedRole,
           plan: pendingInvite.plan ?? "PRO",
-          accountStatus: "ACTIVE",
+          accountStatus: stripeStatusToAccountStatus((pendingInvite.stripeStatus ?? "active") as Stripe.Subscription.Status),
           isComped: false,
           organizationId: pendingInvite.organizationId ?? null,
           stripeCustomerId: pendingInvite.stripeCustomerId,
           stripeSubscriptionId: pendingInvite.stripeSubscriptionId,
           stripeStatus: pendingInvite.stripeStatus,
+          hasUsedTrial: pendingInvite.hasUsedTrial,
+          trialEndsAt: pendingInvite.trialEndsAt,
         },
       }),
       prisma.pendingStripeInvite.delete({ where: { token } }),

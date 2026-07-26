@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, Loader2, CreditCard, User, Users, Minus, Plus, AlertTriangle, Trash2, XCircle, ArrowRightLeft } from "lucide-react";
+import { Check, Loader2, CreditCard, User, Users, Minus, Plus, AlertTriangle, Trash2, XCircle, ArrowRightLeft, Sparkles } from "lucide-react";
 import type { UserPlan } from "@/lib/tiers";
 import { PUBLIC_PLAN_LABELS } from "@/lib/tiers";
 import type { BillingInterval } from "@/lib/pricing";
 import { calculateCommunityTotal, formatCurrency } from "@/lib/pricing";
+import { trialDaysRemaining } from "@/lib/trial";
 import SeatManager from "./SeatManager";
 
 interface BillingClientProps {
@@ -24,6 +25,8 @@ interface BillingClientProps {
   canManageSeats: boolean;
   orgAdminEmail: string | null;
   userRole: string;
+  trialEndsAt: Date | null;
+  hasUsedTrial: boolean;
 }
 
 const SOLO_FEATURES = [
@@ -49,6 +52,7 @@ export default function BillingClient({
   plan,
   stripeCustomerId,
   stripeStatus,
+  accountStatus,
   isComped,
   stripeCheckoutReady,
   organizationId,
@@ -58,6 +62,8 @@ export default function BillingClient({
   canManageSeats,
   orgAdminEmail,
   userRole,
+  trialEndsAt,
+  hasUsedTrial,
 }: BillingClientProps) {
   const searchParams = useSearchParams();
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
@@ -86,6 +92,9 @@ export default function BillingClient({
   const hasActiveSubscription = !!stripeCustomerId && !isComped;
   const canShowDangerZone = hasActiveSubscription || hasFullAccess;
   const isTeamAdminSwitching = userRole === "TEAM_ADMIN" && hasCommunityMembership && !isComped;
+
+  const isTrial = accountStatus === "TRIAL";
+  const trialDaysLeft = trialEndsAt ? trialDaysRemaining(new Date(trialEndsAt)) : 0;
 
   const communityTotal = calculateCommunityTotal(seats, billingInterval);
   const perSeat = seats > 0 ? communityTotal / seats : 0;
@@ -245,6 +254,21 @@ export default function BillingClient({
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400">
           {error}
+        </div>
+      )}
+
+      {/* Trial banner */}
+      {isTrial && trialEndsAt && (
+        <div className="bg-accent-primary/10 border border-accent-primary/30 rounded-xl p-4 text-sm">
+          <div className="flex items-center gap-2 text-accent-primary font-semibold mb-1">
+            <Sparkles className="h-4 w-4" />
+            Free Trial Active
+          </div>
+          <p className="text-text-muted">
+            {trialDaysLeft > 0
+              ? `You have ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left in your free trial. Your first payment will be charged on ${new Date(trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+              : "Your free trial ends today. Your first payment will be processed shortly."}
+          </p>
         </div>
       )}
 
@@ -527,10 +551,10 @@ export default function BillingClient({
           <div className="flex items-center justify-between flex-wrap gap-4 pb-6 border-b border-border-primary">
             <div className="max-w-md">
               <p className="text-sm font-medium text-text-primary">
-                Cancel Subscription
+                Cancel {isTrial ? "Trial" : "Subscription"}
               </p>
               <p className="text-xs text-text-muted mt-1">
-                Cancel at the end of your current billing period. You won&apos;t be charged again and will keep access until then. Your data is preserved and your account will be locked when the period ends.
+                Cancel at the end of your {isTrial ? "free trial" : "current billing period"}. You won't be charged{isTrial ? " at all" : " again"} and will keep access until then. Your data is preserved and your account will be locked when the {isTrial ? "trial" : "period"} ends.
               </p>
               {isCancelScheduled && (
                 <p className="text-xs text-yellow-400 mt-2">
@@ -544,7 +568,7 @@ export default function BillingClient({
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <XCircle className="h-4 w-4" />
-              {isCancelScheduled ? "Cancellation Scheduled" : "Cancel Subscription"}
+              {isCancelScheduled ? "Cancellation Scheduled" : isTrial ? "Cancel Trial" : "Cancel Subscription"}
             </button>
           </div>
 
@@ -577,14 +601,16 @@ export default function BillingClient({
             <div className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-yellow-400" />
               <h3 className="text-lg font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
-                Cancel Subscription
+                Cancel {isTrial ? "Trial" : "Subscription"}
               </h3>
             </div>
             <p className="text-sm text-text-muted">
-              Your subscription will be canceled at the end of your current billing period. You&apos;ll keep full access until then, and you won&apos;t be charged again.
+              {isTrial
+                ? "Canceling during your free trial will end your access when the trial period is over. You won't be charged. Your data will be preserved in case you want to come back later."
+                : "Your subscription will be canceled at the end of your current billing period. You'll keep full access until then, and you won't be charged again."}
             </p>
             <p className="text-sm text-text-muted">
-              When the period ends, your account will be archived. Your data will be preserved in case you want to come back later.
+              When the {isTrial ? "trial" : "period"} ends, your account will be archived. Your data will be preserved in case you want to come back later.
             </p>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
@@ -599,7 +625,7 @@ export default function BillingClient({
                 disabled={cancelLoading}
                 className="px-4 py-2 rounded-lg text-sm font-bold bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/30 transition-all disabled:opacity-50"
               >
-                {cancelLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel at Period End"}
+                {cancelLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isTrial ? "Cancel Trial" : "Cancel at Period End"}
               </button>
             </div>
           </div>

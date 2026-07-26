@@ -23,6 +23,8 @@ export default async function BillingPage() {
       isComped: true,
       organizationId: true,
       role: true,
+      trialEndsAt: true,
+      hasUsedTrial: true,
     },
   });
 
@@ -102,6 +104,8 @@ export default async function BillingPage() {
         canManageSeats={canManageSeats}
         orgAdminEmail={orgAdminEmail}
         userRole={user.role}
+        trialEndsAt={user.trialEndsAt}
+        hasUsedTrial={user.hasUsedTrial}
       />
     </div>
   );

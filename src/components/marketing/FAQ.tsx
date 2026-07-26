@@ -27,7 +27,7 @@ const FAQS = [
   {
     question: "Do I need an existing account to purchase?",
     answer:
-      "No. You can purchase first. After checkout, you'll receive a setup link to create your Local Post account and complete onboarding.",
+      "No. You can purchase first — your 7-day free trial starts immediately. After checkout, you'll receive a setup link to create your Local Post account and complete onboarding.",
   },
   {
     question: "Can I change Community seats later?",
@@ -40,9 +40,14 @@ const FAQS = [
       "Yes. Both Solo and Communities memberships offer annual billing at a discount — you get two months free compared to monthly pricing. Annual pricing equals the monthly seat total multiplied by ten.",
   },
   {
+    question: "Is there a free trial?",
+    answer:
+      "Yes. Solo memberships include a 7-day free trial. You'll need to enter a card at checkout, but you won't be charged until the trial ends. Cancel anytime within the first 7 days and you won't be billed at all. One trial per person.",
+  },
+  {
     question: "Can I cancel anytime?",
     answer:
-      "Yes. Your subscription is managed through Stripe and can be cancelled anytime from your billing dashboard. You'll keep access until the end of your billing period.",
+      "Yes. Your subscription is managed through Stripe and can be cancelled anytime from your billing dashboard. If you cancel during your free trial, you'll keep access until the trial ends and you won't be charged. If you cancel after the trial or a paid billing period, you'll keep access until the end of that period.",
   },
   {
     question: "Which social platforms are supported?",

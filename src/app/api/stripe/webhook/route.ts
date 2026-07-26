@@ -6,6 +6,7 @@ import { getStripe, stripeStatusToAccountStatus } from "@/lib/stripe";
 import { isStripeWebhookConfigured } from "@/lib/stripe-config";
 import { prisma } from "@/lib/prisma";
 import { sendPaidMembershipRegistrationEmail } from "@/lib/paid-registration-email";
+import { severZernioForUser } from "@/lib/zernio-sever";
 
 /**
  * Stripe webhook handler.
@@ -84,6 +85,10 @@ export async function POST(request: Request) {
       }
       case "invoice.payment_failed": {
         await handleInvoiceFailed(event.data.object as Stripe.Invoice);
+        break;
+      }
+      case "customer.subscription.trial_will_end": {
+        await handleTrialWillEnd(event.data.object as Stripe.Subscription);
         break;
       }
       default:
@@ -261,7 +266,19 @@ async function fulfillSoloCheckout(userId: string, customerId: string, subscript
   }
 
   const stripe = getStripe();
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  let subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+  // Trial abuse guard: if the user already used a trial but Stripe returned
+  // a trialing subscription, end the trial immediately so they're billed.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { hasUsedTrial: true },
+  });
+  if (subscription.status === "trialing" && user?.hasUsedTrial) {
+    console.log(`[STRIPE WEBHOOK] User ${userId} already used trial — ending trial immediately`);
+    await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  }
 
   await prisma.user.update({
     where: { id: userId },
@@ -273,10 +290,12 @@ async function fulfillSoloCheckout(userId: string, customerId: string, subscript
       accountStatus: stripeStatusToAccountStatus(subscription.status),
       isComped: false,
       organizationId: null,
+      hasUsedTrial: subscription.status === "trialing" || user?.hasUsedTrial || false,
+      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     },
   });
 
-  console.log(`[STRIPE WEBHOOK] User ${userId} upgraded to PRO via Solo checkout`);
+  console.log(`[STRIPE WEBHOOK] User ${userId} upgraded to PRO via Solo checkout (status: ${subscription.status})`);
 }
 
 /**
@@ -362,9 +381,21 @@ async function fulfillCommunityCheckout(
   const isProtected = await isProtectedUser(userId);
 
   const stripe = getStripe();
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  let subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const quantity = subscription.items.data[0]?.quantity ?? 1;
   const organizationName = session.metadata?.organizationName || "Community";
+
+  // Trial abuse guard: if the user already used a trial but Stripe returned
+  // a trialing subscription, end the trial immediately so they're billed.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { hasUsedTrial: true },
+  });
+  if (subscription.status === "trialing" && user?.hasUsedTrial) {
+    console.log(`[STRIPE WEBHOOK] User ${userId} already used trial — ending trial immediately`);
+    await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  }
 
   // Find existing org by stripeCustomerId or stripeSubscriptionId
   const existingOrg = await prisma.organization.findFirst({
@@ -432,6 +463,8 @@ async function fulfillCommunityCheckout(
       accountStatus: stripeStatusToAccountStatus(subscription.status),
       isComped: false,
       organizationId,
+      hasUsedTrial: subscription.status === "trialing" || user?.hasUsedTrial || false,
+      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     },
   });
 
@@ -523,14 +556,29 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
         });
         console.log(`[STRIPE WEBHOOK] Public community — protected user ${existingUser.id} linked to org ${organizationId}`);
       } else {
+        let effectiveStatus = stripeStatus;
+        let trialEnd: number | null | undefined = subscription.trial_end;
+
+        // Trial abuse guard: if user already used trial but sub came back trialing, end it
+        if (stripeStatus === "trialing" && existingUser.hasUsedTrial) {
+          const stripe = getStripe();
+          await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
+          const refreshed = await stripe.subscriptions.retrieve(subscriptionId);
+          effectiveStatus = refreshed.status;
+          trialEnd = refreshed.trial_end;
+          console.log(`[STRIPE WEBHOOK] Public community — user ${existingUser.id} already used trial, ended immediately`);
+        }
+
         await prisma.user.update({
           where: { id: existingUser.id },
           data: {
             role: "TEAM_ADMIN",
             plan: "PRO",
-            accountStatus: stripeStatusToAccountStatus(stripeStatus),
+            accountStatus: stripeStatusToAccountStatus(effectiveStatus),
             isComped: false,
             organizationId,
+            hasUsedTrial: effectiveStatus === "trialing" || existingUser.hasUsedTrial,
+            trialEndsAt: trialEnd ? new Date(trialEnd * 1000) : null,
           },
         });
         console.log(`[STRIPE WEBHOOK] Public community — user ${existingUser.id} set as TEAM_ADMIN of org ${organizationId}`);
@@ -550,25 +598,42 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
       stripeStatus,
       inviteRole: "TEAM_ADMIN",
       organizationId,
+      hasUsedTrial: stripeStatus === "trialing",
+      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     });
   } else {
     // Solo
     if (existingUser) {
       const isProtected = existingUser.role === "ADMIN" || existingUser.isComped;
       if (!isProtected) {
+        let effectiveStatus = stripeStatus;
+        let trialEnd: number | null | undefined = subscription.trial_end;
+
+        // Trial abuse guard: if user already used trial but sub came back trialing, end it
+        if (stripeStatus === "trialing" && existingUser.hasUsedTrial) {
+          const stripe = getStripe();
+          await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
+          const refreshed = await stripe.subscriptions.retrieve(subscriptionId);
+          effectiveStatus = refreshed.status;
+          trialEnd = refreshed.trial_end;
+          console.log(`[STRIPE WEBHOOK] Public solo — user ${existingUser.id} already used trial, ended immediately`);
+        }
+
         await prisma.user.update({
           where: { id: existingUser.id },
           data: {
             stripeCustomerId: customerId,
             stripeSubscriptionId: subscriptionId,
-            stripeStatus,
+            stripeStatus: effectiveStatus,
             plan: "PRO",
-            accountStatus: stripeStatusToAccountStatus(stripeStatus),
+            accountStatus: stripeStatusToAccountStatus(effectiveStatus),
             isComped: false,
             organizationId: null,
+            hasUsedTrial: effectiveStatus === "trialing" || existingUser.hasUsedTrial,
+            trialEndsAt: trialEnd ? new Date(trialEnd * 1000) : null,
           },
         });
-        console.log(`[STRIPE WEBHOOK] Public solo — user ${existingUser.id} upgraded to PRO`);
+        console.log(`[STRIPE WEBHOOK] Public solo — user ${existingUser.id} upgraded to PRO (status: ${effectiveStatus})`);
       } else {
         console.log(`[STRIPE WEBHOOK] Public solo — skipping protected user ${existingUser.id}`);
       }
@@ -585,6 +650,8 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
       stripeSubscriptionId: subscriptionId,
       stripeStatus,
       inviteRole: "USER",
+      hasUsedTrial: stripeStatus === "trialing",
+      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     });
   }
 }
@@ -600,6 +667,8 @@ async function createPendingStripeInvite(params: {
   stripeStatus: string;
   inviteRole: "USER" | "TEAM_ADMIN";
   organizationId?: string;
+  hasUsedTrial?: boolean;
+  trialEndsAt?: Date | null;
 }) {
   // Check for existing pending invite by email — don't create duplicates
   const existing = await prisma.pendingStripeInvite.findFirst({
@@ -619,6 +688,8 @@ async function createPendingStripeInvite(params: {
         stripeStatus: params.stripeStatus,
         inviteRole: params.inviteRole,
         organizationId: params.organizationId,
+        hasUsedTrial: params.hasUsedTrial ?? false,
+        trialEndsAt: params.trialEndsAt ?? null,
         expiresAt: new Date(Date.now() + PENDING_INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
       },
     });
@@ -643,6 +714,8 @@ async function createPendingStripeInvite(params: {
       plan: "PRO",
       inviteRole: params.inviteRole,
       organizationId: params.organizationId,
+      hasUsedTrial: params.hasUsedTrial ?? false,
+      trialEndsAt: params.trialEndsAt ?? null,
       expiresAt,
     },
   });
@@ -730,15 +803,24 @@ async function updateUserFromSubscription(userId: string, subscription: Stripe.S
     return;
   }
 
-  // If cancel_at_period_end is true, keep the user ACTIVE until the period ends.
-  // Store a synthetic status so the UI can show "cancellation scheduled".
+  // If cancel_at_period_end is true, keep the user's current status until the
+  // period ends. Store a synthetic status so the UI can show "cancellation scheduled".
+  // During a trial, preserve TRIAL (not ACTIVE) so the UI reflects the trial state.
   const effectiveStatus = subscription.cancel_at_period_end
     ? "cancel_at_period_end"
     : subscription.status;
 
-  const accountStatus = subscription.cancel_at_period_end
-    ? "ACTIVE" as const
-    : stripeStatusToAccountStatus(subscription.status);
+  let accountStatus: "ACTIVE" | "TRIAL" | "PAST_DUE" | "CANCELED" | "EXPIRED";
+  if (subscription.cancel_at_period_end) {
+    // Keep current status — trial users stay TRIAL, active users stay ACTIVE
+    if (subscription.status === "trialing") {
+      accountStatus = "TRIAL";
+    } else {
+      accountStatus = "ACTIVE";
+    }
+  } else {
+    accountStatus = stripeStatusToAccountStatus(subscription.status);
+  }
 
   await prisma.user.update({
     where: { id: userId },
@@ -746,6 +828,9 @@ async function updateUserFromSubscription(userId: string, subscription: Stripe.S
       stripeSubscriptionId: subscription.id,
       stripeStatus: effectiveStatus,
       accountStatus,
+      ...(subscription.trial_end && subscription.status === "trialing"
+        ? { trialEndsAt: new Date(subscription.trial_end * 1000) }
+        : { trialEndsAt: null }),
     },
   });
   console.log(`[STRIPE WEBHOOK] User ${userId} subscription updated — status: ${effectiveStatus}`);
@@ -769,7 +854,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     });
 
     if (org) {
-      await downgradeOrganization(org.id);
+      await downgradeOrganization(org.id, subscription.id);
       return;
     }
     // Community event with no matching org — do NOT fall through to user lookup
@@ -780,7 +865,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   // Solo subscription
   const userId = subscription.metadata?.userId;
   if (userId) {
-    await downgradeUser(userId);
+    await downgradeUser(userId, subscription.id);
     return;
   }
 
@@ -791,7 +876,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       select: { id: true },
     });
     if (user) {
-      await downgradeUser(user.id);
+      await downgradeUser(user.id, subscription.id);
       return;
     }
   }
@@ -799,11 +884,24 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.warn("[STRIPE WEBHOOK] subscription.deleted — no user or org found");
 }
 
-async function downgradeUser(userId: string) {
+async function downgradeUser(userId: string, deletedSubscriptionId?: string) {
   // Protect ADMIN and comped users
   if (await isProtectedUser(userId)) {
     console.log(`[STRIPE WEBHOOK] Skipping downgrade for protected user ${userId}`);
     return;
+  }
+
+  // Race guard: if the user has a different subscription ID than the one
+  // being deleted, they've already re-subscribed. Don't downgrade them.
+  if (deletedSubscriptionId) {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { stripeSubscriptionId: true },
+    });
+    if (currentUser?.stripeSubscriptionId && currentUser.stripeSubscriptionId !== deletedSubscriptionId) {
+      console.log(`[STRIPE WEBHOOK] Skipping downgrade for user ${userId} — current sub ${currentUser.stripeSubscriptionId} != deleted ${deletedSubscriptionId}`);
+      return;
+    }
   }
 
   await prisma.user.update({
@@ -814,12 +912,30 @@ async function downgradeUser(userId: string) {
       stripeSubscriptionId: null,
       stripeCustomerId: null,
       stripeStatus: "canceled",
+      trialEndsAt: null,
     },
   });
-  console.log(`[STRIPE WEBHOOK] User ${userId} downgraded to CALENDAR_ONLY + ARCHIVED (subscription deleted)`);
+
+  // Sever all Zernio social-account connections
+  await severZernioForUser(userId);
+
+  console.log(`[STRIPE WEBHOOK] User ${userId} downgraded to CALENDAR_ONLY + ARCHIVED, Zernio severed (subscription deleted)`);
 }
 
-async function downgradeOrganization(orgId: string) {
+async function downgradeOrganization(orgId: string, deletedSubscriptionId?: string) {
+  // Race guard: if the org has a different subscription ID than the one
+  // being deleted, they've already re-subscribed. Don't downgrade.
+  if (deletedSubscriptionId) {
+    const currentOrg = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { stripeSubscriptionId: true },
+    });
+    if (currentOrg?.stripeSubscriptionId && currentOrg.stripeSubscriptionId !== deletedSubscriptionId) {
+      console.log(`[STRIPE WEBHOOK] Skipping org downgrade — current sub ${currentOrg.stripeSubscriptionId} != deleted ${deletedSubscriptionId}`);
+      return;
+    }
+  }
+
   // Mark org as canceled, clear Stripe billing fields, preserve data for reactivation
   await prisma.organization.update({
     where: { id: orgId },
@@ -846,11 +962,60 @@ async function downgradeOrganization(orgId: string) {
       data: {
         accountStatus: "ARCHIVED",
         plan: "CALENDAR_ONLY",
+        trialEndsAt: null,
       },
     });
+
+    // Sever Zernio connections for each downgraded member
+    for (const member of members) {
+      await severZernioForUser(member.id);
+    }
   }
 
-  console.log(`[STRIPE WEBHOOK] Org ${orgId} canceled — ${members.length} members downgraded`);
+  console.log(`[STRIPE WEBHOOK] Org ${orgId} canceled — ${members.length} members downgraded + Zernio severed`);
+}
+
+// ─── customer.subscription.trial_will_end ────────────────────────────────────
+
+async function handleTrialWillEnd(subscription: Stripe.Subscription) {
+  let userId = subscription.metadata?.userId;
+
+  // Public checkout users may not have userId in subscription metadata —
+  // fall back to looking up by stripeCustomerId
+  if (!userId) {
+    const customerId = getCustomerId(subscription);
+    if (customerId) {
+      const user = await prisma.user.findFirst({
+        where: { stripeCustomerId: customerId },
+        select: { id: true },
+      });
+      if (user) {
+        userId = user.id;
+      }
+    }
+  }
+
+  if (!userId) {
+    console.log("[STRIPE WEBHOOK] trial_will_end — no userId found in metadata or by customer lookup, skipping");
+    return;
+  }
+
+  if (await isProtectedUser(userId)) {
+    console.log(`[STRIPE WEBHOOK] trial_will_end — skipping protected user ${userId}`);
+    return;
+  }
+
+  const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000) : null;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      trialWillEndNotifiedAt: new Date(),
+      ...(trialEnd ? { trialEndsAt: trialEnd } : {}),
+    },
+  });
+
+  console.log(`[STRIPE WEBHOOK] trial_will_end — user ${userId} notified, trial ends at ${trialEnd?.toISOString() ?? "unknown"}`);
 }
 
 // ─── invoice events ─────────────────────────────────────────────────────────
@@ -902,6 +1067,9 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     data: {
       stripeStatus: subscription.status,
       accountStatus: stripeStatusToAccountStatus(subscription.status),
+      ...(subscription.status === "trialing" && subscription.trial_end
+        ? { trialEndsAt: new Date(subscription.trial_end * 1000) }
+        : { trialEndsAt: null }),
     },
   });
 }
@@ -937,6 +1105,7 @@ async function handleInvoiceFailed(invoice: Stripe.Invoice) {
     data: {
       stripeStatus: "past_due",
       accountStatus: "PAST_DUE",
+      trialEndsAt: null,
     },
   });
 

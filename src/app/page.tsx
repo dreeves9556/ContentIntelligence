@@ -11,7 +11,7 @@ import { PublicFooter } from "@/components/marketing/PublicFooter";
 export const metadata: Metadata = {
   title: "The Local Post — AI Content System for Local Professionals",
   description:
-    "The Local Post helps real estate agents, local professionals, and growing teams turn their expertise into weekly content that builds trust and keeps them visible in their market.",
+    "The Local Post helps real estate agents, local professionals, and growing teams turn their expertise into weekly content that builds trust and keeps them visible. Start with a 7-day free trial on Solo memberships.",
   keywords: [
     "real estate marketing",
     "local business marketing",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "The Local Post — AI Content System for Local Professionals",
     description:
-      "Turn your expertise, stories, and community knowledge into weekly content that builds trust and drives conversations.",
+      "Turn your expertise, stories, and community knowledge into weekly content that builds trust and drives conversations. Start with a 7-day free trial on Solo memberships.",
     type: "website",
   },
 };

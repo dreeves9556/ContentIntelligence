@@ -3,6 +3,7 @@ import { getStripe, getAppUrl } from "@/lib/stripe";
 import { getPriceId, isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import type { PurchaseType, BillingInterval } from "@/lib/pricing";
 import { COMMUNITY_MIN_SEATS, COMMUNITY_MAX_SEATS } from "@/lib/pricing";
+import { buildTrialSubscriptionData } from "@/lib/trial";
 
 /**
  * Public Stripe Checkout — no authentication required.
@@ -83,12 +84,15 @@ export async function POST(request: Request) {
   const appUrl = getAppUrl();
   const organizationName = body.organizationName?.trim();
 
+  const trialEligible = true;
+
   const metadata: Record<string, string> = {
     checkoutSource: "public_homepage",
     purchaseType,
     billingInterval,
     seats: String(seats),
     appPlan: "PRO",
+    ...(trialEligible ? { trialGranted: "true" } : {}),
     ...(organizationName ? { organizationName } : {}),
   };
 
@@ -99,7 +103,10 @@ export async function POST(request: Request) {
       line_items: [{ price: priceId, quantity: seats }],
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/?checkout=cancelled#pricing`,
-      subscription_data: { metadata },
+      subscription_data: {
+        metadata,
+        ...buildTrialSubscriptionData(trialEligible),
+      },
       metadata,
       allow_promotion_codes: true,
     });

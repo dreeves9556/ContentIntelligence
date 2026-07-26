@@ -40,6 +40,8 @@ export const getAccessUser = cache(async (userId: string) => {
       expirationAction: true,
       isComped: true,
       internalTag: true,
+      hasUsedTrial: true,
+      stripeSubscriptionId: true,
     },
   });
 });

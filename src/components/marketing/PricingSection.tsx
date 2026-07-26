@@ -14,6 +14,7 @@ import {
 } from "@/lib/pricing";
 
 const SOLO_FEATURES: (string | { text: string; emphasized?: boolean })[] = [
+  { text: "7-day free trial", emphasized: true },
   "Full AI content calendar",
   "Weekly content generation",
   "Brand Brain memory system",
@@ -145,7 +146,10 @@ export function PricingSection() {
         {/* Pricing cards */}
         <Reveal className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Solo */}
-          <div className="bg-background-secondary rounded-xl border border-border-primary p-6 sm:p-8 flex flex-col">
+          <div className="bg-background-secondary rounded-xl border border-border-primary p-6 sm:p-8 flex flex-col relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+              7-Day Free Trial
+            </div>
             <div className="flex items-center gap-2 mb-4">
               <User className="h-6 w-6 text-accent-primary" />
               <h3
@@ -157,6 +161,11 @@ export function PricingSection() {
             </div>
 
             <div className="mb-4">
+              <p className="text-sm text-text-muted mb-1">
+                Free for 7 days, then {billingInterval === "monthly"
+                  ? formatCurrency(SOLO_MONTHLY_CENTS)
+                  : formatCurrency(SOLO_ANNUAL_CENTS)}/{billingInterval === "monthly" ? "month" : "year"}
+              </p>
               <span className="text-3xl font-bold text-text-primary">
                 {billingInterval === "monthly"
                   ? formatCurrency(SOLO_MONTHLY_CENTS)
@@ -199,9 +208,12 @@ export function PricingSection() {
                   Redirecting to checkout…
                 </>
               ) : (
-                "Start Solo Membership"
+                "Start 7-Day Free Trial"
               )}
             </button>
+            <p className="text-center text-xs text-text-muted mt-3">
+              Card required. Cancel anytime in the first 7 days and you won't be charged.
+            </p>
           </div>
 
           {/* Communities */}
@@ -325,7 +337,7 @@ export function PricingSection() {
         )}
 
         <p className="text-center text-xs text-text-muted mt-6">
-          Secure checkout powered by Stripe. Cancel anytime.
+          Secure checkout powered by Stripe. Solo memberships include a 7-day free trial. Cancel anytime.
         </p>
       </div>
     </section>
