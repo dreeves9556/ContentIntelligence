@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { AccountAccessUser } from "@/lib/account-access";
@@ -21,6 +22,29 @@ export type DashboardAccessResult =
     };
 
 /**
+ * Load the access-relevant user record.
+ *
+ * Wrapped in React `cache` so that repeated authorization checks inside a
+ * single request (layout + page + server actions) share one database round
+ * trip instead of issuing one query per call.
+ */
+export const getAccessUser = cache(async (userId: string) => {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      plan: true,
+      accountStatus: true,
+      accessExpiresAt: true,
+      expirationAction: true,
+      isComped: true,
+      internalTag: true,
+    },
+  });
+});
+
+/**
  * Authorize a dashboard operation at the server boundary.
  *
  * Page layouts are not an authorization boundary: Server Actions and route
@@ -39,19 +63,7 @@ export async function requireDashboardAccess(
     return { allowed: false, status: 403, error: "Not authorized" };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      role: true,
-      plan: true,
-      accountStatus: true,
-      accessExpiresAt: true,
-      expirationAction: true,
-      isComped: true,
-      internalTag: true,
-    },
-  });
+  const user = await getAccessUser(session.user.id);
 
   if (!user) {
     return { allowed: false, status: 401, error: "Not authenticated" };

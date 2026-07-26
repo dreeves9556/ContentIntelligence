@@ -4,6 +4,7 @@ import CalendarClient from "./CalendarClient";
 import CalendarStrategyNote from "./CalendarStrategyNote";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { autoSyncAnalyticsIfNeeded } from "../integrations/actions";
 import { parseLocalDate } from "@/lib/best-time";
@@ -22,24 +23,31 @@ export default async function CalendarPage() {
     redirect("/login");
   }
 
-  // Auto-sync analytics once per day per account (fire-and-forget)
-  autoSyncAnalyticsIfNeeded().catch((err) =>
-    console.error("Auto analytics sync failed:", err)
-  );
-
-  const calendar = await getWeeklyCalendar();
-
-  const zernioAccounts = await prisma.zernioAccount.findMany({
-    where: { userId: session.user.id },
-    select: { platform: true },
+  // Auto-sync analytics once per day per account. Runs after the response is
+  // sent so it never competes with page rendering for the DB connection pool.
+  after(async () => {
+    try {
+      await autoSyncAnalyticsIfNeeded();
+    } catch (err) {
+      console.error("Auto analytics sync failed:", err);
+    }
   });
+
+  // Independent reads — issue them concurrently rather than waiting on each in turn.
+  const [calendar, zernioAccounts, bestTimeRows] = await Promise.all([
+    getWeeklyCalendar(),
+    prisma.zernioAccount.findMany({
+      where: { userId: session.user.id },
+      select: { platform: true },
+    }),
+    prisma.bestTimeToPost.findMany({
+      where: { userId: session.user.id },
+      select: { platform: true, heatmap: true },
+    }),
+  ]);
+
   const connectedPlatforms = zernioAccounts.map((a) => a.platform);
 
-  // Fetch best-time-to-post heatmaps for connected platforms
-  const bestTimeRows = await prisma.bestTimeToPost.findMany({
-    where: { userId: session.user.id },
-    select: { platform: true, heatmap: true },
-  });
   const bestTimes = bestTimeRows.map((r) => ({
     platform: r.platform,
     heatmap: r.heatmap as unknown as { grid: number[][]; bestSlots: { day: number; hour: number; engagement: number }[] },

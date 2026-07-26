@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { shouldBlockDashboardAccess, type AccountAccessUser } from "@/lib/account-access";
+import { getAccessUser } from "@/lib/server-access";
 import DashboardLayoutClient from "./DashboardLayoutClient";
 
 export const dynamic = "force-dynamic";
@@ -14,18 +14,7 @@ export default async function DashboardLayout({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      role: true,
-      accountStatus: true,
-      accessExpiresAt: true,
-      expirationAction: true,
-      isComped: true,
-      internalTag: true,
-    },
-  });
+  const user = await getAccessUser(session.user.id);
 
   if (!user) redirect("/login");
 

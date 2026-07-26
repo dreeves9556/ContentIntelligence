@@ -14,39 +14,39 @@ export default async function AnalyticsPage() {
   const hasAnalyticsAccess = canAccessAnalytics(plan) || access.user.role === "ADMIN";
   const userId = access.user.id;
 
-  const posts = hasAnalyticsAccess ? await prisma.postAnalytics.findMany({
-    where: { userId },
-    orderBy: { publishedAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      format: true,
-      publishedAt: true,
-      views: true,
-      likes: true,
-      comments: true,
-      postUrl: true,
-    },
-  }) : [];
-
-  // Fetch best-time-to-post heatmaps for connected platforms
-  const bestTimeRows = hasAnalyticsAccess ? await prisma.bestTimeToPost.findMany({
-    where: { userId },
-    select: { platform: true, heatmap: true, updatedAt: true },
-  }) : [];
-
-  // Fetch follower stats for connected platforms
-  const followerStatsRows = hasAnalyticsAccess ? await prisma.followerStats.findMany({
-    where: { userId },
-    orderBy: { date: "asc" },
-    select: { platform: true, date: true, followerCount: true, growthDelta: true, growthPercent: true },
-  }) : [];
-
-  // Fetch deep analytics for connected platforms
-  const deepAnalyticsRows = hasAnalyticsAccess ? await prisma.deepAnalytics.findMany({
-    where: { userId },
-    select: { platform: true, dataType: true, data: true, updatedAt: true },
-  }) : [];
+  // All four reads are independent — issue them concurrently so page render
+  // waits on one round trip instead of four.
+  const [posts, bestTimeRows, followerStatsRows, deepAnalyticsRows] = hasAnalyticsAccess
+    ? await Promise.all([
+        prisma.postAnalytics.findMany({
+          where: { userId },
+          orderBy: { publishedAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            format: true,
+            publishedAt: true,
+            views: true,
+            likes: true,
+            comments: true,
+            postUrl: true,
+          },
+        }),
+        prisma.bestTimeToPost.findMany({
+          where: { userId },
+          select: { platform: true, heatmap: true, updatedAt: true },
+        }),
+        prisma.followerStats.findMany({
+          where: { userId },
+          orderBy: { date: "asc" },
+          select: { platform: true, date: true, followerCount: true, growthDelta: true, growthPercent: true },
+        }),
+        prisma.deepAnalytics.findMany({
+          where: { userId },
+          select: { platform: true, dataType: true, data: true, updatedAt: true },
+        }),
+      ])
+    : [[], [], [], []];
 
   // Serialize dates to ISO strings for the client component
   const serializedPosts = posts.map((p) => ({
