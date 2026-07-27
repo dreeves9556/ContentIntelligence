@@ -49,8 +49,8 @@ export async function requestPasswordReset(
     };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: normalizedEmail, mode: "insensitive" } },
   });
 
   // Don't reveal whether the email exists — always return success
@@ -133,8 +133,8 @@ export async function resetPassword(
       : { success: false, error: "This reset link is invalid or has already been used." };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: claim.email },
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: claim.email, mode: "insensitive" } },
   });
 
   if (!user) {
@@ -144,7 +144,7 @@ export async function resetPassword(
   const hashedPassword = await bcrypt.hash(password, 12);
 
   await prisma.user.update({
-    where: { email: claim.email },
+    where: { id: user.id },
     data: {
       password: hashedPassword,
       tokenVersion: { increment: 1 },

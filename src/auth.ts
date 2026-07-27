@@ -31,7 +31,8 @@ export const {
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = (credentials.email as string).trim().toLowerCase();
+        const rawEmail = (credentials.email as string).trim();
+        const email = rawEmail.toLowerCase();
         const rateLimitKey = `login:${email}`;
 
         const rateCheck = await checkRateLimit(rateLimitKey);
@@ -39,8 +40,8 @@ export const {
           throw new Error(`Too many login attempts. Try again in ${formatRetryTime(rateCheck.retryAfterMs!)}.`);
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
+        const user = await prisma.user.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } },
         });
 
         if (!user || !user.password) {
