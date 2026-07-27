@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { sanitizeRichText } from "@/lib/sanitize";
 
 export type LoginSegment = "all" | "CALENDAR_ONLY" | "PRO" | "connected" | "unconnected";
 
@@ -35,11 +36,16 @@ export async function createLoginAnnouncement(
     return { success: false, error: "Title and message are required." };
   }
 
+  const sanitizedMessage = sanitizeRichText(message.trim());
+  if (!sanitizedMessage) {
+    return { success: false, error: "Message contains no renderable content." };
+  }
+
   try {
     await prisma.loginAnnouncement.create({
       data: {
         title: title.trim(),
-        message: message.trim(),
+        message: sanitizedMessage,
         segment,
         isActive: true,
         createdBy: session.user.id,
@@ -65,12 +71,17 @@ export async function updateLoginAnnouncement(
     return { success: false, error: "Title and message are required." };
   }
 
+  const sanitizedMessage = sanitizeRichText(message.trim());
+  if (!sanitizedMessage) {
+    return { success: false, error: "Message contains no renderable content." };
+  }
+
   try {
     await prisma.loginAnnouncement.update({
       where: { id },
       data: {
         title: title.trim(),
-        message: message.trim(),
+        message: sanitizedMessage,
         segment,
         isActive,
       },

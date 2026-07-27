@@ -10,7 +10,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const { name } = await req.json();
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
+    if (!name || typeof name !== "string" || name.trim().length === 0 || name.trim().length > 100) {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 

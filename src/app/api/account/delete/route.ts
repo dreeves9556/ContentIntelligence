@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
@@ -19,10 +20,21 @@ import { zernio } from "@/lib/zernio";
  *
  * If the user is a TEAM_ADMIN, they must transfer admin role first.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: { password?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (!body.password) {
+    return NextResponse.json({ error: "Password confirmation is required to delete your account." }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({
@@ -31,6 +43,7 @@ export async function POST() {
       id: true,
       email: true,
       role: true,
+      password: true,
       stripeCustomerId: true,
       stripeSubscriptionId: true,
       organizationId: true,
@@ -39,6 +52,15 @@ export async function POST() {
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (!user.password) {
+    return NextResponse.json({ error: "Password confirmation is required to delete your account." }, { status: 400 });
+  }
+
+  const passwordValid = await bcrypt.compare(body.password, user.password);
+  if (!passwordValid) {
+    return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
   }
 
   // TEAM_ADMIN must transfer admin role before deleting their account

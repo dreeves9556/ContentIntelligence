@@ -78,6 +78,7 @@ export default function BillingClient({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [switchLoading, setSwitchLoading] = useState(false);
 
@@ -202,7 +203,11 @@ export default function BillingClient({
     setError(null);
     setDeleteLoading(true);
     try {
-      const res = await fetch("/api/account/delete", { method: "POST" });
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deletePassword }),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Failed to delete account");
@@ -658,6 +663,18 @@ export default function BillingClient({
             </p>
             <div>
               <label className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                Enter your password to confirm
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Your password"
+                className="w-full px-4 py-2.5 bg-background-secondary border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-red-500/50 transition-colors text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
                 Type DELETE to confirm
               </label>
               <input
@@ -673,6 +690,7 @@ export default function BillingClient({
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeleteConfirmText("");
+                  setDeletePassword("");
                 }}
                 disabled={deleteLoading}
                 className="px-4 py-2 rounded-lg text-sm font-medium border border-border-primary text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
@@ -681,7 +699,7 @@ export default function BillingClient({
               </button>
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteLoading || deleteConfirmText !== "DELETE"}
+                disabled={deleteLoading || deleteConfirmText !== "DELETE" || !deletePassword}
                 className="px-4 py-2 rounded-lg text-sm font-bold bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all disabled:opacity-50"
               >
                 {deleteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete Everything"}

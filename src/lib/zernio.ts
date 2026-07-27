@@ -178,6 +178,9 @@ export const zernio = {
       zernioAccountId: string,
       path: string
     ): Promise<unknown> {
+      if (!/^[a-z0-9-]+$/i.test(path)) {
+        throw new Error(`Invalid analytics path: ${path}`);
+      }
       return zernioFetch<unknown>(`/accounts/${zernioAccountId}/${path}`);
     },
 

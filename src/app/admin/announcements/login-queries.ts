@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { LoginAnnouncementData } from "./login-actions";
+import { sanitizeRichText } from "@/lib/sanitize";
 
 async function requireAdmin() {
   const session = await auth();
@@ -26,7 +27,8 @@ export async function getLoginAnnouncements(): Promise<{ announcements: LoginAnn
     announcements: rows.map((r) => ({
       id: r.id,
       title: r.title,
-      message: r.message,
+      // Rows written before sanitisation was enforced are cleaned on read.
+      message: sanitizeRichText(r.message),
       segment: r.segment,
       isActive: r.isActive,
       createdAt: r.createdAt.toISOString(),
@@ -79,7 +81,8 @@ export async function getPendingLoginAnnouncements(
     announcements: matching.map((a) => ({
       id: a.id,
       title: a.title,
-      message: a.message,
+      // Rows written before sanitisation was enforced are cleaned on read.
+      message: sanitizeRichText(a.message),
       segment: a.segment,
       isActive: a.isActive,
       createdAt: a.createdAt.toISOString(),

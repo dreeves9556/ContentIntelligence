@@ -1,11 +1,14 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 import { checkActionRateLimit } from "@/lib/rate-limiter";
+import {
+  issuePasswordResetToken,
+  consumePasswordResetToken,
+} from "@/lib/password-reset-tokens";
 
 const RESET_MAX_ATTEMPTS = 3;
 const RESET_LOCKOUT_MS = 60 * 60 * 1000; // 1 hour
@@ -55,17 +58,7 @@ export async function requestPasswordReset(
     return { success: true };
   }
 
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-  // Delete any existing tokens for this email, then create a new one
-  await prisma.passwordResetToken.deleteMany({
-    where: { email: normalizedEmail },
-  });
-
-  await prisma.passwordResetToken.create({
-    data: { email: normalizedEmail, token, expiresAt },
-  });
+  const { token } = await issuePasswordResetToken(normalizedEmail, 60 * 60 * 1000);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
@@ -132,21 +125,16 @@ export async function resetPassword(
     return { success: false, error: "Password must include at least one letter and one number." };
   }
 
-  const resetToken = await prisma.passwordResetToken.findUnique({
-    where: { token },
-  });
+  const claim = await consumePasswordResetToken(token);
 
-  if (!resetToken) {
-    return { success: false, error: "This reset link is invalid or has already been used." };
-  }
-
-  if (resetToken.expiresAt < new Date()) {
-    await prisma.passwordResetToken.delete({ where: { token } });
-    return { success: false, error: "This reset link has expired." };
+  if (!claim.ok) {
+    return claim.reason === "expired"
+      ? { success: false, error: "This reset link has expired." }
+      : { success: false, error: "This reset link is invalid or has already been used." };
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: resetToken.email },
+    where: { email: claim.email },
   });
 
   if (!user) {
@@ -156,15 +144,12 @@ export async function resetPassword(
   const hashedPassword = await bcrypt.hash(password, 12);
 
   await prisma.user.update({
-    where: { email: resetToken.email },
+    where: { email: claim.email },
     data: {
       password: hashedPassword,
       tokenVersion: { increment: 1 },
     },
   });
-
-  // Delete the token so it can't be reused
-  await prisma.passwordResetToken.delete({ where: { token } });
 
   return { success: true };
 }

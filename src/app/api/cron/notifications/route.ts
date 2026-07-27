@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import {
   sendPostingReminder,
@@ -11,8 +12,13 @@ import {
 function verifyCronAuth(request: Request): boolean {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  return authHeader === `Bearer ${cronSecret}`;
+  if (!cronSecret || !authHeader) return false;
+  const expected = `Bearer ${cronSecret}`;
+  try {
+    return timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+  } catch {
+    return false;
+  }
 }
 
 // ─── Posting Reminders ──────────────────────────────────────────────

@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { authConfig } from "./auth.config";
+import { authConfig, isSessionExpired } from "./auth.config";
 import { prisma } from "./lib/prisma";
 import { checkRateLimit, recordFailedAttempt, clearRateLimit, formatRetryTime } from "./lib/rate-limiter";
 
@@ -31,8 +31,8 @@ export const {
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = credentials.email as string;
-        const rateLimitKey = `login:${email.toLowerCase()}`;
+        const email = (credentials.email as string).trim().toLowerCase();
+        const rateLimitKey = `login:${email}`;
 
         const rateCheck = await checkRateLimit(rateLimitKey);
         if (!rateCheck.allowed) {
@@ -120,7 +120,7 @@ export const {
     session({ session, token }) {
       if (token) {
         const sessionExpiry = token.sessionExpiry as number | undefined;
-        const isExpired = sessionExpiry ? Date.now() > sessionExpiry : false;
+        const isExpired = isSessionExpired(sessionExpiry);
 
         if (isExpired) {
           return {
@@ -131,7 +131,7 @@ export const {
 
         session.user.id = token.id as string;
         session.user.role = token.role as "USER" | "TEAM_ADMIN" | "ADMIN";
-        session.user.plan = (token.plan ?? "PRO") as "CALENDAR_ONLY" | "PRO";
+        session.user.plan = (token.plan ?? "CALENDAR_ONLY") as "CALENDAR_ONLY" | "PRO";
         session.user.accountStatus = token.accountStatus as string;
         (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }

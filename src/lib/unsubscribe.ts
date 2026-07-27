@@ -1,33 +1,50 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 function getSecret(): string {
-  const secret = process.env.UNSUBSCRIBE_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const secret =
+    process.env.UNSUBSCRIBE_SECRET ??
+    process.env.AUTH_SECRET ??
+    process.env.NEXTAUTH_SECRET;
   if (!secret) {
     throw new Error("Unsubscribe secret is not configured");
   }
   return secret;
 }
 
+/**
+ * Payload separator.
+ *
+ * A literal "." cannot be used: every real email address contains at least one
+ * dot, so splitting the decoded payload on "." produced more than three parts
+ * and every token failed verification. "|" is not valid in an email address
+ * local part or domain, and user IDs are cuid/uuid values, so it cannot appear
+ * in either field.
+ */
+const SEPARATOR = "|";
+
+function sign(payload: string): string {
+  return createHmac("sha256", getSecret()).update(payload).digest("hex");
+}
+
 export function generateUnsubscribeToken(userId: string, email: string): string {
-  const payload = `${userId}.${email}`;
-  const signature = createHmac("sha256", getSecret())
-    .update(payload)
-    .digest("hex");
-  return Buffer.from(`${payload}.${signature}`).toString("base64url");
+  const payload = `${userId}${SEPARATOR}${email}`;
+  return Buffer.from(`${payload}${SEPARATOR}${sign(payload)}`).toString("base64url");
 }
 
 export function verifyUnsubscribeToken(token: string): { userId: string; email: string } | null {
   try {
     const decoded = Buffer.from(token, "base64url").toString("utf8");
-    const parts = decoded.split(".");
+    const parts = decoded.split(SEPARATOR);
     if (parts.length !== 3) return null;
     const [userId, email, signature] = parts;
+    if (!userId || !email || !signature) return null;
 
-    const expectedSignature = createHmac("sha256", getSecret())
-      .update(`${userId}.${email}`)
-      .digest("hex");
+    const expectedSignature = sign(`${userId}${SEPARATOR}${email}`);
 
-    if (signature !== expectedSignature) return null;
+    const provided = Buffer.from(signature, "utf8");
+    const expected = Buffer.from(expectedSignature, "utf8");
+    if (provided.length !== expected.length) return null;
+    if (!timingSafeEqual(provided, expected)) return null;
 
     return { userId, email };
   } catch {

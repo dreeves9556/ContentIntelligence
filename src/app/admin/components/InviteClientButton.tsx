@@ -2,16 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, X, Link2, Copy, Check, Loader2, Mail, MailCheck, Tag } from "lucide-react";
+import { UserPlus, X, Link2, Loader2, Mail, MailCheck, Tag, Check } from "lucide-react";
 import { createClientProfile, type CreateClientOptions } from "../actions";
 import { ACCOUNT_PRESETS } from "@/lib/account-access";
 
 export function InviteClientButton() {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState("");
-  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [created, setCreated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [emailSent, setEmailSent] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>("");
@@ -20,9 +19,8 @@ export function InviteClientButton() {
   function handleClose() {
     setShowModal(false);
     setEmail("");
-    setGeneratedPassword(null);
+    setCreated(false);
     setError(null);
-    setCopied(false);
     setSelectedPreset("");
   }
 
@@ -45,25 +43,13 @@ export function InviteClientButton() {
           })()
         : undefined;
       const result = await createClientProfile(email, options);
-      if ("password" in result) {
-        setGeneratedPassword(result.password);
-        setEmailSent(!result.error);
-        router.refresh();
-        if (result.error) {
-          setError(result.error);
-        }
-      } else if ("error" in result) {
+      if (result.error) {
         setError(result.error);
+      } else {
+        setCreated(true);
+        setEmailSent(true);
+        router.refresh();
       }
-    });
-  }
-
-  function handleCopy() {
-    if (!generatedPassword) return;
-    const credentials = `Email: ${email}\nPassword: ${generatedPassword}`;
-    navigator.clipboard.writeText(credentials).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     });
   }
 
@@ -91,7 +77,7 @@ export function InviteClientButton() {
               <X className="h-5 w-5" />
             </button>
 
-            {!generatedPassword ? (
+            {!created ? (
               <>
                 <div className="mb-6">
                   <div className="w-12 h-12 bg-accent-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -195,9 +181,9 @@ export function InviteClientButton() {
                   </h3>
                   <p className="text-sm text-text-muted">
                     {emailSent ? (
-                      <>A welcome email with a password setup link has been sent to <span className="text-accent-primary">{email}</span>. The temporary password below is a backup — share it only if they cannot access the email.</>
+                      <>A welcome email with a password setup link has been sent to <span className="text-accent-primary">{email}</span>.</>
                     ) : (
-                      <>Share these credentials with <span className="text-accent-primary">{email}</span> so they can log in. They will be prompted to complete onboarding after their first login.</>
+                      <>Account created for <span className="text-accent-primary">{email}</span>. The welcome email could not be sent — the user can request a password reset from the login page.</>
                     )}
                   </p>
                 </div>
@@ -209,37 +195,10 @@ export function InviteClientButton() {
                   </div>
                 )}
 
-                <div className="bg-background-secondary border border-border-primary rounded-lg p-4 mb-4 space-y-2">
-                  <div>
-                    <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Email</p>
-                    <p className="text-sm text-text-primary font-mono break-all">{email}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Password</p>
-                    <p className="text-sm text-text-primary font-mono break-all">{generatedPassword}</p>
-                  </div>
-                </div>
-
                 <div className="flex gap-3">
                   <button
-                    onClick={handleCopy}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent-primary hover:bg-accent-primary/90 text-white font-medium rounded-lg transition-colors"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="h-4 w-4" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Copy to Clipboard
-                      </>
-                    )}
-                  </button>
-                  <button
                     onClick={handleClose}
-                    className="px-4 py-2.5 bg-background-secondary hover:bg-background-secondary text-text-muted hover:text-text-primary font-medium rounded-lg transition-colors"
+                    className="flex-1 py-2.5 bg-accent-primary hover:bg-accent-primary/90 text-white font-medium rounded-lg transition-colors"
                   >
                     Close
                   </button>

@@ -1,5 +1,15 @@
 import type { NextAuthConfig } from "next-auth";
 
+/**
+ * A revoked token (tokenVersion mismatch) is stamped with `sessionExpiry: 0`.
+ * A truthiness check treats 0 as "no expiry set" and lets the revoked token
+ * through, so the comparison must be against null/undefined explicitly.
+ */
+export function isSessionExpired(sessionExpiry: number | undefined | null): boolean {
+  if (sessionExpiry === undefined || sessionExpiry === null) return false;
+  return Date.now() > sessionExpiry;
+}
+
 // Edge-safe config: no Prisma, no bcrypt.
 // Credentials provider and all DB callbacks live in auth.ts (Node.js only).
 export const authConfig = {
@@ -11,7 +21,7 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const userRole = (auth?.user as { role?: string })?.role;
       const sessionExpiry = (auth?.user as { sessionExpiry?: number } | undefined)?.sessionExpiry;
-      const isExpired = sessionExpiry ? Date.now() > sessionExpiry : false;
+      const isExpired = isSessionExpired(sessionExpiry);
       const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
       const isOnOnboarding = nextUrl.pathname.startsWith("/onboarding");
       const isOnAdmin = nextUrl.pathname.startsWith("/admin");
@@ -38,7 +48,7 @@ export const authConfig = {
     session({ session, token }) {
       if (token) {
         const sessionExpiry = token.sessionExpiry as number | undefined;
-        const isExpired = sessionExpiry ? Date.now() > sessionExpiry : false;
+        const isExpired = isSessionExpired(sessionExpiry);
 
         if (isExpired) {
           return {

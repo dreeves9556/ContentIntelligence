@@ -50,20 +50,39 @@ export async function getNotificationPrefs(): Promise<NotificationPrefs> {
   };
 }
 
+const PREF_KEYS = [
+  "postingReminder",
+  "postPublished",
+  "postFailed",
+  "newComment",
+  "analyticsMilestone",
+  "streakWarning",
+  "weeklyDigest",
+  "accountDisconnected",
+  "adminBroadcast",
+] as const;
+
 export async function updateNotificationPrefs(
   prefs: Partial<NotificationPrefs>
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
+  const sanitized: Record<string, boolean> = {};
+  for (const key of PREF_KEYS) {
+    if (key in prefs && typeof prefs[key] === "boolean") {
+      sanitized[key] = prefs[key];
+    }
+  }
+
   try {
     await prisma.notificationPreference.upsert({
       where: { userId: session.user.id },
-      update: prefs,
+      update: sanitized,
       create: {
         userId: session.user.id,
         ...DEFAULT_PREFS,
-        ...prefs,
+        ...sanitized,
       },
     });
     return { success: true };
@@ -74,6 +93,15 @@ export async function updateNotificationPrefs(
 }
 
 export async function getNotificationPrefsForUser(userId: string): Promise<NotificationPrefs> {
+  const session = await auth();
+  if (!session?.user?.id) return DEFAULT_PREFS;
+
+  // Any authenticated caller could previously read any other user's
+  // preferences by passing an arbitrary userId. Restrict to self or ADMIN.
+  if (session.user.id !== userId && session.user.role !== "ADMIN") {
+    return DEFAULT_PREFS;
+  }
+
   const prefs = await prisma.notificationPreference.findUnique({
     where: { userId },
   });

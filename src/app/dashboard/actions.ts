@@ -8,6 +8,7 @@ import { getAnthropicApiKey, getAnthropicModel, getPlatformConfig } from "@/lib/
 import { summarizeFollowerGrowth } from "@/lib/follower-stats";
 import { summarizeDemographicsForAI } from "@/lib/deep-analytics";
 import { requireDashboardAccess } from "@/lib/server-access";
+import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -157,6 +158,15 @@ export async function generateAIInsight(userId: string): Promise<AIInsightResult
     requiredPlan: "PRO",
   });
   if (!access.allowed) return { success: false, error: access.error };
+
+  const rateLimit = await checkActionRateLimit(
+    `ai_insight:${userId}`,
+    10,
+    60 * 60 * 1000
+  );
+  if (!rateLimit.allowed) {
+    return { success: false, error: `Too many insight requests. Please try again in ${formatRetryTime(rateLimit.retryAfterMs ?? 0)}.` };
+  }
 
   const posts = await prisma.postAnalytics.findMany({
     where: { userId },
@@ -355,6 +365,21 @@ export async function subscribeUser(sub: {
 }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
+
+  if (typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || sub.endpoint.length > 2048) {
+    throw new Error("Invalid push endpoint");
+  }
+
+  // Re-pointing an existing endpoint at the caller would let one account claim
+  // another account's registered device. Only the current owner may update it.
+  const existing = await prisma.pushSubscription.findUnique({
+    where: { endpoint: sub.endpoint },
+    select: { userId: true },
+  });
+
+  if (existing && existing.userId !== session.user.id) {
+    throw new Error("Push endpoint is already registered to another account");
+  }
 
   await prisma.pushSubscription.upsert({
     where: { endpoint: sub.endpoint },

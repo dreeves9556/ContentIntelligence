@@ -122,6 +122,18 @@ export async function POST(request: Request) {
     );
   }
 
+  if (body.action === "remove") {
+    const activeMembers = await prisma.user.count({
+      where: { organizationId: org.id, accountStatus: { not: "ARCHIVED" } },
+    });
+    if (newQuantity < activeMembers) {
+      return NextResponse.json(
+        { error: `Cannot reduce to ${newQuantity} seats — you have ${activeMembers} active member(s). Remove members first.` },
+        { status: 400 }
+      );
+    }
+  }
+
   const stripe = getStripe();
 
   try {

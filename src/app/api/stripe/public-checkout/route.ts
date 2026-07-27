@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { getStripe, getAppUrl } from "@/lib/stripe";
 import { getPriceId, isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import type { PurchaseType, BillingInterval } from "@/lib/pricing";
 import { COMMUNITY_MIN_SEATS, COMMUNITY_MAX_SEATS } from "@/lib/pricing";
 import { buildTrialSubscriptionData } from "@/lib/trial";
+import { checkActionRateLimit } from "@/lib/rate-limiter";
 
 /**
  * Public Stripe Checkout — no authentication required.
@@ -22,6 +24,21 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Checkout is not configured. Please try again later." },
       { status: 503 }
+    );
+  }
+
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const clientIp = forwardedFor || requestHeaders.get("x-real-ip") || "unknown";
+  const rateLimit = await checkActionRateLimit(
+    `public_checkout:${clientIp}`,
+    5,
+    10 * 60 * 1000
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many checkout attempts. Please try again later." },
+      { status: 429 }
     );
   }
 

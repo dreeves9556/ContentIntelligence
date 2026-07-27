@@ -10,6 +10,7 @@ import { zernio } from "@/lib/zernio";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, ExpirationAction } from "@/lib/account-access";
 import { sendSignupNotification, sendBulkSignupNotification } from "@/lib/signup-notification";
+import { issuePasswordResetToken } from "@/lib/password-reset-tokens";
 
 function generateRandomPassword(): string {
   const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -25,13 +26,7 @@ async function sendOnboardingEmail(email: string): Promise<boolean> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
 
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-  await prisma.passwordResetToken.deleteMany({ where: { email } });
-  await prisma.passwordResetToken.create({
-    data: { email, token, expiresAt },
-  });
+  const { token } = await issuePasswordResetToken(email, 24 * 60 * 60 * 1000);
 
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
   const loginUrl = `${baseUrl}/login`;
@@ -93,7 +88,7 @@ export interface CreateClientOptions {
 export async function createClientProfile(
   email: string,
   options?: CreateClientOptions
-): Promise<{ password: string; error?: string } | { error: string }> {
+): Promise<{ error?: string }> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { error: "Unauthorized" };
@@ -113,6 +108,7 @@ export async function createClientProfile(
 
   const password = generateRandomPassword();
   const hashedPassword = await bcrypt.hash(password, 12);
+  void password;
 
   try {
     await prisma.user.create({
@@ -139,7 +135,7 @@ export async function createClientProfile(
     console.error("[SIGNUP NOTIFICATION] Failed:", err)
   );
 
-  return { password, error: emailSent ? undefined : "Account created, but welcome email failed to send. Share credentials manually." };
+  return { error: emailSent ? undefined : "Account created, but welcome email failed to send. The user can request a password reset from the login page." };
 }
 
 export async function updateUserPlan(
@@ -247,7 +243,6 @@ export interface BulkInviteResult {
   email: string;
   success: boolean;
   error?: string;
-  password?: string;
 }
 
 export async function bulkCreateInvites(
@@ -301,7 +296,16 @@ export async function bulkCreateInvites(
         },
       });
       const emailSent = await sendOnboardingEmail(email);
-      results.push({ email, success: true, password, error: emailSent ? undefined : "Welcome email failed — share credentials manually" });
+      // The generated password is never surfaced to the admin UI. The user sets
+      // their own password through the emailed reset link; returning it here
+      // would put a live credential into an admin's browser and clipboard.
+      results.push({
+        email,
+        success: true,
+        error: emailSent
+          ? undefined
+          : "Welcome email failed — use “Send reset link” to re-issue an invite.",
+      });
       addedEmails.push(email);
     } catch {
       results.push({ email, success: false, error: "Failed to create account" });
@@ -454,13 +458,7 @@ export async function adminResetPassword(
   }
 
   const email = user.email;
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  await prisma.passwordResetToken.deleteMany({ where: { email } });
-  await prisma.passwordResetToken.create({
-    data: { email, token, expiresAt },
-  });
+  const { token } = await issuePasswordResetToken(email, 24 * 60 * 60 * 1000);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
