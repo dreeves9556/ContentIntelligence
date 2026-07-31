@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { FileText, CalendarDays, Share2, Users, UserPlus, Settings2, Filter, X, Activity } from "lucide-react";
+import { FileText, CalendarDays, Share2, Users, UserPlus, Settings2, Filter, X, Activity, CreditCard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, UserRole } from "@/lib/account-access";
@@ -19,6 +19,7 @@ import ResetPasswordButton from "./ResetPasswordButton";
 import DeleteUserButton from "./DeleteUserButton";
 import { TagBadge, StatusBadge, CompedBadge } from "./AccountBadges";
 import AccountManagerModal, { type AccountModalUser } from "./AccountManagerModal";
+import BillingModal from "./BillingModal";
 import BulkActionBar from "./BulkActionBar";
 
 export interface RosterUser {
@@ -36,6 +37,11 @@ export interface RosterUser {
   accessExpiresAt: Date | null;
   expirationAction: string;
   organizationId: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeStatus: string | null;
+  trialEndsAt: Date | null;
+  hasUsedTrial: boolean;
   _count?: {
     questionnaires: number;
     profileSurveys: number;
@@ -58,6 +64,7 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalUser, setModalUser] = useState<RosterUser | null>(null);
+  const [billingUser, setBillingUser] = useState<RosterUser | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const [filterTag, setFilterTag] = useState<FilterTag>("ALL");
@@ -268,6 +275,9 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
                   Expires
                 </th>
                 <th className="text-left py-3 px-3 text-xs font-medium text-text-muted uppercase tracking-wider">
+                  Stripe
+                </th>
+                <th className="text-left py-3 px-3 text-xs font-medium text-text-muted uppercase tracking-wider">
                   Activity
                 </th>
                 <th className="text-left py-3 px-3 text-xs font-medium text-text-muted uppercase tracking-wider">
@@ -323,6 +333,37 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
                       </div>
                     ) : (
                       <span className="text-xs text-text-muted">No expiry</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3">
+                    {user.stripeSubscriptionId ? (
+                      <button
+                        onClick={() => setBillingUser(user)}
+                        className="flex flex-col items-start gap-0.5 group"
+                        title="View billing details"
+                      >
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                          user.stripeStatus === "trialing"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                            : user.stripeStatus === "active"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : user.stripeStatus === "past_due"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            : user.stripeStatus === "cancel_at_period_end"
+                            ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                            : "bg-red-500/10 text-red-400 border-red-500/20"
+                        }`}>
+                          <CreditCard className="h-3 w-3" />
+                          {user.stripeStatus ?? "unknown"}
+                        </span>
+                        {user.trialEndsAt && user.stripeStatus === "trialing" && (
+                          <span className="text-xs text-text-muted">
+                            Trial ends {format(user.trialEndsAt, "MMM d")}
+                          </span>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-text-muted">—</span>
                     )}
                   </td>
                   <td className="py-3 px-3">
@@ -451,6 +492,14 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
           user={modalUser as AccountModalUser}
           onClose={() => setModalUser(null)}
           onSaved={handleModalSave}
+        />
+      )}
+
+      {/* Billing modal */}
+      {billingUser && (
+        <BillingModal
+          user={billingUser}
+          onClose={() => setBillingUser(null)}
         />
       )}
     </div>

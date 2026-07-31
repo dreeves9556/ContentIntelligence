@@ -46,6 +46,11 @@ async function getUsers(): Promise<RosterUser[]> {
     accessExpiresAt: user.accessExpiresAt,
     expirationAction: user.expirationAction,
     organizationId: user.organizationId,
+    stripeCustomerId: user.stripeCustomerId,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    stripeStatus: user.stripeStatus,
+    trialEndsAt: user.trialEndsAt,
+    hasUsedTrial: user.hasUsedTrial,
     _count: user._count,
   }));
 }
