@@ -882,6 +882,7 @@ async function updateUserFromSubscription(userId: string, subscription: Stripe.S
       stripeSubscriptionId: subscription.id,
       stripeStatus: effectiveStatus,
       accountStatus,
+      hasUsedTrial: true, // Trial has ended — mark as consumed (safety net for paths that don't set it at checkout)
       ...(subscription.trial_end && subscription.status === "trialing"
         ? { trialEndsAt: new Date(subscription.trial_end * 1000) }
         : { trialEndsAt: null }),
@@ -1121,6 +1122,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     data: {
       stripeStatus: subscription.status,
       accountStatus: stripeStatusToAccountStatus(subscription.status),
+      hasUsedTrial: true, // First real payment — trial is consumed (safety net)
       ...(subscription.status === "trialing" && subscription.trial_end
         ? { trialEndsAt: new Date(subscription.trial_end * 1000) }
         : { trialEndsAt: null }),

@@ -113,6 +113,7 @@ export async function GET(request: Request) {
             stripeStatus: sub.status,
             stripeSubscriptionId: null,
             stripeCustomerId: null,
+            hasUsedTrial: true, // Trial is consumed — prevent repeat trials
             trialEndsAt: null,
           },
         });
@@ -125,6 +126,7 @@ export async function GET(request: Request) {
           data: {
             accountStatus: stripeStatusToAccountStatus(sub.status),
             stripeStatus: sub.status,
+            hasUsedTrial: true, // Trial is consumed — prevent repeat trials
             trialEndsAt: null,
           },
         });
