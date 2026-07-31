@@ -1,5 +1,9 @@
-import { CheckCircle2, Mail, ArrowRight, Home } from "lucide-react";
+import { CheckCircle2, Mail, ArrowRight, Home, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { getStripe } from "@/lib/stripe";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Welcome to The Local Post — Checkout Complete",
@@ -12,6 +16,33 @@ interface SuccessPageProps {
 
 export default async function CheckoutSuccessPage({ searchParams }: SuccessPageProps) {
   const { session_id } = await searchParams;
+
+  let email: string | null = null;
+  let pendingInviteExists = false;
+  let userAlreadyExists = false;
+
+  if (session_id) {
+    try {
+      const stripe = getStripe();
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      email = session.customer_details?.email ?? null;
+
+      if (email) {
+        const [pending, existingUser] = await Promise.all([
+          prisma.pendingStripeInvite.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
+          prisma.user.findUnique({ where: { email }, select: { id: true } }),
+        ]);
+        pendingInviteExists = !!pending;
+        userAlreadyExists = !!existingUser;
+      }
+    } catch {
+      // Session lookup failed — fall back to generic message
+    }
+  }
+
+  const showEmailMessage = email && pendingInviteExists && !userAlreadyExists;
+  const showExistingUserMessage = userAlreadyExists;
+  const showPendingMessage = email && !pendingInviteExists && !userAlreadyExists;
 
   return (
     <div className="min-h-screen bg-background-secondary flex items-center justify-center p-4">
@@ -45,22 +76,63 @@ export default async function CheckoutSuccessPage({ searchParams }: SuccessPageP
           </h1>
 
           <p className="text-sm text-text-muted text-center mb-6 leading-relaxed">
-            Your membership is being activated. We&apos;ve sent a registration link to your email
-            so you can set your password and access your account.
+            Your payment was successful and your membership is being activated.
           </p>
 
           {/* Instructions */}
           <div className="space-y-4 mb-8">
-            <div className="flex items-start gap-3 p-4 bg-background-secondary rounded-lg border border-border-primary">
-              <Mail className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Check your email</p>
-                <p className="text-xs text-text-muted mt-1">
-                  Look for a message from The Local Post with a link to create your account.
-                  The link expires in 14 days.
-                </p>
+            {showEmailMessage && (
+              <div className="flex items-start gap-3 p-4 bg-background-secondary rounded-lg border border-border-primary">
+                <Mail className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Check your email</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    We&apos;ve sent a registration link to <strong>{email}</strong>.
+                    Click it to create your account. The link expires in 14 days.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {showPendingMessage && (
+              <div className="flex items-start gap-3 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+                <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Registration email pending</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    Your payment was processed but the registration email hasn&apos;t been sent yet.
+                    We&apos;ll send it shortly — check your inbox in a few minutes. If you don&apos;t
+                    receive it, contact support.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {showExistingUserMessage && (
+              <div className="flex items-start gap-3 p-4 bg-background-secondary rounded-lg border border-border-primary">
+                <ArrowRight className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">You already have an account</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    Your membership has been applied to your existing account. Just log in to
+                    access your upgraded access.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!email && (
+              <div className="flex items-start gap-3 p-4 bg-background-secondary rounded-lg border border-border-primary">
+                <Mail className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Check your email</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    Look for a message from The Local Post with a link to create your account.
+                    The link expires in 14 days.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-start gap-3 p-4 bg-background-secondary rounded-lg border border-border-primary">
               <ArrowRight className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />

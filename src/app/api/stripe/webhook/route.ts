@@ -670,9 +670,9 @@ async function createPendingStripeInvite(params: {
   hasUsedTrial?: boolean;
   trialEndsAt?: Date | null;
 }) {
-  // Check for existing pending invite by email — don't create duplicates
+  // Check for existing pending invite by email (case-insensitive) — don't create duplicates
   const existing = await prisma.pendingStripeInvite.findFirst({
-    where: { email: params.email },
+    where: { email: { equals: params.email, mode: "insensitive" } },
   });
   if (existing) {
     // Update the existing one with new Stripe info
@@ -694,6 +694,27 @@ async function createPendingStripeInvite(params: {
       },
     });
     console.log(`[STRIPE WEBHOOK] Updated existing PendingStripeInvite for ${params.email}`);
+
+    // Resend the registration email — the original may have failed or bounced
+    const registerUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/register?token=${existing.token}`;
+    const emailSent = await sendPaidMembershipRegistrationEmail({
+      email: params.email,
+      registerUrl,
+      purchaseType: params.purchaseType,
+      organizationName: params.organizationName,
+    });
+    await prisma.pendingStripeInvite.update({
+      where: { id: existing.id },
+      data: {
+        emailSentAt: emailSent ? new Date() : null,
+        lastEmailError: emailSent ? null : "Resend failed — check RESEND_FROM_EMAIL and API key",
+      },
+    });
+    if (!emailSent) {
+      console.error(`[STRIPE WEBHOOK] Failed to resend paid registration email to ${params.email} — invite token updated but email not sent`);
+    } else {
+      console.log(`[STRIPE WEBHOOK] PendingStripeInvite updated + email resent for ${params.email} (${params.purchaseType})`);
+    }
     return;
   }
 
@@ -728,6 +749,14 @@ async function createPendingStripeInvite(params: {
     registerUrl,
     purchaseType: params.purchaseType,
     organizationName: params.organizationName,
+  });
+
+  await prisma.pendingStripeInvite.updateMany({
+    where: { token },
+    data: {
+      emailSentAt: emailSent ? new Date() : null,
+      lastEmailError: emailSent ? null : "Initial send failed — check RESEND_FROM_EMAIL and API key",
+    },
   });
 
   if (!emailSent) {

@@ -20,6 +20,7 @@ import {
   Radio,
   TrendingUp,
   ScrollText,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -28,6 +29,7 @@ const adminNavItems = [
   { name: "Exit Admin Mode", href: "/dashboard", icon: LogOut },
   { name: "Client Roster", href: "/admin", icon: Users },
   { name: "Organizations", href: "/admin/organizations", icon: Building2 },
+  { name: "Pending Stripe Invites", href: "/admin/pending-invites", icon: CreditCard },
   { name: "Impact Dashboard", href: "/admin/impact", icon: TrendingUp },
   { name: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { name: "Push Notifications", href: "/admin/notifications", icon: Bell },
