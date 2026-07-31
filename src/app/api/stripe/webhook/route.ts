@@ -270,11 +270,18 @@ async function fulfillSoloCheckout(userId: string, customerId: string, subscript
 
   // Trial abuse guard: if the user already used a trial but Stripe returned
   // a trialing subscription, end the trial immediately so they're billed.
+  // Skip if the user's current subscription IS this subscription — that means
+  // the checkout webhook was delayed and the user already registered against
+  // this same trial, not a new one.
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { hasUsedTrial: true },
+    select: { hasUsedTrial: true, stripeSubscriptionId: true },
   });
-  if (subscription.status === "trialing" && user?.hasUsedTrial) {
+  if (
+    subscription.status === "trialing" &&
+    user?.hasUsedTrial &&
+    user?.stripeSubscriptionId !== subscriptionId
+  ) {
     console.log(`[STRIPE WEBHOOK] User ${userId} already used trial — ending trial immediately`);
     await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
     subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -387,11 +394,17 @@ async function fulfillCommunityCheckout(
 
   // Trial abuse guard: if the user already used a trial but Stripe returned
   // a trialing subscription, end the trial immediately so they're billed.
+  // Skip if the user's current subscription IS this subscription — delayed
+  // webhook reprocessing of the same checkout is not abuse.
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { hasUsedTrial: true },
+    select: { hasUsedTrial: true, stripeSubscriptionId: true },
   });
-  if (subscription.status === "trialing" && user?.hasUsedTrial) {
+  if (
+    subscription.status === "trialing" &&
+    user?.hasUsedTrial &&
+    user?.stripeSubscriptionId !== subscriptionId
+  ) {
     console.log(`[STRIPE WEBHOOK] User ${userId} already used trial — ending trial immediately`);
     await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
     subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -559,8 +572,14 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
         let effectiveStatus = stripeStatus;
         let trialEnd: number | null | undefined = subscription.trial_end;
 
-        // Trial abuse guard: if user already used trial but sub came back trialing, end it
-        if (stripeStatus === "trialing" && existingUser.hasUsedTrial) {
+        // Trial abuse guard: if user already used trial but sub came back trialing, end it.
+        // Skip if this IS the user's current subscription — delayed webhook reprocessing
+        // of the same checkout is not abuse.
+        if (
+          stripeStatus === "trialing" &&
+          existingUser.hasUsedTrial &&
+          existingUser.stripeSubscriptionId !== subscriptionId
+        ) {
           const stripe = getStripe();
           await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
           const refreshed = await stripe.subscriptions.retrieve(subscriptionId);
@@ -609,8 +628,14 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
         let effectiveStatus = stripeStatus;
         let trialEnd: number | null | undefined = subscription.trial_end;
 
-        // Trial abuse guard: if user already used trial but sub came back trialing, end it
-        if (stripeStatus === "trialing" && existingUser.hasUsedTrial) {
+        // Trial abuse guard: if user already used trial but sub came back trialing, end it.
+        // Skip if this IS the user's current subscription — delayed webhook reprocessing
+        // of the same checkout is not abuse.
+        if (
+          stripeStatus === "trialing" &&
+          existingUser.hasUsedTrial &&
+          existingUser.stripeSubscriptionId !== subscriptionId
+        ) {
           const stripe = getStripe();
           await stripe.subscriptions.update(subscriptionId, { trial_end: "now" });
           const refreshed = await stripe.subscriptions.retrieve(subscriptionId);
