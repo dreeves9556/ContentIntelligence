@@ -218,9 +218,12 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
   // Summary strip counts (computed from full list, not filtered)
   const totalClients = users.filter((u) => u.role === "USER").length;
   const teamCount = users.filter((u) => u.role === "TEAM_ADMIN" || u.role === "ADMIN").length;
-  const trialsEndingSoon = users.filter(
-    (u) => u.accessExpiresAt && daysUntil(u.accessExpiresAt) <= 7 && daysUntil(u.accessExpiresAt) >= 0
-  ).length;
+  const trialsEndingSoon = users.filter((u) => {
+    const isTrial = u.stripeStatus === "trialing" || u.accountStatus === "TRIAL";
+    if (!isTrial || !u.trialEndsAt) return false;
+    const d = daysUntil(u.trialEndsAt);
+    return d >= 0 && d <= 7;
+  }).length;
   const pastDueCount = users.filter(
     (u) => u.stripeStatus === "past_due" || u.accountStatus === "PAST_DUE"
   ).length;
