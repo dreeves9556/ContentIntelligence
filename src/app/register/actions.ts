@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
+import { AuthError } from "next-auth";
+import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { sendSignupNotification } from "@/lib/signup-notification";
 import { stripeStatusToAccountStatus } from "@/lib/stripe";
@@ -90,7 +92,22 @@ export async function registerWithToken(
       console.error("[SIGNUP NOTIFICATION] Failed:", err)
     );
 
-    redirect("/onboarding");
+    // Sign in the newly created user so the session cookie is set before
+    // redirecting to onboarding. Without this, /api/questionnaire rejects
+    // the submission with "Not authenticated" because no session exists.
+    try {
+      await signIn("credentials", {
+        email: pendingInvite.email,
+        password,
+        redirectTo: "/onboarding",
+      });
+    } catch (error) {
+      if (error instanceof AuthError) {
+        return { error: "Account created, but automatic sign-in failed. Please log in." };
+      }
+      throw error; // NEXT_REDIRECT propagates here
+    }
+    redirect("/onboarding"); // fallback — signIn with redirectTo throws first
   }
 
   // ─── InviteToken flow (admin/team invite) ───
@@ -152,5 +169,17 @@ export async function registerWithToken(
     console.error("[SIGNUP NOTIFICATION] Failed:", err)
   );
 
-  redirect("/onboarding");
+  try {
+    await signIn("credentials", {
+      email: invite.email,
+      password,
+      redirectTo: "/onboarding",
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: "Account created, but automatic sign-in failed. Please log in." };
+    }
+    throw error; // NEXT_REDIRECT propagates here
+  }
+  redirect("/onboarding"); // fallback — signIn with redirectTo throws first
 }
