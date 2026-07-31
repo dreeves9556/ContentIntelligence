@@ -21,6 +21,7 @@ import {
   TrendingUp,
   ScrollText,
   CreditCard,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -30,6 +31,7 @@ const adminNavItems = [
   { name: "Client Roster", href: "/admin", icon: Users },
   { name: "Organizations", href: "/admin/organizations", icon: Building2 },
   { name: "Pending Stripe Invites", href: "/admin/pending-invites", icon: CreditCard },
+  { name: "Revenue", href: "/admin/revenue", icon: DollarSign },
   { name: "Impact Dashboard", href: "/admin/impact", icon: TrendingUp },
   { name: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { name: "Push Notifications", href: "/admin/notifications", icon: Bell },

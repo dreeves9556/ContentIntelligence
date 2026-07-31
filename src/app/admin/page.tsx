@@ -32,6 +32,8 @@ async function getUsers(): Promise<RosterUser[]> {
     role: user.role,
     plan: (user.plan ?? "PRO") as UserPlan,
     createdAt: user.createdAt,
+    updatedAt: user.updatedAt ?? null,
+    lastAccessCheckAt: user.lastAccessCheckAt ?? null,
     status:
       user.role === "ADMIN" ||
       (user._count?.questionnaires ?? 0) > 0 ||

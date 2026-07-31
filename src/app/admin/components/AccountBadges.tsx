@@ -1,8 +1,19 @@
+import { format } from "date-fns";
 import {
   ACCOUNT_STATUS_LABELS,
+  getEffectiveAccountStatus,
   TAG_LABELS,
   type AccountStatus,
+  type AccountAccessUser,
 } from "@/lib/account-access";
+import { humanizeStripeStatus } from "@/lib/stripe-status";
+import type { UserPlan } from "@/lib/tiers";
+import { ADMIN_PLAN_LABELS } from "@/lib/tiers";
+
+const PLAN_BADGE_STYLES: Record<UserPlan, string> = {
+  CALENDAR_ONLY: "bg-background-secondary text-text-muted border-border-primary",
+  PRO: "bg-accent-primary/10 text-accent-primary border-[#c8952a]/30",
+};
 
 const TAG_STYLES: Record<string, string> = {
   KWLG: "bg-purple-500/10 text-purple-400 border-purple-500/20",
@@ -58,5 +69,57 @@ export function CompedBadge({ isComped, reason }: { isComped: boolean; reason?: 
     >
       COMPED
     </span>
+  );
+}
+
+/** Small plan pill — display only, no switcher. */
+export function PlanBadge({ plan }: { plan: UserPlan }) {
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${PLAN_BADGE_STYLES[plan]}`}
+    >
+      {ADMIN_PLAN_LABELS[plan]}
+    </span>
+  );
+}
+
+/**
+ * Compact single-cell summary of a user's access state for the roster row.
+ * Shows effective status badge (so expired users don't look "Active"),
+ * plan, tag, comped dot, and a humanized Stripe sub-line when present.
+ */
+export interface StatusCellUser extends AccountAccessUser {
+  plan: UserPlan;
+  stripeStatus: string | null;
+  stripeSubscriptionId: string | null;
+  trialEndsAt: Date | null;
+  compReason: string | null;
+}
+
+export function StatusCell({ user }: { user: StatusCellUser }) {
+  const effective = getEffectiveAccountStatus(user);
+  const stripe = user.stripeSubscriptionId
+    ? humanizeStripeStatus(user.stripeStatus)
+    : null;
+
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <div className="flex flex-wrap items-center gap-1">
+        <StatusBadge status={effective} />
+        <PlanBadge plan={user.plan} />
+        {user.internalTag && <TagBadge tag={user.internalTag} />}
+        {user.isComped && <CompedBadge isComped reason={user.compReason} />}
+      </div>
+      {stripe && (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border w-fit ${stripe.badgeClass}`}>
+          {stripe.label}
+          {user.stripeStatus === "trialing" && user.trialEndsAt && (
+            <span className="text-text-muted font-normal">
+              · ends {format(user.trialEndsAt, "MMM d")}
+            </span>
+          )}
+        </span>
+      )}
+    </div>
   );
 }
