@@ -110,10 +110,10 @@ function isAppSubscriptionInvoice(inv: Stripe.Invoice): boolean {
   return false;
 }
 
-/** Sum collected revenue for a month, excluding comped customers and non-app charges. */
+/** Sum collected revenue for a month, excluding comped/trialing customers and non-app charges. */
 function sumMonthRevenue(
   invoices: Stripe.Invoice[],
-  compedCustomerIds: Set<string>
+  excludedCustomerIds: Set<string>
 ): { totalCents: number; invoiceCount: number } {
   let totalCents = 0;
   let invoiceCount = 0;
@@ -123,7 +123,7 @@ function sumMonthRevenue(
     if (!isAppSubscriptionInvoice(inv)) continue;
 
     const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id ?? null;
-    if (customerId && compedCustomerIds.has(customerId)) continue;
+    if (customerId && excludedCustomerIds.has(customerId)) continue;
 
     totalCents += inv.total ?? 0;
     invoiceCount += 1;
@@ -133,12 +133,12 @@ function sumMonthRevenue(
 }
 
 /**
- * Compute current MRR from active subscriptions, excluding comped customers.
+ * Compute current MRR from active subscriptions, excluding comped/trialing customers.
  * Monthly subs contribute their full amount; annual subs contribute amount / 12.
  */
 async function computeMrr(
   stripe: ReturnType<typeof getStripe>,
-  compedCustomerIds: Set<string>
+  excludedCustomerIds: Set<string>
 ): Promise<MrrSummary> {
   let mrrCents = 0;
   let activeSubCount = 0;
@@ -158,7 +158,7 @@ async function computeMrr(
 
     for (const sub of page.data) {
       const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null;
-      if (customerId && compedCustomerIds.has(customerId)) continue;
+      if (customerId && excludedCustomerIds.has(customerId)) continue;
 
       const item = sub.items.data[0];
       const price = item?.price;
@@ -202,13 +202,21 @@ export async function getRevenueData(): Promise<RevenueData | { error: string }>
   try {
     const stripe = getStripe();
 
-    // Pull comped users' Stripe customer IDs for exclusion.
-    const compedUsers = await prisma.user.findMany({
-      where: { isComped: true, stripeCustomerId: { not: null } },
-      select: { stripeCustomerId: true },
-    });
-    const compedCustomerIds = new Set<string>(
-      compedUsers
+    // Pull excluded customers: comped users + users still in trial.
+    // Trial customers haven't started paying — their invoices are $0 trial
+    // invoices or charges that get reversed by credit memos.
+    const [compedUsers, trialingUsers] = await Promise.all([
+      prisma.user.findMany({
+        where: { isComped: true, stripeCustomerId: { not: null } },
+        select: { stripeCustomerId: true },
+      }),
+      prisma.user.findMany({
+        where: { stripeStatus: "trialing", stripeCustomerId: { not: null } },
+        select: { stripeCustomerId: true },
+      }),
+    ]);
+    const excludedCustomerIds = new Set<string>(
+      [...compedUsers, ...trialingUsers]
         .map((u) => u.stripeCustomerId)
         .filter((c): c is string => Boolean(c))
     );
@@ -228,7 +236,7 @@ export async function getRevenueData(): Promise<RevenueData | { error: string }>
     );
 
     const monthly: MonthlyRevenue[] = months.map((m, idx) => {
-      const { totalCents, invoiceCount } = sumMonthRevenue(monthInvoices[idx], compedCustomerIds);
+      const { totalCents, invoiceCount } = sumMonthRevenue(monthInvoices[idx], excludedCustomerIds);
       return {
         monthKey: monthKey(m.start),
         monthLabel: monthLabel(m.start),
@@ -238,7 +246,7 @@ export async function getRevenueData(): Promise<RevenueData | { error: string }>
       };
     });
 
-    const mrr = await computeMrr(stripe, compedCustomerIds);
+    const mrr = await computeMrr(stripe, excludedCustomerIds);
 
     const data: RevenueData = {
       monthly,
