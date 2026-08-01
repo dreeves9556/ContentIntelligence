@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import {
   Save,
   ChevronDown,
@@ -812,6 +812,7 @@ function AccordionRow({
   color,
   isCompleted,
   badge,
+  id,
   children,
 }: {
   icon: React.ElementType;
@@ -820,12 +821,19 @@ function AccordionRow({
   color: string;
   isCompleted: boolean;
   badge?: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!id) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash === `#${id}`) setOpen(true);
+  }, [id]);
+
   return (
-    <div className="rounded-2xl border border-border-primary bg-background-card overflow-hidden">
+    <div id={id} className="rounded-2xl border border-border-primary bg-background-card overflow-hidden scroll-mt-24">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -1003,6 +1011,7 @@ export default function QuestionnaireClient({
           return (
             <AccordionRow
               key={survey.type}
+              id={survey.type === "WEEKLY_CONTEXT" ? "weekly-context" : undefined}
               icon={survey.icon}
               title={survey.title}
               subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}

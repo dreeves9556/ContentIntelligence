@@ -107,7 +107,7 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
 
       {!isLoading && (
         <Link
-          href="/dashboard/profile"
+          href="/dashboard/questionnaire#weekly-context"
           className="flex items-center gap-1 text-xs text-accent-primary hover:text-accent-primary/80 transition-colors"
         >
           <ExternalLink className="h-3 w-3" />
