@@ -78,7 +78,7 @@ export function LoginAnnouncementModal({
             {current.title}
           </h2>
           <div
-            className="text-sm text-text-muted leading-relaxed prose prose-sm max-w-none"
+            className="text-sm text-text-muted leading-relaxed prose prose-sm dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: current.message }}
           />
         </div>
