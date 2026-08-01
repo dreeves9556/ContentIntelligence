@@ -125,7 +125,10 @@ function sumMonthRevenue(
     const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id ?? null;
     if (customerId && compedCustomerIds.has(customerId)) continue;
 
-    totalCents += inv.total ?? 0;
+    // Use amount_paid (money actually collected), not inv.total.
+    // inv.total includes credit memos (negative total, amount_paid=0),
+    // which would net real charges against credits and understate revenue.
+    totalCents += inv.amount_paid ?? 0;
     invoiceCount += 1;
   }
 
