@@ -231,7 +231,7 @@ function LoginAnnouncementRow({
 
       <div className="border-t border-border-primary px-4 py-3 bg-background-secondary/20">
         <div
-          className="text-sm text-text-muted prose prose-sm dark:prose-invert max-w-none"
+          className="text-sm text-text-muted prose prose-sm max-w-none"
           dangerouslySetInnerHTML={{ __html: announcement.message }}
         />
       </div>
