@@ -36,15 +36,6 @@ function formatCurrencyShort(cents: number): string {
   const dollars = cents / 100;
   if (Math.abs(dollars) >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(1)}M`;
   if (Math.abs(dollars) >= 1_000) return `$${(dollars / 1_000).toFixed(1)}K`;
-  // Sub-dollar values: show cents instead of rounding to $0.
-  if (Math.abs(dollars) > 0 && Math.abs(dollars) < 1) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(dollars);
-  }
   return `$${Math.round(dollars)}`;
 }
 

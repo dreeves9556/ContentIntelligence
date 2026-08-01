@@ -65,13 +65,13 @@ export function centsToDollars(cents: number): number {
   return cents / 100;
 }
 
-/** Format cents as a USD currency string (e.g. $780, $0.30). */
+/** Format cents as a USD currency string (e.g. $780). */
 export function formatCurrency(cents: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(cents / 100);
 }
 
