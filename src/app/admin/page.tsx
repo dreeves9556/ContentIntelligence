@@ -57,11 +57,25 @@ async function getUsers(): Promise<RosterUser[]> {
   }));
 }
 
+/**
+ * Find emails with expired, unconsumed password-setup tokens.
+ * consumePasswordResetToken deletes the row on use, so any remaining row
+ * with expiresAt < now was issued but never acted on.
+ */
+async function getExpiredTokenEmails(): Promise<Set<string>> {
+  const expired = await prisma.passwordResetToken.findMany({
+    where: { expiresAt: { lt: new Date() } },
+    select: { email: true },
+  });
+  return new Set(expired.map((r) => r.email));
+}
+
 export default async function AdminPage() {
   const users = await getUsers();
   const session = await auth();
   const currentUserId = session?.user?.id;
   const invites = await getPendingInvites();
+  const expiredTokenEmails = await getExpiredTokenEmails();
 
   return (
     <div className="space-y-6">
@@ -81,7 +95,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      <AdminRosterClient users={users} currentUserId={currentUserId} />
+      <AdminRosterClient users={users} currentUserId={currentUserId} expiredTokenEmails={expiredTokenEmails} />
     </div>
   );
 }

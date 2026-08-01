@@ -15,6 +15,7 @@ import {
 import { StatusCell } from "./AccountBadges";
 import BulkActionBar from "./BulkActionBar";
 import ClientDetailDrawer, { type DrawerUser } from "./ClientDetailDrawer";
+import ResendWelcomeButton from "./ResendWelcomeButton";
 
 export interface RosterUser {
   id: string;
@@ -49,6 +50,7 @@ export interface RosterUser {
 interface Props {
   users: RosterUser[];
   currentUserId?: string;
+  expiredTokenEmails?: Set<string>;
 }
 
 type FilterTag = string | "ALL";
@@ -63,7 +65,8 @@ type QuickFilter =
   | "TRIALS"
   | "NEEDS_ATTENTION"
   | "COMPED"
-  | "PAST_DUE";
+  | "PAST_DUE"
+  | "EXPIRED_LOGIN";
 
 type SortKey = "name" | "status" | "expires" | "created";
 type SortDir = "asc" | "desc";
@@ -78,6 +81,7 @@ const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
   { key: "NEEDS_ATTENTION", label: "Needs Attention" },
   { key: "COMPED", label: "Comped" },
   { key: "PAST_DUE", label: "Past Due" },
+  { key: "EXPIRED_LOGIN", label: "Expired Login" },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -99,7 +103,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
   );
 }
 
-function matchesQuickFilter(u: RosterUser, qf: QuickFilter): boolean {
+function matchesQuickFilter(u: RosterUser, qf: QuickFilter, expiredEmails?: Set<string>): boolean {
   switch (qf) {
     case "ALL":
       return true;
@@ -115,6 +119,12 @@ function matchesQuickFilter(u: RosterUser, qf: QuickFilter): boolean {
       return u.isComped;
     case "PAST_DUE":
       return u.stripeStatus === "past_due" || u.accountStatus === "PAST_DUE";
+    case "EXPIRED_LOGIN":
+      // User has an expired password-setup token AND no activity — they
+      // never completed initial login. Skip active users even if a stale
+      // token row exists for their email.
+      if (!expiredEmails || !u.email || !expiredEmails.has(u.email)) return false;
+      return u.status === "PENDING";
   }
 }
 
@@ -142,7 +152,7 @@ function getAttentionReason(u: RosterUser): string | null {
   return null;
 }
 
-export default function AdminRosterClient({ users, currentUserId }: Props) {
+export default function AdminRosterClient({ users, currentUserId, expiredTokenEmails }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawerUser, setDrawerUser] = useState<RosterUser | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -168,7 +178,7 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
 
   const filteredUsers = useMemo(() => {
     const result = users.filter((u) => {
-      if (!matchesQuickFilter(u, quickFilter)) return false;
+      if (!matchesQuickFilter(u, quickFilter, expiredTokenEmails)) return false;
       if (filterTag !== "ALL" && u.internalTag !== filterTag) return false;
       if (filterStatus !== "ALL" && u.accountStatus !== filterStatus) return false;
       if (filterRole !== "ALL" && u.role !== filterRole) return false;
@@ -207,7 +217,7 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
     });
 
     return result;
-  }, [users, quickFilter, filterTag, filterStatus, filterRole, filterPlan, searchQuery, sortKey, sortDir]);
+  }, [users, quickFilter, filterTag, filterStatus, filterRole, filterPlan, searchQuery, sortKey, sortDir, expiredTokenEmails]);
 
   const activeAdvancedFilterCount =
     (filterTag !== "ALL" ? 1 : 0) +
@@ -228,6 +238,9 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
     (u) => u.stripeStatus === "past_due" || u.accountStatus === "PAST_DUE"
   ).length;
   const compedCount = users.filter((u) => u.isComped).length;
+  const expiredLoginCount = users.filter(
+    (u) => u.email && expiredTokenEmails?.has(u.email) && u.status === "PENDING"
+  ).length;
 
   // Pagination slice
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
@@ -305,6 +318,12 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
       highlight: pastDueCount > 0,
     },
     { label: "Comped", value: compedCount, onClick: () => setQuickFilter("COMPED") },
+    {
+      label: "Expired login",
+      value: expiredLoginCount,
+      onClick: () => setQuickFilter("EXPIRED_LOGIN"),
+      highlight: expiredLoginCount > 0,
+    },
   ];
 
   return (
@@ -525,7 +544,14 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
                     </td>
                     <td className="py-3 px-3">
                       {totalActivity === 0 ? (
-                        <span className="text-xs text-text-muted">No activity</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-text-muted">No activity</span>
+                          {expiredTokenEmails?.has(user.email ?? "") && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <ResendWelcomeButton userId={user.id} />
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <p className="text-xs text-text-muted">
                           {q > 0 && <>{q} questionnaire{q !== 1 ? "s" : ""} · </>}
@@ -602,6 +628,11 @@ export default function AdminRosterClient({ users, currentUserId }: Props) {
                     {cal > 0 && <>{cal} calendar{cal !== 1 ? "s" : ""} · </>}
                     {zernio > 0 && <>{zernio} zernio</>}
                   </p>
+                )}
+                {totalActivity === 0 && expiredTokenEmails?.has(user.email ?? "") && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ResendWelcomeButton userId={user.id} />
+                  </div>
                 )}
               </button>
             );

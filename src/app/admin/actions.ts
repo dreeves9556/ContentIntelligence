@@ -26,7 +26,7 @@ async function sendOnboardingEmail(email: string): Promise<boolean> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
 
-  const { token } = await issuePasswordResetToken(email, 24 * 60 * 60 * 1000);
+  const { token } = await issuePasswordResetToken(email, 7 * 24 * 60 * 60 * 1000);
 
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
   const loginUrl = `${baseUrl}/login`;
@@ -52,7 +52,7 @@ async function sendOnboardingEmail(email: string): Promise<boolean> {
             <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#1E56D6;color:#FFFFFF;font-weight:600;font-size:14px;text-decoration:none;border-radius:6px;margin-bottom:16px;">Set Your Password</a>
 
             <p style="margin:12px 0 0;font-size:12px;color:#5B6472;line-height:1.6;">
-              This link expires in 24 hours. After setting your password, you can sign in at
+              This link expires in 7 days. After setting your password, you can sign in at
               <a href="${loginUrl}" style="color:#1E56D6;text-decoration:underline;">${loginUrl}</a>.
             </p>
           </div>
@@ -73,6 +73,30 @@ async function sendOnboardingEmail(email: string): Promise<boolean> {
     console.error("[ONBOARDING EMAIL] Failed to send:", emailError);
     return false;
   }
+}
+
+/**
+ * Re-send the welcome / password-setup email to an existing user whose
+ * initial token has expired. Issues a fresh 7-day token and sends the
+ * same welcome template used at account creation.
+ */
+export async function resendWelcomeEmail(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.email) {
+    return { success: false, error: "User not found or has no email." };
+  }
+
+  const emailSent = await sendOnboardingEmail(user.email);
+  return emailSent
+    ? { success: true }
+    : { success: false, error: "Failed to send welcome email. Check RESEND_FROM_EMAIL and API key." };
 }
 
 export interface CreateClientOptions {
