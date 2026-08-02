@@ -443,6 +443,12 @@ export default function LoginPage() {
             Subscribe and create your account
           </Link>
         </p>
+
+        <p className="text-center text-xs text-text-muted" style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+          <Link href="/terms" className="hover:text-text-primary transition-colors underline">Terms of Service</Link>
+          {" · "}
+          <Link href="/privacy" className="hover:text-text-primary transition-colors underline">Privacy Policy</Link>
+        </p>
         </div>
       </div>
     </div>

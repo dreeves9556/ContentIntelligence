@@ -6,7 +6,9 @@ import {
   MapPin,
   LogOut,
   Building2,
+  FileText,
 } from "lucide-react";
+import Link from "next/link";
 import ChangePasswordForm from "./ChangePasswordForm";
 import { PushNotificationManager } from "@/components/PushNotificationManager";
 import { NotificationHistory } from "@/components/NotificationHistory";
@@ -102,6 +104,32 @@ export default function ProfileDashboardClient({ questionnaire }: Props) {
 
       {/* ── Notification History ── */}
       <NotificationHistory />
+
+      {/* ── Legal ── */}
+      <div className="rounded-2xl border border-border-primary bg-background-card p-4 sm:p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="h-5 w-5 text-accent-primary" />
+          <h2 className="text-lg font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+            Legal
+          </h2>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+          <Link
+            href="/terms"
+            target="_blank"
+            className="text-sm text-accent-primary hover:text-accent-primary/80 transition-colors"
+          >
+            Terms of Service
+          </Link>
+          <Link
+            href="/privacy"
+            target="_blank"
+            className="text-sm text-accent-primary hover:text-accent-primary/80 transition-colors"
+          >
+            Privacy Policy
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

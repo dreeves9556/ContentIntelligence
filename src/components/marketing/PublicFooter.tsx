@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Newspaper } from "lucide-react";
 
 export function PublicFooter() {
@@ -25,6 +26,12 @@ export function PublicFooter() {
             <a href="#faq" className="text-sm text-text-muted hover:text-text-primary transition-colors">
               FAQ
             </a>
+            <Link href="/terms" className="text-sm text-text-muted hover:text-text-primary transition-colors">
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="text-sm text-text-muted hover:text-text-primary transition-colors">
+              Privacy Policy
+            </Link>
           </nav>
         </div>
 

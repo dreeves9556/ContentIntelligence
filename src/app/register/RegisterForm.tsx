@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import Link from "next/link";
 import { registerWithToken } from "./actions";
 
 interface RegisterFormProps {
@@ -12,12 +13,17 @@ interface RegisterFormProps {
 export function RegisterForm({ email, token }: RegisterFormProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!agreeToTerms) {
+      setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
+      return;
+    }
     startTransition(async () => {
       const result = await registerWithToken(token, password);
       if (result && "error" in result) {
@@ -76,6 +82,27 @@ export function RegisterForm({ email, token }: RegisterFormProps) {
         </div>
       </div>
 
+      <div className="flex items-start gap-2">
+        <input
+          id="agreeToTerms"
+          type="checkbox"
+          checked={agreeToTerms}
+          onChange={(e) => setAgreeToTerms(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-border-primary bg-background-secondary accent-accent-primary cursor-pointer shrink-0"
+        />
+        <label htmlFor="agreeToTerms" className="text-xs text-text-muted leading-relaxed">
+          I agree to the{" "}
+          <Link href="/terms" target="_blank" className="text-accent-primary hover:text-accent-primary/80 underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" target="_blank" className="text-accent-primary hover:text-accent-primary/80 underline">
+            Privacy Policy
+          </Link>
+          .
+        </label>
+      </div>
+
       {error && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
           {error}
@@ -84,7 +111,7 @@ export function RegisterForm({ email, token }: RegisterFormProps) {
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !agreeToTerms}
         className="w-full flex items-center justify-center gap-2 py-3 bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
       >
         {isPending ? (
