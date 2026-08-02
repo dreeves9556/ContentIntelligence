@@ -6,9 +6,11 @@ import { Copy, Check } from "lucide-react";
 interface CopyButtonProps {
   text: string;
   label?: string;
+  /** When true, renders an icon-only button with an accessible label (no visible text). */
+  iconOnly?: boolean;
 }
 
-export function CopyButton({ text, label }: CopyButtonProps) {
+export function CopyButton({ text, label, iconOnly = false }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -23,6 +25,26 @@ export function CopyButton({ text, label }: CopyButtonProps) {
 
   const displayLabel = label ?? "Copy";
   const copiedLabel = label ? `Copied ${label.replace(/^Copy /, "").toLowerCase()}` : "Copied";
+
+  if (iconOnly) {
+    return (
+      <button
+        onClick={handleCopy}
+        className={`
+          inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md transition-all duration-200 ease-out
+          ${
+            copied
+              ? "text-green-400 bg-green-400/10 border border-green-400/30"
+              : "text-text-muted/70 hover:text-text-primary hover:bg-background-secondary border border-transparent hover:border-border-primary"
+          }
+        `}
+        aria-label={copied ? copiedLabel : `Copy ${displayLabel.replace(/^Copy /, "").toLowerCase()}`}
+        title={copied ? copiedLabel : displayLabel}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </button>
+    );
+  }
 
   return (
     <button

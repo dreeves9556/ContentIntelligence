@@ -32,6 +32,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { GenerateButton } from "./GenerateButton";
+import { MobileDayCard } from "./MobileDayCard";
 
 type Platform = "instagram" | "tiktok" | "youtube" | "facebook" | "linkedin";
 
@@ -694,8 +695,8 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
         </div>
       )}
 
-      {/* Today's Edition masthead */}
-      <div className="text-center mb-2">
+      {/* Today's Edition masthead — static on ≥sm */}
+      <div className="hidden sm:block text-center mb-2">
         <h2 className="text-2xl sm:text-3xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
           Today&apos;s Edition
         </h2>
@@ -708,41 +709,60 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
-        {days.map((day, index) => {
-          const isActive = index === activeIndex;
-          const isPosted = posted[index];
-          const tabDate = new Date(baseDate);
-          tabDate.setDate(baseDate.getDate() + index);
-          const dateLabel = tabDate.toLocaleDateString("en-US", {
-            weekday: "short",
-            day: "numeric",
-          });
-          return (
-            <button
-              key={day.day}
-              onClick={() => setActiveIndex(index)}
-              className={`
-                shrink-0 sm:shrink sm:flex-1 sm:min-w-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase
-                transition-all duration-200 ease-out whitespace-nowrap text-center
-                ${
-                  isActive
-                    ? "bg-accent-primary text-white shadow-lg shadow-accent-primary/20"
-                    : "bg-background-secondary text-text-muted hover:text-text-primary hover:bg-background-card border border-border-primary"
-                }
-                ${isPosted ? "line-through opacity-50" : ""}
-              `}
-            >
-              {dateLabel}
-            </button>
-          );
-        })}
+      {/* Phone masthead + day navigation stay together while scrolling. */}
+      <div className="sm:hidden sticky top-[60px] z-20 -mx-4 px-4 pt-2 pb-2 bg-background-secondary">
+        <div className="text-center mb-2">
+          <h2 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+            Today&apos;s Edition
+          </h2>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="h-px flex-1 bg-border-primary" />
+            <span className="text-xs font-semibold tracking-[0.15em] text-text-muted uppercase">
+              {parseLocalDate(weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            </span>
+            <span className="h-px flex-1 bg-border-primary" />
+          </div>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
+          {days.map((day, index) => {
+            const isActive = index === activeIndex;
+            const isPosted = posted[index];
+            const tabDate = new Date(baseDate);
+            tabDate.setDate(baseDate.getDate() + index);
+            const dateLabel = tabDate.toLocaleDateString("en-US", {
+              weekday: "short",
+              day: "numeric",
+            });
+            return (
+              <button
+                key={day.day}
+                onClick={() => setActiveIndex(index)}
+                className={`
+                  shrink-0 sm:shrink sm:flex-1 sm:min-w-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase
+                  transition-all duration-200 ease-out whitespace-nowrap text-center
+                  ${
+                    isActive
+                      ? "bg-accent-primary text-white shadow-lg shadow-accent-primary/20"
+                      : "bg-background-secondary text-text-muted hover:text-text-primary hover:bg-background-card border border-border-primary"
+                  }
+                  ${isPosted ? "line-through opacity-50" : ""}
+                `}
+              >
+                {dateLabel}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Focused Day Card */}
-      <div className="transition-all duration-300 ease-in-out">
+      {/* Focused Day Card — desktop/tablet */}
+      <div className="hidden sm:block transition-all duration-300 ease-in-out">
         <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} />
+      </div>
+
+      {/* Focused Day Card — phone (tabs) */}
+      <div className="sm:hidden">
+        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} />
       </div>
     </div>
   );

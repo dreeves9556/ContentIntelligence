@@ -51,7 +51,7 @@ export default function LibraryTabs({
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="sm:inline">{tab.label}</span>
+              <span className="inline">{tab.label}</span>
             </button>
           );
         })}

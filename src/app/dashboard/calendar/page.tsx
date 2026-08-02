@@ -2,6 +2,7 @@ import { getWeeklyCalendar } from "./actions";
 import { GenerateButton } from "./GenerateButton";
 import CalendarClient from "./CalendarClient";
 import CalendarStrategyNote from "./CalendarStrategyNote";
+import { MobileCalendarHeader } from "./MobileCalendarHeader";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -72,66 +73,76 @@ export default async function CalendarPage() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
-            Content Calendar
-          </h1>
-          <p className="text-text-muted mt-1">
-            Your AI-powered weekly content strategy
-          </p>
-        </div>
-        <div className="flex flex-col items-center sm:flex-row sm:items-start gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-background-card rounded-lg border border-border-primary">
-            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
-            <span className="text-sm sm:text-base text-text-primary font-medium">
-              Week of {parseLocalDate(calendar.weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-            </span>
+    <div className="space-y-6 sm:space-y-8">
+      {/* Phone: compact header (week toolbar + legend trigger) */}
+      <MobileCalendarHeader weekStarting={calendar.weekStarting} />
+
+      {/* Desktop/tablet: unchanged header + strategy + legends */}
+      <div className="hidden sm:block space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
+              Content Calendar
+            </h1>
+            <p className="text-text-muted mt-1">
+              Your AI-powered weekly content strategy
+            </p>
           </div>
-          <GenerateButton regenerate />
+          <div className="flex flex-col items-center sm:flex-row sm:items-start gap-3">
+            <div className="flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-background-card rounded-lg border border-border-primary">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
+              <span className="text-sm sm:text-base text-text-primary font-medium">
+                Week of {parseLocalDate(calendar.weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              </span>
+            </div>
+            <GenerateButton regenerate />
+          </div>
+        </div>
+
+        {/* AI Strategy Note */}
+        <CalendarStrategyNote />
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 items-center">
+          <span className="text-sm text-text-muted font-medium">Content Types:</span>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-purple-400" />
+              <span className="text-xs text-text-muted">Reel</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Images className="h-4 w-4 text-blue-400" />
+              <span className="text-xs text-text-muted">Carousel</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-green-400" />
+              <span className="text-xs text-text-muted">Static</span>
+            </div>
+          </div>
+          <div className="w-full sm:w-auto flex flex-wrap gap-4 items-center">
+            <div className="w-px h-4 bg-border-primary hidden sm:block" />
+            <span className="text-sm text-text-muted font-medium">Buckets:</span>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded bg-brand-personal/20 border border-brand-personal" />
+                <span className="text-xs text-text-muted">Personal</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded bg-brand-expert/20 border border-brand-expert" />
+                <span className="text-xs text-text-muted">Expert</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded bg-brand-local/20 border border-brand-local" />
+                <span className="text-xs text-text-muted">Local</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* AI Strategy Note */}
-      <CalendarStrategyNote />
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <span className="text-sm text-text-muted font-medium">Content Types:</span>
-        <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <Video className="h-4 w-4 text-purple-400" />
-            <span className="text-xs text-text-muted">Reel</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Images className="h-4 w-4 text-blue-400" />
-            <span className="text-xs text-text-muted">Carousel</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-green-400" />
-            <span className="text-xs text-text-muted">Static</span>
-          </div>
-        </div>
-        <div className="w-full sm:w-auto flex flex-wrap gap-4 items-center">
-          <div className="w-px h-4 bg-border-primary hidden sm:block" />
-          <span className="text-sm text-text-muted font-medium">Buckets:</span>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded bg-brand-personal/20 border border-brand-personal" />
-              <span className="text-xs text-text-muted">Personal</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded bg-brand-expert/20 border border-brand-expert" />
-              <span className="text-xs text-text-muted">Expert</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded bg-brand-local/20 border border-brand-local" />
-              <span className="text-xs text-text-muted">Local</span>
-            </div>
-          </div>
-        </div>
+      {/* Phone: collapsed AI Strategy below the calendar content (rendered by CalendarClient) */}
+      <div className="sm:hidden">
+        <CalendarStrategyNote />
       </div>
 
       {/* Focus Mode Calendar */}

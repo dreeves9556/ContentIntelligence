@@ -38,6 +38,7 @@ import {
 } from "recharts";
 import { seedPostAnalytics, getCachedInsight } from "./actions";
 import SyncButton from "./integrations/SyncButton";
+import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 import {
   DAY_LABELS_SHORT,
   formatHour,
@@ -1035,7 +1036,6 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
   const [aiLoading, setAiLoading] = useState(true);
   const [aiError, setAiError] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string>("ALL");
-  const [insightExpanded, setInsightExpanded] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
   const [activeSection, setActiveSection] = useState<Section>("overview");
 
@@ -1224,7 +1224,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
         <div className="flex items-center gap-1 p-1 bg-background-card border border-border-primary rounded-xl overflow-x-auto">
           <button
             onClick={() => setActivePlatform("ALL")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
               activePlatform === "ALL"
                 ? "bg-accent-primary text-background-primary"
                 : "text-text-muted hover:text-text-primary"
@@ -1237,7 +1237,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
             <button
               key={platform}
               onClick={() => setActivePlatform(platform)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 activePlatform === platform
                   ? "bg-accent-primary text-background-primary"
                   : "text-text-muted hover:text-text-primary"
@@ -1250,8 +1250,29 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
         </div>
       )}
 
-      {/* Section Sub-Tabs + Sync Button */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Section Sub-Tabs — phone: compact underline tabs */}
+      <div className="sm:hidden flex items-center gap-1 overflow-x-auto scrollbar-none border-b border-border-primary">
+        {SECTIONS.map((section) => {
+          const isActive = activeSection === section.id;
+          return (
+            <button
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
+              aria-selected={isActive}
+              className={`shrink-0 px-3 py-2.5 text-xs font-bold tracking-wide uppercase whitespace-nowrap border-b-2 -mb-px transition-colors min-h-[44px] flex items-center ${
+                isActive
+                  ? "border-accent-primary text-text-primary"
+                  : "border-transparent text-text-muted hover:text-text-primary"
+              }`}
+            >
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Section Sub-Tabs + Sync Button — ≥sm: unchanged */}
+      <div className="hidden sm:flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1 p-1 bg-background-card border border-border-primary rounded-xl overflow-x-auto">
           {SECTIONS.map((section) => {
             const Icon = section.icon;
@@ -1279,8 +1300,34 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
       {/* Overview Section */}
       {activeSection === "overview" && (
         <>
-      {/* AI Insights Box */}
-      <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
+      {/* AI Insights Box — phone: compact disclosure */}
+      <div className="sm:hidden">
+        {aiLoading ? (
+          <div className="rounded-xl border border-accent-primary/30 bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent p-4 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-accent-primary animate-spin shrink-0" />
+            <span className="text-sm text-text-muted">Analyzing your content performance…</span>
+          </div>
+        ) : aiError ? (
+          <div className="rounded-xl border border-border-primary bg-background-card p-4">
+            <div className="flex items-center gap-2 text-accent-primary mb-1">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-semibold" style={{ fontFamily: "var(--font-serif)" }}>AI Insight</span>
+            </div>
+            <p className="text-text-muted text-sm leading-relaxed">{aiError}</p>
+          </div>
+        ) : aiInsight ? (
+          <MobileDisclosure
+            label="AI Insight"
+            summary={aiInsight.match(/^[^.!?]+[.!?]/)?.[0] ?? aiInsight.slice(0, 120) + (aiInsight.length > 120 ? "…" : "")}
+            className="border-accent-primary/30 bg-gradient-to-r from-accent-primary/10 via-accent-primary/5 to-transparent"
+          >
+            <p className="text-text-primary leading-relaxed text-sm">{aiInsight}</p>
+          </MobileDisclosure>
+        ) : null}
+      </div>
+
+      {/* AI Insights Box — ≥sm: unchanged */}
+      <div className="hidden sm:block bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
             {aiLoading ? (
@@ -1294,23 +1341,6 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
               <h3 className="text-lg font-semibold text-accent-primary">
                 AI Insight
               </h3>
-              {aiInsight && !aiLoading && (
-                <button
-                  onClick={() => setInsightExpanded((v) => !v)}
-                  className="sm:hidden flex items-center gap-1 text-xs text-accent-primary/70 hover:text-accent-primary transition-colors shrink-0"
-                  aria-label={insightExpanded ? "Collapse insight" : "Expand insight"}
-                >
-                  {insightExpanded ? (
-                    <>
-                      Less <ChevronUp className="h-3.5 w-3.5" />
-                    </>
-                  ) : (
-                    <>
-                      More <ChevronDown className="h-3.5 w-3.5" />
-                    </>
-                  )}
-                </button>
-              )}
             </div>
             {aiLoading && (
               <p className="text-text-muted leading-relaxed">Analyzing your content performance...</p>
@@ -1319,40 +1349,31 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
               <p className="text-text-muted leading-relaxed">{aiError}</p>
             )}
             {aiInsight && !aiLoading && (
-              <>
-                {/* Mobile: collapsed shows first sentence only */}
-                <p className="sm:hidden text-text-primary leading-relaxed">
-                  {insightExpanded
-                    ? aiInsight
-                    : (aiInsight.match(/^[^.!?]+[.!?]/)?.[0] ?? aiInsight.slice(0, 120) + (aiInsight.length > 120 ? "…" : ""))}
-                </p>
-                {/* Desktop: always show full insight */}
-                <p className="hidden sm:block text-text-primary leading-relaxed">{aiInsight}</p>
-              </>
+              <p className="text-text-primary leading-relaxed">{aiInsight}</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Top Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
               key={stat.name}
-              className="bg-background-card rounded-xl p-6 border border-border-primary hover:border-accent-primary/30 transition-colors"
+              className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary hover:border-accent-primary/30 transition-colors"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-muted">{stat.name}</p>
-                  <p className="text-2xl font-bold text-text-primary mt-1">{stat.value}</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-text-muted truncate">{stat.name}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-text-primary mt-1">{stat.value}</p>
                 </div>
-                <div className="p-3 bg-accent-primary/10 rounded-xl">
-                  <Icon className="h-5 w-5 text-accent-primary" />
+                <div className="p-2 sm:p-3 bg-accent-primary/10 rounded-xl shrink-0">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
                 </div>
               </div>
-              <div className="mt-4 flex items-center text-sm">
+              <div className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm">
                 <span className="text-brand-expert font-medium">{stat.change}</span>
                 <span className="text-text-muted ml-2">vs last month</span>
               </div>

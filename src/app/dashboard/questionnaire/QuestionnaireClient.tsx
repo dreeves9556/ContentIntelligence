@@ -27,6 +27,7 @@ import Link from "next/link";
 import { saveProfileSurvey, deleteProfileSurvey } from "../profile/actions";
 import SettingsForm from "../settings/SettingsForm";
 import BrandBrainClient from "../brand-brain/BrandBrainClient";
+import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import type { MemoryType } from "@prisma/client";
 import type { CreatorMemoryData } from "@/lib/memory/memory-types";
@@ -837,9 +838,9 @@ function AccordionRow({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left hover:bg-background-secondary/50 transition-colors"
+        className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 text-left hover:bg-background-secondary/50 transition-colors"
       >
-        <div className="shrink-0 p-2 sm:p-2.5 rounded-xl" style={{ background: `${color}20` }}>
+        <div className="shrink-0 p-1.5 sm:p-2.5 rounded-xl" style={{ background: `${color}20` }}>
           <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color }} />
         </div>
         <div className="flex-1 min-w-0">
@@ -901,6 +902,95 @@ export default function QuestionnaireClient({
   const completedCount = profileSurveys.length + (questionnaire ? 1 : 0);
   const totalCount = DEEP_DIVE_SURVEYS.length + 1 + 3; // +1 for brand questionnaire, +3 for timed surveys
 
+  // Build row descriptors for incomplete-first phone ordering.
+  // Each entry carries enough info to render its AccordionRow without duplicating form children.
+  const timedSurveys = getTimedSurveys();
+  const brandRow = {
+    key: "brand",
+    completed: !!questionnaire,
+    render: () => (
+      <AccordionRow
+        icon={ClipboardList}
+        title="Brand Questionnaire"
+        subtitle="Your core brand settings — identity, story, industry, content preferences, and voice."
+        color="#1E56D6"
+        isCompleted={!!questionnaire}
+      >
+        {questionnaire ? (
+          <div className="pt-4">
+            {questionnaire.lastUpdated && (
+              <div className="flex items-center gap-2 mb-4 text-xs text-text-muted">
+                <SettingsIcon className="h-3.5 w-3.5 text-accent-primary" />
+                <span>Last saved: <span className="text-text-primary font-medium">{questionnaire.lastUpdated}</span></span>
+              </div>
+            )}
+            <SettingsForm questionnaireId={questionnaire.id} initialData={questionnaire.formData} />
+          </div>
+        ) : (
+          <div className="pt-4 text-center py-8">
+            <ClipboardList className="h-10 w-10 text-accent-primary/40 mx-auto mb-3" />
+            <p className="text-sm text-text-muted mb-4">
+              Complete the onboarding questionnaire first to set up your brand profile.
+            </p>
+            <Link
+              href="/onboarding"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold bg-accent-primary text-white hover:bg-accent-primary/90 transition-colors"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Complete Onboarding
+            </Link>
+          </div>
+        )}
+      </AccordionRow>
+    ),
+  };
+  const deepDiveRows = DEEP_DIVE_SURVEYS.map((survey) => {
+    const existing = profileSurveys.find((s) => s.surveyType === survey.type);
+    return {
+      key: survey.type,
+      completed: !!existing,
+      render: () => (
+        <AccordionRow
+          key={survey.type}
+          icon={survey.icon}
+          title={survey.title}
+          subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
+          color={survey.color}
+          isCompleted={!!existing}
+        >
+          <DeepDivePanel survey={survey} existing={existing} industry={industry} />
+        </AccordionRow>
+      ),
+    };
+  });
+  const timedRows = timedSurveys.map((survey) => {
+    const existing = profileSurveys.find((s) => s.surveyType === survey.type);
+    const expired = survey.isExpired(existing?.updatedAt);
+    const isCurrent = !!existing && !expired;
+    return {
+      key: survey.type,
+      completed: isCurrent,
+      render: () => (
+        <AccordionRow
+          key={survey.type}
+          id={survey.type === "WEEKLY_CONTEXT" ? "weekly-context" : undefined}
+          icon={survey.icon}
+          title={survey.title}
+          subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
+          color={survey.color}
+          isCompleted={isCurrent}
+          badge={survey.resetLabel}
+        >
+          <TimedSurveyPanel survey={survey} existing={existing} industry={industry} />
+        </AccordionRow>
+      ),
+    };
+  });
+
+  const allRows = [brandRow, ...deepDiveRows, ...timedRows];
+  const incompleteRows = allRows.filter((r) => !r.completed);
+  const completedRows = allRows.filter((r) => r.completed);
+
   return (
     <div className="max-w-2xl mx-auto lg:max-w-none lg:mx-0 space-y-4 sm:space-y-6">
       {/* ── Header ── */}
@@ -913,8 +1003,35 @@ export default function QuestionnaireClient({
         </p>
       </div>
 
-      {/* ── AI context progress ── */}
-      <div className="rounded-2xl border border-border-primary bg-background-card p-4 sm:p-5">
+      {/* ── Phone: merged compact progress block ── */}
+      <div className="sm:hidden rounded-2xl border border-border-primary bg-background-card p-4 space-y-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-text-muted">AI Context Strength</span>
+          <span className="font-medium text-accent-primary">{completedCount}/{totalCount}</span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-background-secondary overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${Math.round((completedCount / totalCount) * 100)}%`, background: "var(--color-accent-primary)" }}
+          />
+        </div>
+        <p className="text-xs text-text-muted">
+          {incompleteRows.length > 0
+            ? `Complete ${incompleteRows.length} more section${incompleteRows.length !== 1 ? "s" : ""} to improve your posts.`
+            : "All sections complete. Your posts are fully personalized."}
+        </p>
+        <MobileDisclosure
+          label="How this improves your content"
+          summary="Each section feeds the AI hyper-specific details no generic tool has."
+        >
+          <p className="text-sm text-text-muted leading-relaxed">
+            Each section below feeds the AI hyper-specific details about your personality, market, and clients that no generic tool will ever have. A half-filled answer still helps — but those who complete every section get posts that sound like <em>them</em>, not a template.
+          </p>
+        </MobileDisclosure>
+      </div>
+
+      {/* ── ≥sm: AI context progress (unchanged) ── */}
+      <div className="hidden sm:block rounded-2xl border border-border-primary bg-background-card p-4 sm:p-5">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-text-muted">AI Context Strength</span>
@@ -930,16 +1047,38 @@ export default function QuestionnaireClient({
         </div>
       </div>
 
-      {/* ── Deep Dive callout ── */}
-      <div className="rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-4 sm:px-5 py-4">
+      {/* ── ≥sm: Deep Dive callout (unchanged) ── */}
+      <div className="hidden sm:block rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-4 sm:px-5 py-4">
         <p className="text-sm font-semibold text-accent-primary mb-1">The more you put in, the more bespoke your posts become.</p>
         <p className="text-sm text-text-muted leading-relaxed">
           Each section below feeds the AI hyper-specific details about your personality, market, and clients that no generic tool will ever have. A half-filled answer still helps — but those who complete every section get posts that sound like <em>them</em>, not a template.
         </p>
       </div>
 
-      {/* ── Accordion list ── */}
-      <div className="space-y-3">
+      {/* ── Phone: incomplete-first ordering ── */}
+      <div className="sm:hidden space-y-3">
+        {incompleteRows.length > 0 && (
+          <>
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider px-1">Continue where you left off</p>
+            {incompleteRows.map((r) => <div key={r.key}>{r.render()}</div>)}
+          </>
+        )}
+        {completedRows.length > 0 && (
+          <MobileDisclosure
+            label={`Completed (${completedRows.length})`}
+            summary="View your completed sections"
+            expandLabel="View"
+            collapseLabel="Hide"
+          >
+            <div className="space-y-3">
+              {completedRows.map((r) => <div key={r.key}>{r.render()}</div>)}
+            </div>
+          </MobileDisclosure>
+        )}
+      </div>
+
+      {/* ── ≥sm: Accordion list (unchanged definition order) ── */}
+      <div className="hidden sm:block space-y-3">
         {/* Brand Questionnaire row */}
         <AccordionRow
           icon={ClipboardList}
@@ -1001,10 +1140,10 @@ export default function QuestionnaireClient({
         <div className="h-px flex-1 bg-border-primary" />
       </div>
 
-      {/* ── Timed context surveys ── */}
-      <div className="space-y-3">
+      {/* ── ≥sm: Timed context surveys (unchanged) ── */}
+      <div className="hidden sm:block space-y-3">
         {/* Timed context surveys (weekly + monthly) */}
-        {getTimedSurveys().map((survey) => {
+        {timedSurveys.map((survey) => {
           const existing = profileSurveys.find((s) => s.surveyType === survey.type);
           const expired = survey.isExpired(existing?.updatedAt);
           const isCurrent = !!existing && !expired;

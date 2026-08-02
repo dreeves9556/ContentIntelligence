@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { BookOpen, Tag, Calendar, Search, ChevronDown, ChevronUp, Mail } from "lucide-react";
+import { BookOpen, Tag, Calendar, Search, ChevronDown, ChevronUp, Mail, Filter } from "lucide-react";
 import type { ResourcePostData } from "@/app/admin/resources/actions";
+import { MobileBottomSheet } from "@/components/mobile/MobileBottomSheet";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -40,12 +41,12 @@ function AuthorByline({ post }: { post: ResourcePostData }) {
       <div className="min-w-0">
         <p className="text-xs font-semibold text-text-primary leading-tight">{name}</p>
         {post.authorOrganization && (
-          <p className="text-[10px] text-text-muted leading-tight">{post.authorOrganization}</p>
+          <p className="hidden sm:block text-[10px] text-text-muted leading-tight">{post.authorOrganization}</p>
         )}
         {post.authorContactEmail && (
           <a
             href={`mailto:${post.authorContactEmail}`}
-            className="text-[10px] text-accent-primary leading-tight mt-0.5 hover:underline inline-flex items-center gap-1"
+            className="hidden sm:inline-flex text-[10px] text-accent-primary leading-tight mt-0.5 hover:underline items-center gap-1"
           >
             <Mail className="h-2.5 w-2.5" />
             {post.authorContactEmail}
@@ -64,7 +65,7 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
       {/* Header — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full p-5 flex items-start justify-between gap-4 text-left hover:bg-background-secondary/30 transition-colors"
+        className="w-full p-4 sm:p-5 flex items-start justify-between gap-3 sm:gap-4 text-left hover:bg-background-secondary/30 transition-colors"
       >
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -107,6 +108,7 @@ function ResourceCard({ post }: { post: ResourcePostData }) {
 export default function ResourcesTab({ posts }: { posts: ResourcePostData[] }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   const categories = ["All", ...Array.from(new Set(posts.map((p) => p.category).filter(Boolean) as string[]))];
 
@@ -139,21 +141,34 @@ export default function ResourcesTab({ posts }: { posts: ResourcePostData[] }) {
 
   return (
     <div className="space-y-6">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search articles…"
-          className="w-full pl-10 pr-4 py-2.5 bg-background-card border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 text-sm"
-        />
+      {/* Search + phone filter button */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search articles…"
+            className="w-full pl-10 pr-4 py-2.5 bg-background-card border border-border-primary rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/50 text-sm"
+          />
+        </div>
+        {categories.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setFilterSheetOpen(true)}
+            aria-label="Filter by category"
+            className="sm:hidden inline-flex items-center gap-1.5 px-3 rounded-lg border border-border-primary bg-background-card text-text-primary text-sm font-medium min-h-[44px]"
+          >
+            <Filter className="h-4 w-4" />
+            {activeCategory === "All" ? "Filter" : activeCategory}
+          </button>
+        )}
       </div>
 
-      {/* Category filters */}
+      {/* Category filters — ≥sm: unchanged flex-wrap row */}
       {categories.length > 1 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="hidden sm:flex flex-wrap gap-2">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -168,6 +183,34 @@ export default function ResourcesTab({ posts }: { posts: ResourcePostData[] }) {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Phone: category bottom sheet */}
+      {categories.length > 1 && (
+        <MobileBottomSheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          title="Filter by category"
+        >
+          <div className="space-y-2">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setActiveCategory(cat);
+                  setFilterSheetOpen(false);
+                }}
+                className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
+                  activeCategory === cat
+                    ? "bg-accent-primary text-background-primary"
+                    : "bg-background-secondary text-text-muted hover:text-text-primary"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </MobileBottomSheet>
       )}
 
       {/* Results */}

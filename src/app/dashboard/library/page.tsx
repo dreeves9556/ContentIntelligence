@@ -42,16 +42,21 @@ export default async function LibraryPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
             Content Library
           </h1>
-          <p className="text-text-muted mt-1">
+          <p className="text-text-muted mt-1 text-sm sm:text-base">
             Your post archive and coaching resources — all in one place
           </p>
+          {/* Phone: inline metadata */}
+          <p className="sm:hidden text-xs text-text-muted mt-1.5">
+            {calendars.length} week{calendars.length !== 1 ? "s" : ""} · {resourcePosts.length} article{resourcePosts.length !== 1 ? "s" : ""}
+          </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-border-primary self-start">
+        {/* ≥sm: badge card unchanged */}
+        <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-background-card rounded-lg border border-border-primary self-start">
           <BookOpen className="h-4 w-4 text-accent-primary" />
           <span className="text-sm text-text-primary font-medium">
             {calendars.length} week{calendars.length !== 1 ? "s" : ""} · {resourcePosts.length} article{resourcePosts.length !== 1 ? "s" : ""}

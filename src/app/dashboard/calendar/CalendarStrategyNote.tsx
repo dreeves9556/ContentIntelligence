@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, Loader2, ChevronUp, ChevronDown } from "lucide-react";
+import { Sparkles, Loader2 } from "lucide-react";
 import { getCachedCalendarStrategy } from "./actions";
+import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 
 const HIGHLIGHTS = [
   { phrase: "local community content", className: "text-brand-local font-semibold" },
@@ -57,7 +58,6 @@ export default function CalendarStrategyNote() {
   const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [insightExpanded, setInsightExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,65 +81,71 @@ export default function CalendarStrategyNote() {
     return () => { cancelled = true; };
   }, []);
 
+  const firstSentence =
+    insight
+      ? (insight.match(/^[^.!?]+[.!?]/)?.[0] ?? insight.slice(0, 120) + (insight.length > 120 ? "\u2026" : ""))
+      : "";
+
   return (
-    <div className="bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
-      <div className="flex items-start gap-4">
-        <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
-          {loading ? (
-            <Loader2 className="h-6 w-6 text-accent-primary animate-spin" />
-          ) : (
-            <Sparkles className="h-6 w-6 text-accent-primary" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <h3 className="text-lg font-semibold text-accent-primary">
-              AI Strategy Note
-            </h3>
-            {insight && !loading && (
-              <button
-                onClick={() => setInsightExpanded((v) => !v)}
-                className="sm:hidden flex items-center gap-1 text-xs text-accent-primary/70 hover:text-accent-primary transition-colors shrink-0"
-                aria-label={insightExpanded ? "Collapse strategy note" : "Expand strategy note"}
-              >
-                {insightExpanded ? (
-                  <>
-                    Less <ChevronUp className="h-3.5 w-3.5" />
-                  </>
-                ) : (
-                  <>
-                    More <ChevronDown className="h-3.5 w-3.5" />
-                  </>
-                )}
-              </button>
+    <>
+      {/* Phone: compact disclosure */}
+      <div className="sm:hidden">
+        {loading ? (
+          <div className="rounded-xl border border-accent-primary/30 bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent p-4 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-accent-primary animate-spin shrink-0" />
+            <span className="text-sm text-text-muted">Analyzing this week&apos;s strategy…</span>
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-border-primary bg-background-card p-4">
+            <div className="flex items-center gap-2 text-accent-primary mb-1">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-semibold" style={{ fontFamily: "var(--font-serif)" }}>AI Strategy Note</span>
+            </div>
+            <p className="text-text-muted text-sm leading-relaxed">{error}</p>
+          </div>
+        ) : (
+          <MobileDisclosure
+            label="AI Strategy Note"
+            summary={<HighlightedText text={firstSentence} />}
+            className="border-accent-primary/30 bg-gradient-to-r from-accent-primary/10 via-accent-primary/5 to-transparent"
+          >
+            <p className="text-text-primary leading-relaxed text-sm">
+              <HighlightedText text={insight ?? ""} />
+            </p>
+          </MobileDisclosure>
+        )}
+      </div>
+
+      {/* Desktop: unchanged full card */}
+      <div className="hidden sm:block bg-gradient-to-r from-accent-primary/20 via-accent-primary/10 to-transparent border border-accent-primary/30 rounded-xl p-6">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-accent-primary/20 rounded-lg shrink-0">
+            {loading ? (
+              <Loader2 className="h-6 w-6 text-accent-primary animate-spin" />
+            ) : (
+              <Sparkles className="h-6 w-6 text-accent-primary" />
             )}
           </div>
-          {loading && (
-            <p className="text-text-muted leading-relaxed">Analyzing this week&apos;s content strategy...</p>
-          )}
-          {error && (
-            <p className="text-text-muted leading-relaxed">{error}</p>
-          )}
-          {insight && !loading && (
-            <>
-              {/* Mobile: collapsed shows first sentence only */}
-              <p className="sm:hidden text-text-primary leading-relaxed">
-                <HighlightedText
-                  text={
-                    insightExpanded
-                      ? insight
-                      : (insight.match(/^[^.!?]+[.!?]/)?.[0] ?? insight.slice(0, 120) + (insight.length > 120 ? "\u2026" : ""))
-                  }
-                />
-              </p>
-              {/* Desktop: always show full note */}
-              <p className="hidden sm:block text-text-primary leading-relaxed">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-lg font-semibold text-accent-primary">
+                AI Strategy Note
+              </h3>
+            </div>
+            {loading && (
+              <p className="text-text-muted leading-relaxed">Analyzing this week&apos;s content strategy...</p>
+            )}
+            {error && (
+              <p className="text-text-muted leading-relaxed">{error}</p>
+            )}
+            {insight && !loading && (
+              <p className="text-text-primary leading-relaxed">
                 <HighlightedText text={insight} />
               </p>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

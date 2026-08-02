@@ -176,7 +176,7 @@ function WeekCard({ calendar }: { calendar: SavedCalendar }) {
       {/* Week header — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-background-secondary/30 transition-colors"
+        className="w-full p-4 sm:p-5 flex items-center justify-between gap-3 sm:gap-4 text-left hover:bg-background-secondary/30 transition-colors"
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-3">

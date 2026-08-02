@@ -19,9 +19,11 @@ const statusSteps = [
 
 interface GenerateButtonProps {
   regenerate?: boolean;
+  /** When true, renders an icon-only button with an accessible label (no visible text). Phone-only use. */
+  iconOnly?: boolean;
 }
 
-export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
+export function GenerateButton({ regenerate = false, iconOnly = false }: GenerateButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -79,8 +81,11 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
       <button
         onClick={handleGenerate}
         disabled={isLoading}
+        aria-label={regenerate ? "Regenerate calendar" : "Generate calendar"}
+        title={regenerate ? "Regenerate calendar" : "Generate calendar"}
         className={`
           flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:px-6 sm:py-3 sm:text-base
+          ${iconOnly ? "min-w-[44px] min-h-[44px] justify-center" : ""}
           ${
             regenerate
               ? "bg-background-card hover:bg-background-secondary border border-border-primary text-text-primary"
@@ -91,7 +96,7 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin sm:h-5 sm:w-5" />
-            {regenerate ? "Regenerating calendar..." : "Generating calendar..."}
+            {!iconOnly && (regenerate ? "Regenerating calendar..." : "Generating calendar...")}
           </>
         ) : (
           <>
@@ -100,12 +105,12 @@ export function GenerateButton({ regenerate = false }: GenerateButtonProps) {
             ) : (
               <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
             )}
-            {regenerate ? "Regenerate Calendar" : "Generate My Week 1 Calendar"}
+            {!iconOnly && (regenerate ? "Regenerate Calendar" : "Generate My Week 1 Calendar")}
           </>
         )}
       </button>
 
-      {!isLoading && (
+      {!isLoading && !iconOnly && (
         <Link
           href="/dashboard/questionnaire#weekly-context"
           className="flex items-center gap-1 text-xs text-accent-primary hover:text-accent-primary/80 transition-colors"

@@ -182,10 +182,15 @@ export default function DashboardLayoutClient({
             </Link>
           )}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-3">
+        <div
+          className="absolute bottom-0 left-0 right-0 p-4 border-t border-background-primary space-y-3"
+          style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-text-muted">Membership</p>
+              <p className="text-xs text-text-muted">
+                Membership{session?.user?.role ? ` · ${session.user.role}` : ""}
+              </p>
               <p className="text-sm font-medium text-accent-primary">{PUBLIC_PLAN_LABELS[plan]}</p>
             </div>
             <ThemeToggle />
@@ -291,7 +296,10 @@ export default function DashboardLayoutClient({
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden overflow-y-auto bg-background-secondary">
           {/* Mobile header */}
-          <header className="lg:hidden flex items-center justify-between p-4 border-b border-border-primary bg-background-card/95 backdrop-blur">
+          <header
+            className="lg:hidden flex items-center justify-between px-4 py-3 sm:p-4 border-b border-border-primary bg-background-card/95 backdrop-blur sticky top-0 z-30"
+            style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+          >
             <div className="flex items-center gap-2">
               <Newspaper className="h-6 w-6 text-accent-primary" />
               <span className="font-bold text-lg" style={{ fontFamily: "var(--font-serif)" }}>
@@ -299,10 +307,11 @@ export default function DashboardLayoutClient({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted">{session?.user?.role}</span>
+              <span className="hidden sm:inline text-xs text-text-muted">{session?.user?.role}</span>
               <button
                 onClick={() => setMobileMenuOpen(true)}
-                className="p-2 rounded-md text-text-muted hover:text-text-primary"
+                aria-label="Open navigation menu"
+                className="p-2.5 sm:p-2 rounded-md text-text-muted hover:text-text-primary min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <Menu className="h-6 w-6" />
               </button>
