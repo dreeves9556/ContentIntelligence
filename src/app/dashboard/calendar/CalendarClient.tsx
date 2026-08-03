@@ -593,6 +593,8 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
   // posts[i].status === "PUBLISHED" initializes posted[i]; localStorage is
   // only used for legacy blob calendars with no Post rows.
   const isPostBacked = posts.length === days.length;
+  const activePost = isPostBacked ? posts[activeIndex] : undefined;
+  const activePostRefinable = !!activePost && activePost.status !== "PUBLISHED" && activePost.status !== "SCHEDULED";
 
   const baseDate = parseLocalDate(weekStarting);
   const postedKey = `calendar-posted-${weekStarting}`;
@@ -824,12 +826,12 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
 
       {/* Focused Day Card — desktop/tablet */}
       <div className="hidden sm:block transition-all duration-300 ease-in-out">
-        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={isPostBacked && !!posts[activeIndex]} onTweak={() => posts[activeIndex] && setRefinePostId(posts[activeIndex].id)} />
+        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={activePostRefinable} onTweak={() => activePost && setRefinePostId(activePost.id)} />
       </div>
 
       {/* Focused Day Card — phone (tabs) */}
       <div className="sm:hidden">
-        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={isPostBacked && !!posts[activeIndex]} onTweak={() => posts[activeIndex] && setRefinePostId(posts[activeIndex].id)} />
+        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={activePostRefinable} onTweak={() => activePost && setRefinePostId(activePost.id)} />
       </div>
 
       {/* Post Refinement panel — full-screen sheet on phone, slide-over on tablet+ */}
