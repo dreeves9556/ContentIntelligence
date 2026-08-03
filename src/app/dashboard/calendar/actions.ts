@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
+import type { PostStatus } from "@prisma/client";
 import { generateAIInsight } from "../actions";
 import { getPlatformConfig, type PlatformConfigData } from "@/lib/platform-config";
 import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
@@ -23,6 +24,7 @@ import {
   formatHour,
   shiftGridToTimezone,
   formatOffset,
+  parseLocalDate,
   type HeatmapData,
 } from "@/lib/best-time";
 import { summarizeDemographicsForAI, type ContentDecay, type PostingFrequency } from "@/lib/deep-analytics";
@@ -81,6 +83,13 @@ export interface WeeklyCalendar {
   days: CalendarDay[];
 }
 
+export interface PostSummary {
+  id: string;
+  dayIndex: number;
+  status: PostStatus;
+  versionNumber: number | null;
+}
+
 export interface CalendarStrategyResult {
   success: boolean;
   insight?: string;
@@ -124,7 +133,7 @@ ${lines.join("\n")}
 </best_posting_times>`;
 }
 
-export async function getWeeklyCalendar(): Promise<(WeeklyCalendar & { updatedAt: string }) | null> {
+export async function getWeeklyCalendar(): Promise<(WeeklyCalendar & { id: string; updatedAt: string; posts?: PostSummary[] }) | null> {
   const access = await requireDashboardAccess();
   if (!access.allowed) return null;
   const userId = access.user.id;
@@ -132,14 +141,54 @@ export async function getWeeklyCalendar(): Promise<(WeeklyCalendar & { updatedAt
   const calendar = await prisma.calendar.findFirst({
     where: { userId },
     orderBy: { createdAt: "desc" },
+    include: {
+      posts: {
+        orderBy: { dayIndex: "asc" },
+        include: { currentVersion: { select: { versionNumber: true, source: true, changeSummary: true, createdAt: true } } },
+      },
+    },
   });
 
   if (!calendar) {
     return null;
   }
 
+  // Dual-read: Post rows are canonical for new-generation calendars; the
+  // contentJson blob is the fallback for legacy calendars without Post rows.
+  if (calendar.posts.length > 0) {
+    const days: CalendarDay[] = calendar.posts.map((post) => ({
+      day: post.day,
+      format: post.format as ContentFormat,
+      bucket: post.bucket as ContentBucket,
+      title: post.title,
+      hook: post.hook,
+      body: post.body,
+      cta: post.cta,
+      caption: post.caption,
+      musicSuggestion: post.musicSuggestion ?? undefined,
+      duration: post.duration ?? undefined,
+      directions: post.directions ?? undefined,
+    }));
+
+    const posts: PostSummary[] = calendar.posts.map((post) => ({
+      id: post.id,
+      dayIndex: post.dayIndex,
+      status: post.status,
+      versionNumber: post.currentVersion?.versionNumber ?? null,
+    }));
+
+    // Preserve weekStarting from contentJson if present (legacy field), else
+    // fall back to the Calendar.weekStarting column.
+    const blob = calendar.contentJson as unknown as Partial<WeeklyCalendar> | null;
+    const weekStarting = calendar.weekStarting
+      ? calendar.weekStarting.toISOString().slice(0, 10)
+      : (blob?.weekStarting ?? "");
+
+    return { id: calendar.id, weekStarting, days, updatedAt: calendar.updatedAt.toISOString(), posts };
+  }
+
   const content = calendar.contentJson as unknown as WeeklyCalendar;
-  return { ...content, updatedAt: calendar.updatedAt.toISOString() };
+  return { ...content, id: calendar.id, updatedAt: calendar.updatedAt.toISOString() };
 }
 
 export async function generateCalendarStrategy(
@@ -793,12 +842,79 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       where: { userId },
     });
 
-    await prisma.calendar.create({
-      data: {
-        userId,
-        weekNumber: existingCount + 1,
-        contentJson: calendarData as unknown as Prisma.InputJsonValue,
-      },
+    const weekStartingDate = parseLocalDate(weekStarting);
+
+    // Transactional creation: Calendar + Post + PostVersion (v1) rows together.
+    // If any insert fails, the whole generation rolls back — no orphan rows.
+    await prisma.$transaction(async (tx) => {
+      const calendar = await tx.calendar.create({
+        data: {
+          userId,
+          weekNumber: existingCount + 1,
+          weekStarting: weekStartingDate,
+          generationStatus: "COMPLETED",
+          model,
+          promptVersion: "calendar-v1",
+          contentJson: calendarData as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      // Create a Post + PostVersion (v1, source GENERATION) for each day.
+      // Post denormalized fields mirror v1; currentVersionId points to v1.
+      for (let index = 0; index < calendarData.days.length; index++) {
+        const day = calendarData.days[index];
+        const post = await tx.post.create({
+          data: {
+            userId,
+            calendarId: calendar.id,
+            dayIndex: index,
+            day: day.day,
+            format: day.format,
+            bucket: day.bucket,
+            title: day.title,
+            hook: day.hook,
+            body: day.body,
+            cta: day.cta,
+            caption: day.caption,
+            musicSuggestion: day.musicSuggestion ?? null,
+            duration: day.duration ?? null,
+            directions: day.directions ?? null,
+            status: "GENERATED",
+            provenanceJson: {
+              promptVersion: "calendar-v1",
+              model,
+              sources: [],
+            } as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        const version = await tx.postVersion.create({
+          data: {
+            postId: post.id,
+            versionNumber: 1,
+            source: "GENERATION",
+            title: day.title,
+            hook: day.hook,
+            body: day.body,
+            cta: day.cta,
+            caption: day.caption,
+            musicSuggestion: day.musicSuggestion ?? null,
+            duration: day.duration ?? null,
+            directions: day.directions ?? null,
+            provenanceJson: {
+              promptVersion: "calendar-v1",
+              model,
+              sources: [],
+            } as unknown as Prisma.InputJsonValue,
+            aiModel: model,
+          },
+        });
+
+        await tx.post.update({
+          where: { id: post.id },
+          data: { currentVersionId: version.id },
+        });
+      }
     });
 
     // Touch memories that were used in this prompt (updates lastUsedAt)
@@ -864,12 +980,42 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
 export async function addToArchive(
   weekStarting: string,
   dayIndex: number,
-  day: CalendarDay
+  day: CalendarDay,
+  postId?: string
 ): Promise<void> {
   const access = await requireDashboardAccess();
   if (!access.allowed) return;
   const userId = access.user.id;
 
+  // Post-backed calendars: Post.status is the authoritative posted state.
+  // Idempotent — double-mark is a no-op that does NOT overwrite
+  // statusBeforePublished.
+  if (postId) {
+    await prisma.$transaction(async (tx) => {
+      const post = await tx.post.findUnique({
+        where: { id: postId },
+        select: { id: true, userId: true, status: true, currentVersionId: true },
+      });
+      if (!post || post.userId !== userId) return;
+
+      if (post.status === "PUBLISHED") {
+        // Already published — idempotent no-op.
+        return;
+      }
+
+      await tx.post.update({
+        where: { id: postId },
+        data: {
+          statusBeforePublished: post.status,
+          status: "PUBLISHED",
+          publishedVersionId: post.currentVersionId,
+          publishedAt: new Date(),
+        },
+      });
+    });
+  }
+
+  // ContentArchive write retained for backward compat (library view).
   await prisma.contentArchive.upsert({
     where: {
       userId_weekStarting_dayIndex: {
@@ -908,15 +1054,44 @@ export async function addToArchive(
   });
 
   revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/calendar");
 }
 
 export async function removeFromArchive(
   weekStarting: string,
-  dayIndex: number
+  dayIndex: number,
+  postId?: string
 ): Promise<void> {
   const access = await requireDashboardAccess();
   if (!access.allowed) return;
   const userId = access.user.id;
+
+  // Post-backed calendars: unmark = "correct accidental mark".
+  // Idempotent — double-unmark on a non-published post is a no-op.
+  if (postId) {
+    await prisma.$transaction(async (tx) => {
+      const post = await tx.post.findUnique({
+        where: { id: postId },
+        select: { id: true, userId: true, status: true, statusBeforePublished: true },
+      });
+      if (!post || post.userId !== userId) return;
+
+      if (post.status !== "PUBLISHED") {
+        // Not published — idempotent no-op.
+        return;
+      }
+
+      await tx.post.update({
+        where: { id: postId },
+        data: {
+          status: post.statusBeforePublished ?? "GENERATED",
+          statusBeforePublished: null,
+          publishedVersionId: null,
+          publishedAt: null,
+        },
+      });
+    });
+  }
 
   await prisma.contentArchive.deleteMany({
     where: {
@@ -927,6 +1102,7 @@ export async function removeFromArchive(
   });
 
   revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/calendar");
 }
 
 export async function addFeedback(

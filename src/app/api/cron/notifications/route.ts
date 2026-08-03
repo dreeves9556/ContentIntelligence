@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { abandonStaleSessions } from "@/app/dashboard/post-refinement/actions";
 import {
   sendPostingReminder,
   sendStreakWarning,
@@ -255,11 +256,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [reminders, streaks, digests, scheduled] = await Promise.all([
+    const [reminders, streaks, digests, scheduled, staleCleanup] = await Promise.all([
       runPostingReminders(),
       runStreakWarnings(),
       runWeeklyDigest(),
       runScheduledPushes(),
+      abandonStaleSessions(),
     ]);
 
     return NextResponse.json({
@@ -268,6 +270,7 @@ export async function GET(request: Request) {
       streakWarnings: streaks,
       weeklyDigests: digests,
       scheduledPushes: scheduled,
+      staleRefinementCleanup: staleCleanup,
     });
   } catch (err) {
     console.error("[CRON NOTIFICATIONS] Failed:", err);

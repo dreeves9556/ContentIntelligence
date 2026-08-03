@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
-import type { ContentFormat, ContentBucket, CalendarDay } from "./actions";
+import { useState, useEffect, useTransition, useRef } from "react";
+import { useRouter } from "next/navigation";
+import type { ContentFormat, ContentBucket, CalendarDay, PostSummary } from "./actions";
 import { addToArchive, removeFromArchive, addFeedback } from "./actions";
+import { RefinementPanel } from "./RefinementPanel";
+import { Sparkles } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import {
   bestSlotForDay,
@@ -245,7 +248,7 @@ export function parseCarouselSlides(body: string): { label: string; text: string
   return [{ label: "Slide 1", text: body.trim() }];
 }
 
-function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes, feedback, onFeedback }: { day: CalendarDay; dayIndex: number; weekStarting: string; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; feedback: "up" | "down" | null; onFeedback: (value: "up" | "down") => void; }) {
+function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes, feedback, onFeedback, onTweak, canTweak }: { day: CalendarDay; dayIndex: number; weekStarting: string; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; feedback: "up" | "down" | null; onFeedback: (value: "up" | "down") => void; onTweak?: () => void; canTweak?: boolean; }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
 
@@ -288,9 +291,19 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
             <BucketBadge bucket={day.bucket} />
           </div>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-text-primary leading-[1.15] mt-3 mb-1" style={{ fontFamily: "var(--font-serif)" }}>
-          {day.title}
-        </h2>
+        <div className="flex items-start justify-between gap-3 mt-3 mb-1">
+          <h2 className="text-2xl sm:text-3xl font-bold text-text-primary leading-[1.15]" style={{ fontFamily: "var(--font-serif)" }}>
+            {day.title}
+          </h2>
+          {canTweak && onTweak && (
+            <button
+              onClick={onTweak}
+              className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-primary hover:text-accent-primary/80 border border-accent-primary/30 hover:border-accent-primary/50 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" /> Tweak
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-2">
           <span className="text-xs font-semibold tracking-wider text-accent-primary uppercase">{dateForDay.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()} Edition</span>
           <span className="h-px flex-1 bg-border-primary" />
@@ -564,14 +577,22 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
   );
 }
 
-export default function CalendarClient({ days, weekStarting, connectedPlatforms, bestTimes }: { days: CalendarDay[]; weekStarting: string; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[] }) {
+export default function CalendarClient({ days, weekStarting, connectedPlatforms, bestTimes, posts = [] }: { days: CalendarDay[]; weekStarting: string; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; posts?: PostSummary[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
   const [feedbackState, setFeedbackState] = useState<("up" | "down" | null)[]>(Array(days.length).fill(null));
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const didInitPosition = useRef(false);
   const [showRegenModal, setShowRegenModal] = useState(false);
+  const [refinePostId, setRefinePostId] = useState<string | null>(null);
+  const router = useRouter();
   const activeDay = days[activeIndex];
+
+  // Post-backed calendars: server is authoritative for posted state.
+  // posts[i].status === "PUBLISHED" initializes posted[i]; localStorage is
+  // only used for legacy blob calendars with no Post rows.
+  const isPostBacked = posts.length === days.length;
 
   const baseDate = parseLocalDate(weekStarting);
   const postedKey = `calendar-posted-${weekStarting}`;
@@ -590,20 +611,31 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
       endDate.setDate(endDate.getDate() + days.length - 1);
       endDate.setHours(23, 59, 59, 999);
 
-      if (days.length > 0 && today >= startDate && today <= endDate) {
-        const diffDays = Math.round((today.getTime() - startDate.getTime()) / 86400000);
-        setActiveIndex(Math.min(Math.max(diffDays, 0), days.length - 1));
-      } else if (days.length > 0 && today > endDate) {
-        setActiveIndex(days.length - 1);
-        setShowRegenModal(true);
+      // Date-based activeIndex init runs once on mount so the selected day is
+      // preserved across post-refinement re-renders (posts prop changes but
+      // we must not jump the user back to "today").
+      if (!didInitPosition.current) {
+        if (days.length > 0 && today >= startDate && today <= endDate) {
+          const diffDays = Math.round((today.getTime() - startDate.getTime()) / 86400000);
+          setActiveIndex(Math.min(Math.max(diffDays, 0), days.length - 1));
+        } else if (days.length > 0 && today > endDate) {
+          setActiveIndex(days.length - 1);
+          setShowRegenModal(true);
+        }
+        didInitPosition.current = true;
       }
 
       try {
-        const savedPosted = localStorage.getItem(postedKey);
-        if (savedPosted) {
-          const parsed = JSON.parse(savedPosted);
-          if (Array.isArray(parsed) && parsed.length === days.length) {
-            setPosted(parsed);
+        // Post-backed calendars: posted state is server-authoritative.
+        if (isPostBacked) {
+          setPosted(posts.map((p) => p.status === "PUBLISHED"));
+        } else {
+          const savedPosted = localStorage.getItem(postedKey);
+          if (savedPosted) {
+            const parsed = JSON.parse(savedPosted);
+            if (Array.isArray(parsed) && parsed.length === days.length) {
+              setPosted(parsed);
+            }
           }
         }
 
@@ -622,16 +654,18 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
     }, 0);
 
     return () => clearTimeout(timeout);
-  }, [days.length, feedbackKey, postedKey, weekStarting]);
+  }, [days.length, feedbackKey, postedKey, weekStarting, isPostBacked, posts]);
 
   useEffect(() => {
     if (!storageLoaded) return;
+    // Legacy calendars only — Post-backed calendars use server-authoritative state.
+    if (isPostBacked) return;
     try {
       localStorage.setItem(postedKey, JSON.stringify(posted));
     } catch {
       // ignore localStorage errors
     }
-  }, [posted, postedKey, storageLoaded]);
+  }, [posted, postedKey, storageLoaded, isPostBacked]);
 
   useEffect(() => {
     if (!storageLoaded) return;
@@ -647,11 +681,12 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
     next[index] = !next[index];
     setPosted(next);
     const willBePosted = next[index];
+    const postId = isPostBacked ? posts[index]?.id : undefined;
     startTransition(async () => {
       if (willBePosted) {
-        await addToArchive(weekStarting, index, days[index]);
+        await addToArchive(weekStarting, index, days[index], postId);
       } else {
-        await removeFromArchive(weekStarting, index);
+        await removeFromArchive(weekStarting, index, postId);
       }
     });
   };
@@ -709,6 +744,38 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
         </div>
       </div>
 
+      {/* Desktop/tablet day navigation — hidden on phone (phone uses the sticky pills below). */}
+      <div className="hidden sm:flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-background-secondary scrollbar-track-transparent">
+        {days.map((day, index) => {
+          const isActive = index === activeIndex;
+          const isPosted = posted[index];
+          const tabDate = new Date(baseDate);
+          tabDate.setDate(baseDate.getDate() + index);
+          const dateLabel = tabDate.toLocaleDateString("en-US", {
+            weekday: "short",
+            day: "numeric",
+          });
+          return (
+            <button
+              key={day.day}
+              onClick={() => setActiveIndex(index)}
+              className={`
+                shrink sm:flex-1 sm:min-w-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase
+                transition-all duration-200 ease-out whitespace-nowrap text-center
+                ${
+                  isActive
+                    ? "bg-accent-primary text-white shadow-lg shadow-accent-primary/20"
+                    : "bg-background-secondary text-text-muted hover:text-text-primary hover:bg-background-card border border-border-primary"
+                }
+                ${isPosted ? "line-through opacity-50" : ""}
+              `}
+            >
+              {dateLabel}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Phone masthead + day navigation stay together while scrolling. */}
       <div className="sm:hidden sticky top-[60px] z-20 -mx-4 px-4 pt-2 pb-2 bg-background-secondary">
         <div className="text-center mb-2">
@@ -757,13 +824,30 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
 
       {/* Focused Day Card — desktop/tablet */}
       <div className="hidden sm:block transition-all duration-300 ease-in-out">
-        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} />
+        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={isPostBacked && !!posts[activeIndex]} onTweak={() => posts[activeIndex] && setRefinePostId(posts[activeIndex].id)} />
       </div>
 
       {/* Focused Day Card — phone (tabs) */}
       <div className="sm:hidden">
-        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} />
+        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={isPostBacked && !!posts[activeIndex]} onTweak={() => posts[activeIndex] && setRefinePostId(posts[activeIndex].id)} />
       </div>
+
+      {/* Post Refinement panel — full-screen sheet on phone, slide-over on tablet+ */}
+      {refinePostId && (
+        <RefinementPanel
+          postId={refinePostId}
+          postTitle={activeDay.title}
+          onClose={() => setRefinePostId(null)}
+          onPostChanged={() => {
+            // revalidatePath in the action marks the cache stale; router.refresh
+            // pulls the fresh server data so the day card re-renders with the
+            // accepted/ restored content without a full page reload.
+            startTransition(() => {
+              router.refresh();
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

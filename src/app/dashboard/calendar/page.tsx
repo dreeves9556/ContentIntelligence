@@ -146,7 +146,7 @@ export default async function CalendarPage() {
       </div>
 
       {/* Focus Mode Calendar */}
-      <CalendarClient key={calendar.updatedAt} days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} />
+      <CalendarClient key={calendar.id} days={calendar.days} weekStarting={calendar.weekStarting} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} posts={calendar.posts ?? []} />
     </div>
   );
 }

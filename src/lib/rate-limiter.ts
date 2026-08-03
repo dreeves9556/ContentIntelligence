@@ -8,7 +8,7 @@ function storageKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
-async function serializableTransaction<T>(
+export async function serializableTransaction<T>(
   operation: (tx: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
   for (let attempt = 0; attempt < MAX_SERIALIZABLE_RETRIES; attempt++) {

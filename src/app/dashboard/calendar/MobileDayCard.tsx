@@ -19,6 +19,7 @@ import {
   Circle,
   ThumbsUp,
   ThumbsDown,
+  Sparkles,
 } from "lucide-react";
 import {
   bestSlotForDay,
@@ -267,6 +268,8 @@ export function MobileDayCard({
   bestTimes,
   feedback,
   onFeedback,
+  onTweak,
+  canTweak,
 }: {
   day: CalendarDay;
   dayIndex: number;
@@ -278,6 +281,8 @@ export function MobileDayCard({
   bestTimes: CalendarBestTimeEntry[];
   feedback: "up" | "down" | null;
   onFeedback: (value: "up" | "down") => void;
+  onTweak?: () => void;
+  canTweak?: boolean;
 }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
@@ -588,9 +593,19 @@ export function MobileDayCard({
             <BucketBadge bucket={day.bucket} />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-text-primary leading-[1.15] mt-2 mb-1" style={{ fontFamily: "var(--font-serif)" }}>
-          {day.title}
-        </h2>
+        <div className="flex items-start justify-between gap-2 mt-2 mb-1">
+          <h2 className="text-2xl font-bold text-text-primary leading-[1.15]" style={{ fontFamily: "var(--font-serif)" }}>
+            {day.title}
+          </h2>
+          {canTweak && onTweak && (
+            <button
+              onClick={onTweak}
+              className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-primary hover:text-accent-primary/80 border border-accent-primary/30 hover:border-accent-primary/50 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" /> Tweak
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-xs font-semibold tracking-wider text-accent-primary uppercase">
             {dateForDay.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()} Edition

@@ -65,6 +65,8 @@ model User {
   bugReports                 BugReport[]
   creatorMemories            CreatorMemory[]
   calendarGenerationLogs     CalendarGenerationLog[]
+  posts                      Post[]
+  postRefinementSessions     PostRefinementSession[]
   notificationLogs           NotificationLog[]
   notificationPreference     NotificationPreference?
   scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
@@ -134,13 +136,21 @@ model Questionnaire {
 }
 
 model Calendar {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weekNumber  Int      @default(1)
-  contentJson Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekNumber       Int      @default(1)
+  contentJson      Json
+  weekStarting     DateTime?
+  generationStatus String   @default("COMPLETED")
+  model            String?
+  promptVersion    String?
+  generationLogId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  posts           Post[]
+  generationLog   CalendarGenerationLog? @relation(fields: [generationLogId], references: [id], onDelete: SetNull)
 
   @@map("calendars")
 }
@@ -669,6 +679,8 @@ model CalendarGenerationLog {
   durationMs                 Int?
   createdAt                  DateTime @default(now())
 
+  calendars                  Calendar[]
+
   @@index([userId, createdAt])
   @@map("calendar_generation_logs")
 }
@@ -800,4 +812,199 @@ model LoginAnnouncementDismissal {
   @@unique([announcementId, userId])
   @@index([userId])
   @@map("login_announcement_dismissals")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Post Refinement Core V1
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum PostStatus {
+  GENERATED
+  REFINED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+}
+
+enum PostVersionSource {
+  GENERATION
+  AI_REFINEMENT
+  MANUAL_EDIT
+  RESTORE
+}
+
+enum RefinementSessionStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+  ABANDONED
+}
+
+enum RefinementMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum RefinementInputType {
+  QUICK_ACTION
+  FREEFORM
+  SUGGESTION
+  CONVERSATION
+}
+
+enum RefinementTurnStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  ERROR
+}
+
+model Post {
+  id                    String     @id @default(cuid())
+  userId                String
+  calendarId            String
+  dayIndex              Int
+  day                   String
+  format                String
+  bucket                String
+  title                 String
+  hook                  String
+  body                  String
+  cta                   String
+  caption               String
+  musicSuggestion       String?
+  duration              String?
+  directions            String?
+  status                PostStatus @default(GENERATED)
+  statusBeforePublished PostStatus?
+  provenanceJson        Json?
+  currentVersionId      String?    @unique
+  publishedVersionId    String?    @unique
+  publishedAt           DateTime?
+  externalPostId        String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendar            Calendar               @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  versions            PostVersion[]          @relation("PostVersions")
+  currentVersion      PostVersion?           @relation("PostCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  publishedVersion    PostVersion?           @relation("PostPublishedVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+  refinementSessions  PostRefinementSession[]
+
+  @@unique([calendarId, dayIndex])
+  @@index([userId, calendarId])
+  @@index([userId, status])
+  @@index([calendarId, status])
+  @@map("posts")
+}
+
+model PostVersion {
+  id                          String              @id @default(cuid())
+  postId                      String
+  versionNumber               Int
+  source                      PostVersionSource   @default(GENERATION)
+  title                       String
+  hook                        String
+  body                        String
+  cta                         String
+  caption                     String
+  musicSuggestion             String?
+  duration                    String?
+  directions                  String?
+  changeSummary               String?
+  provenanceJson              Json?
+  aiModel                     String?
+  estimatedCostMicrodollars   Int? // microdollars — $0.0123 stored as 12300; copied from message on accept
+  latencyMs                   Int?
+  restoredFromVersionId       String?
+  previousVersionId           String?
+  createdAt                   DateTime            @default(now())
+
+  post                   Post                   @relation("PostVersions", fields: [postId], references: [id], onDelete: Cascade)
+  currentVersionOf       Post?                  @relation("PostCurrentVersion")
+  publishedVersionOf     Post?                  @relation("PostPublishedVersion")
+  restoredFrom           PostVersion?           @relation("RestoredFrom", fields: [restoredFromVersionId], references: [id], onDelete: SetNull)
+  restoredInVersions     PostVersion[]          @relation("RestoredFrom")
+  previousVersion        PostVersion?           @relation("PreviousVersion", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  nextVersions           PostVersion[]          @relation("PreviousVersion")
+  acceptedInSession      PostRefinementSession? @relation("SessionAcceptedVersion")
+  baseVersionOfSessions  PostRefinementSession[] @relation("SessionBaseVersion")
+
+  @@unique([postId, versionNumber])
+  @@index([postId, createdAt])
+  @@map("post_versions")
+}
+
+model PostRefinementSession {
+  id                String                   @id @default(cuid())
+  postId            String
+  userId            String
+  status            RefinementSessionStatus  @default(OPEN)
+  baseVersionId     String?
+  baseVersionNumber Int
+  startedAt         DateTime                 @default(now())
+  lastActivityAt    DateTime                 @default(now())
+  completedAt       DateTime?
+  acceptedVersionId String?                  @unique
+
+  post            Post                     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        PostRefinementMessage[]
+  turns           PostRefinementTurn[]
+  acceptedVersion PostVersion?             @relation("SessionAcceptedVersion", fields: [acceptedVersionId], references: [id], onDelete: SetNull)
+  baseVersion     PostVersion?             @relation("SessionBaseVersion", fields: [baseVersionId], references: [id], onDelete: SetNull)
+
+  @@index([postId, startedAt])
+  @@index([userId, startedAt])
+  @@index([postId, status])
+  @@index([status, lastActivityAt])
+  @@map("post_refinement_sessions")
+}
+
+model PostRefinementTurn {
+  id               String                @id @default(cuid())
+  sessionId        String
+  turnId           String                // client-generated UUID, server-validated
+  status           RefinementTurnStatus  @default(PENDING)
+  attemptCount     Int                   @default(0)
+  processingAt     DateTime?
+  completedAt      DateTime?
+  lastErrorKind    String?
+  lastErrorMessage String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  session PostRefinementSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, turnId])
+  @@index([sessionId, status])
+  @@map("post_refinement_turns")
+}
+
+model PostRefinementMessage {
+  id                          String                @id @default(cuid())
+  sessionId                   String
+  turnId                      String                // links to PostRefinementTurn; multiple SYSTEM per turn allowed
+  role                        RefinementMessageRole
+  inputType                   RefinementInputType?
+  actionKey                   String?
+  message                     String // USER: instruction; ASSISTANT: changeSummary; SYSTEM: error/audit text
+  snapshotJson                Json? // ASSISTANT only: validated proposed post fields
+  instructionLength           Int?
+  timeSpentMs                 Int?
+  model                       String?
+  promptTokens                Int?
+  completionTokens            Int?
+  latencyMs                   Int?
+  estimatedCostMicrodollars   Int? // microdollars; calculated once on AI response
+  acceptedAt                  DateTime? // set when this ASSISTANT message's snapshot is accepted
+  createdAt                   DateTime              @default(now())
+
+  session PostRefinementSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, turnId, createdAt])
+  @@index([sessionId, createdAt])
+  @@map("post_refinement_messages")
 }
