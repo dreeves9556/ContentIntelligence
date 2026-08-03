@@ -75,7 +75,7 @@ export default async function CalendarPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Phone: compact header (week toolbar + legend trigger) */}
-      <MobileCalendarHeader weekStarting={calendar.weekStarting} />
+      <MobileCalendarHeader weekStarting={calendar.weekStarting} daysCount={calendar.days.length} />
 
       {/* Desktop/tablet: unchanged header + strategy + legends */}
       <div className="hidden sm:block space-y-8">
@@ -95,7 +95,7 @@ export default async function CalendarPage() {
                 Week of {parseLocalDate(calendar.weekStarting).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </span>
             </div>
-            <GenerateButton regenerate />
+            <GenerateButton regenerate defaultDaysToPost={calendar.days.length} />
           </div>
         </div>
 

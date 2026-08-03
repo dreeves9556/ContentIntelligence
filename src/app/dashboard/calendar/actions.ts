@@ -380,7 +380,10 @@ function logCalendarGeneration(ctx: GenerationLogContext): void {
     .catch((err: unknown) => console.error("Calendar generation log write failed:", err));
 }
 
-export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): Promise<{ success: boolean; error?: string }> {
+export async function generateWeeklyCalendar(
+  timezoneOffsetHours: number = 0,
+  daysToPostOverride?: number,
+): Promise<{ success: boolean; error?: string }> {
   const access = await requireDashboardAccess();
   if (!access.allowed) return { success: false, error: access.error };
   const userId = access.user.id;
@@ -573,10 +576,34 @@ export async function generateWeeklyCalendar(timezoneOffsetHours: number = 0): P
   });
 
   const parsedDaysToPost = Number(answers.daysToPost);
-  const daysToPost =
+  const questionnaireDaysToPost =
     Number.isInteger(parsedDaysToPost) && parsedDaysToPost >= 1 && parsedDaysToPost <= 7
       ? parsedDaysToPost
       : 3;
+
+  // Allow the caller (e.g. the Regenerate Calendar popup) to override the day count
+  // for this generation. When a valid override is supplied and differs from the
+  // questionnaire value, persist it back so future generations use the new default.
+  const overrideValid =
+    daysToPostOverride !== undefined &&
+    Number.isInteger(daysToPostOverride) &&
+    daysToPostOverride >= 1 &&
+    daysToPostOverride <= 7;
+
+  let daysToPost = questionnaireDaysToPost;
+  if (overrideValid) {
+    daysToPost = daysToPostOverride as number;
+    if (daysToPost !== questionnaireDaysToPost) {
+      try {
+        await prisma.questionnaire.update({
+          where: { id: questionnaire.id },
+          data: { content: { ...answers, daysToPost } as unknown as Prisma.InputJsonValue },
+        });
+      } catch (err) {
+        console.error("Failed to persist daysToPost override:", err);
+      }
+    }
+  }
 
   // Compute the user's LOCAL "today" from their timezone offset (local = UTC + offsetHours),
   // so currentDay, targetDays, and weekStarting all agree regardless of the server's timezone.

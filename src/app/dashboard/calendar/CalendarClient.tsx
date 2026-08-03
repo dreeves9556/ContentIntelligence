@@ -391,16 +391,18 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
             </div>
           )}
 
-          {/* CTA */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold tracking-wider text-brand-expert uppercase">Call to Action</span>
-              <CopyButton text={day.cta} label="Copy CTA" />
+          {/* CTA — hidden for Static (CTA lives in the caption) */}
+          {day.format !== "Static" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold tracking-wider text-brand-expert uppercase">Call to Action</span>
+                <CopyButton text={day.cta} label="Copy CTA" />
+              </div>
+              <p className="text-base text-brand-expert leading-relaxed font-medium">
+                {day.cta}
+              </p>
             </div>
-            <p className="text-base text-brand-expert leading-relaxed font-medium">
-              {day.cta}
-            </p>
-          </div>
+          )}
         </div>
       </div>
 
@@ -721,7 +723,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
             <p className="text-text-muted text-sm">
               This calendar&apos;s date range has passed. Generate a new calendar to get fresh content recommendations for the coming week.
             </p>
-            <GenerateButton regenerate />
+            <GenerateButton regenerate defaultDaysToPost={days.length} />
             <button
               onClick={() => setShowRegenModal(false)}
               className="text-sm text-text-muted hover:text-text-primary transition-colors"

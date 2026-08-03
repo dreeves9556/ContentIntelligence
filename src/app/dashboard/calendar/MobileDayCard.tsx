@@ -416,16 +416,19 @@ export function MobileDayCard({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <SectionHeader
-            icon={MessageCircle}
-            label="Call to Action"
-            copyText={day.cta}
-            copyLabel="Copy CTA"
-            iconClass="text-brand-expert"
-          />
-          <p className="text-base text-brand-expert leading-relaxed font-medium">{day.cta}</p>
-        </div>
+        {/* CTA — hidden for Static (CTA lives in the caption) */}
+        {day.format !== "Static" && (
+          <div className="space-y-1.5">
+            <SectionHeader
+              icon={MessageCircle}
+              label="Call to Action"
+              copyText={day.cta}
+              copyLabel="Copy CTA"
+              iconClass="text-brand-expert"
+            />
+            <p className="text-base text-brand-expert leading-relaxed font-medium">{day.cta}</p>
+          </div>
+        )}
       </div>
     </div>
   );

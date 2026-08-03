@@ -14,7 +14,7 @@ import { MobileBottomSheet } from "@/components/mobile/MobileBottomSheet";
  *
  * ≥sm renders the existing page.tsx blocks (this component is wrapped in sm:hidden).
  */
-export function MobileCalendarHeader({ weekStarting }: { weekStarting: string }) {
+export function MobileCalendarHeader({ weekStarting, daysCount }: { weekStarting: string; daysCount: number }) {
   const [legendOpen, setLegendOpen] = useState(false);
 
   const weekLabel = parseLocalDate(weekStarting).toLocaleDateString("en-US", {
@@ -50,7 +50,7 @@ export function MobileCalendarHeader({ weekStarting }: { weekStarting: string })
             Context
           </Link>
           <div className="min-h-[44px] flex items-center">
-            <GenerateButton regenerate iconOnly />
+            <GenerateButton regenerate iconOnly defaultDaysToPost={daysCount} />
           </div>
           <button
             type="button"

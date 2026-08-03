@@ -35,7 +35,7 @@ export const RefinementSnapshotSchema = z.object({
   title: z.string().min(1).max(200),
   hook: z.string().min(1).max(500),
   body: z.string().min(1).max(3000),
-  cta: z.string().min(1).max(300),
+  cta: z.string().max(300), // empty allowed — Static posts put the CTA in the caption
   caption: z.string().min(1).max(2200),
   format: formatField,
   musicSuggestion: z.string().max(200).optional().nullable(),
@@ -86,7 +86,7 @@ Rules:
 - FORMAT-SPECIFIC FIELD MEANING (keep field content appropriate to the format):
   - Reel: hook = first spoken line, body = full spoken script, cta = spoken closer, caption = feed text below the reel.
   - Carousel: hook = cover-slide headline, body = individual slides ("Slide N: ..."), cta = closing slide or caption closer, caption = feed text below the carousel.
-  - Static: hook = headline on the image, body = SHORT text overlaid on the image (under 300 characters, like a quote card or infographic), cta = short pasteable closer, caption = the feed text BELOW the image where the longer explanation goes. Do NOT write a long essay as the body for a Static post. If the user asks to add length or detail to a Static post, put it in the caption, not the body.
+  - Static: hook = headline on the image, body = SHORT text overlaid on the image (under 300 characters, like a quote card or infographic), cta = EMPTY STRING (the CTA goes in the caption, not on the image), caption = the feed text BELOW the image where the longer explanation AND the call-to-action go. Do NOT write a long essay as the body for a Static post. If the user asks to add length, detail, or a CTA to a Static post, put it in the caption, not the body or cta.
 - "changeSummary" is a short Markdown string (bullet points) describing what you changed and why. Max 1000 characters.
 - Do not change the bucket unless explicitly asked.
 - Honor the user's instruction precisely. If they ask to redirect the CTA to a specific resource, do exactly that.
