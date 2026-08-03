@@ -162,10 +162,103 @@ h1, h2, h3, h4, h5, h6 {
   animation: fade-in 0.4s ease-in-out both;
 }
 
+/* ───────────────────────────────────────────────
+   Calendar generation overlay animations.
+   Per brand guide: 150–400ms, ease-in-out, no bounce.
+   ─────────────────────────────────────────────── */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-overlay-in {
+  animation: overlay-in 0.3s ease-out both;
+}
+
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-overlay-out {
+  animation: overlay-out 0.4s ease-in both;
+}
+
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-backdrop-out {
+  animation: backdrop-out 0.4s ease-in both;
+}
+
+@keyframes day-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-day-tile-in {
+  animation: day-tile-in 0.35s ease-out both;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@keyframes indeterminate-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-indeterminate-bar {
+  animation: indeterminate-bar 1.6s ease-in-out infinite;
+}
+
+/* Pro-tip carousel fade-in */
+@keyframes tip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tip-fade-in {
+  animation: tip-fade-in 0.35s ease-out both;
+}
+
 /* Accessibility: honor reduced-motion preference by disabling entrance animations. */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in-up,
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-overlay-in,
+  .animate-overlay-out,
+  .animate-backdrop-out,
+  .animate-day-tile-in,
+  .animate-pulse-soft,
+  .animate-indeterminate-bar,
+  .animate-tip-fade-in {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

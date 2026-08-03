@@ -679,9 +679,23 @@ model CalendarGenerationLog {
   durationMs                 Int?
   createdAt                  DateTime @default(now())
 
+  // ── Idempotency claim state (v3) ──────────────────────────────
+  requestId                  String?  // client-generated UUID; one claim per user+requestId
+  requestStatus              String?  // "PROCESSING" | "COMPLETED" | "FAILED"
+  requestClaimToken          String?  // held by the process allowed to call Anthropic
+  requestClaimedAt           DateTime?
+  requestCompletedAt         DateTime?
+  requestAttempts            Int      @default(0)
+  requestDaysToPost          Int?     // inputs frozen at claim time
+  requestTimezoneOffset      Int?     // inputs frozen at claim time
+  requestUserId              String?  // inputs frozen at claim time (== userId; defends against token reuse across users)
+  resultingCalendarId        String?  // exactly one Calendar per COMPLETED log
+
   calendars                  Calendar[]
 
   @@index([userId, createdAt])
+  @@unique([userId, requestId])             // one claim per user+requestId
+  @@index([requestStatus, requestClaimedAt]) // stale-lease scan
   @@map("calendar_generation_logs")
 }
 

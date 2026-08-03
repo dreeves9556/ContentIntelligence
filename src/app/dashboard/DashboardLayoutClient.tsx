@@ -322,7 +322,14 @@ export default function DashboardLayoutClient({
           <NotificationPrompt />
 
           {/* Page content */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">{children}</main>
+          {/* No overflow-x-hidden here: the parent pane above already clips
+              horizontal overflow. Setting it here too would force overflow-y
+              to "auto" as well (per CSS overflow computed-value rules), turning
+              <main> into its own nested scroll container and breaking the
+              position:sticky offsets used by descendants (e.g. the calendar's
+              mobile day-nav bar), which then stick relative to <main> instead
+              of the real scrolling pane. */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">{children}</main>
         </div>
       </div>
 

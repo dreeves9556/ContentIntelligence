@@ -6,7 +6,7 @@ import type { Prisma } from "@prisma/client";
 import type { PostStatus } from "@prisma/client";
 import { generateAIInsight } from "../actions";
 import { getPlatformConfig, type PlatformConfigData } from "@/lib/platform-config";
-import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
+import { checkActionRateLimit, formatRetryTime, serializableTransaction } from "@/lib/rate-limiter";
 import { requireDashboardAccess } from "@/lib/server-access";
 import {
   buildUserProfileXml,
@@ -380,10 +380,15 @@ function logCalendarGeneration(ctx: GenerationLogContext): void {
     .catch((err: unknown) => console.error("Calendar generation log write failed:", err));
 }
 
+export type GenerateWeeklyCalendarResult =
+  | { success: true; calendarId: string; duplicate: boolean }
+  | { success: false; error: string; inProgress?: boolean; unknownOutcome?: boolean };
+
 export async function generateWeeklyCalendar(
   timezoneOffsetHours: number = 0,
   daysToPostOverride?: number,
-): Promise<{ success: boolean; error?: string }> {
+  requestId?: string,
+): Promise<GenerateWeeklyCalendarResult> {
   const access = await requireDashboardAccess();
   if (!access.allowed) return { success: false, error: access.error };
   const userId = access.user.id;
@@ -605,6 +610,145 @@ export async function generateWeeklyCalendar(
     }
   }
 
+  // ── Idempotency claim (v3) ────────────────────────────────────
+  // Atomically claim a CalendarGenerationLog row as PROCESSING before any AI work.
+  // Only the process holding requestClaimToken may call Anthropic or create a Calendar.
+  // See plan-f61b9b29c33f91cd.md for the full state machine.
+  const CLAIM_LEASE_MS = 120_000; // stale PROCESSING threshold
+  let claimLogId: string | null = null;
+  let claimToken: string | null = null;
+
+  if (requestId) {
+    const newClaimToken = crypto.randomUUID();
+    const now = new Date();
+
+    const claimResult = await serializableTransaction(async (tx) => {
+      // Try to insert a new PROCESSING claim. P2002 on @@unique([userId, requestId])
+      // means a row already exists — we re-read it below.
+      try {
+        const row = await tx.calendarGenerationLog.create({
+          data: {
+            userId,
+            requestId,
+            requestStatus: "PROCESSING",
+            requestClaimToken: newClaimToken,
+            requestClaimedAt: now,
+            requestAttempts: 1,
+            requestDaysToPost: daysToPost,
+            requestTimezoneOffset: timezoneOffsetHours,
+            requestUserId: userId,
+            success: false, // provisional until COMPLETED
+          },
+        });
+        return { kind: "claimed" as const, logId: row.id };
+      } catch (err) {
+        const prismaErr = err as { code?: string };
+        if (prismaErr.code !== "P2002") throw err;
+        // Row exists — re-read the winner and decide.
+        const existing = await tx.calendarGenerationLog.findUnique({
+          where: { userId_requestId: { userId, requestId } },
+        });
+        if (!existing) {
+          // Row vanished between P2002 and re-read (shouldn't happen) — retry insert.
+          const row = await tx.calendarGenerationLog.create({
+            data: {
+              userId,
+              requestId,
+              requestStatus: "PROCESSING",
+              requestClaimToken: newClaimToken,
+              requestClaimedAt: now,
+              requestAttempts: 1,
+              requestDaysToPost: daysToPost,
+              requestTimezoneOffset: timezoneOffsetHours,
+              requestUserId: userId,
+              success: false,
+            },
+          });
+          return { kind: "claimed" as const, logId: row.id };
+        }
+
+        if (existing.requestStatus === "COMPLETED") {
+          return {
+            kind: "completed" as const,
+            calendarId: existing.resultingCalendarId,
+          };
+        }
+
+        if (existing.requestStatus === "PROCESSING") {
+          const isStale =
+            existing.requestClaimedAt &&
+            now.getTime() - existing.requestClaimedAt.getTime() > CLAIM_LEASE_MS;
+          if (isStale) {
+            // Reclaim via optimistic lock on the old token.
+            const updated = await tx.calendarGenerationLog.updateMany({
+              where: {
+                id: existing.id,
+                requestClaimToken: existing.requestClaimToken,
+              },
+              data: {
+                requestClaimToken: newClaimToken,
+                requestClaimedAt: now,
+                requestAttempts: { increment: 1 },
+              },
+            });
+            if (updated.count > 0) {
+              return { kind: "claimed" as const, logId: existing.id };
+            }
+            // Lost the race — another process reclaimed first.
+            return { kind: "in_progress" as const };
+          }
+          return { kind: "in_progress" as const };
+        }
+
+        if (existing.requestStatus === "FAILED") {
+          // Validate inputs match the original request.
+          if (
+            existing.requestDaysToPost !== daysToPost ||
+            existing.requestTimezoneOffset !== timezoneOffsetHours ||
+            existing.requestUserId !== userId
+          ) {
+            return { kind: "param_mismatch" as const };
+          }
+          // Reclaim via optimistic lock on FAILED status.
+          const updated = await tx.calendarGenerationLog.updateMany({
+            where: { id: existing.id, requestStatus: "FAILED" },
+            data: {
+              requestStatus: "PROCESSING",
+              requestClaimToken: newClaimToken,
+              requestClaimedAt: now,
+              requestAttempts: { increment: 1 },
+            },
+          });
+          if (updated.count > 0) {
+            return { kind: "claimed" as const, logId: existing.id };
+          }
+          // Lost the race — another process reclaimed first.
+          return { kind: "in_progress" as const };
+        }
+
+        // Unknown status — treat as in-progress.
+        return { kind: "in_progress" as const };
+      }
+    });
+
+    switch (claimResult.kind) {
+      case "completed":
+        if (claimResult.calendarId) {
+          return { success: true, calendarId: claimResult.calendarId, duplicate: true };
+        }
+        // COMPLETED but no resultingCalendarId — data integrity issue; treat as failed.
+        return { success: false, error: "A previous generation completed but its calendar is missing. Please start a new generation." };
+      case "in_progress":
+        return { success: false, error: "Generation already in progress.", inProgress: true };
+      case "param_mismatch":
+        return { success: false, error: "Request parameters do not match the original request." };
+      case "claimed":
+        claimLogId = claimResult.logId;
+        claimToken = newClaimToken;
+        break;
+    }
+  }
+
   // Compute the user's LOCAL "today" from their timezone offset (local = UTC + offsetHours),
   // so currentDay, targetDays, and weekStarting all agree regardless of the server's timezone.
   // Without this, a late-evening generation west of UTC stores tomorrow's UTC date as
@@ -758,6 +902,37 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
   const defaultUserPrompt = budgetedPrompt.prompt;
   const generationStartTime = Date.now();
 
+  // Helper: record a generation failure on the claim row (or legacy log).
+  async function failClaim(errorMessage: string): Promise<void> {
+    if (claimLogId && claimToken) {
+      await prisma.calendarGenerationLog
+        .updateMany({
+          where: { id: claimLogId, requestClaimToken: claimToken },
+          data: {
+            requestStatus: "FAILED",
+            requestCompletedAt: new Date(),
+            requestClaimToken: null,
+            success: false,
+            errorMessage,
+            durationMs: Date.now() - generationStartTime,
+          },
+        })
+        .catch((err) => console.error("Failed to update claim to FAILED:", err));
+    } else {
+      logCalendarGeneration({
+        userId,
+        success: false,
+        stalenessTriggered,
+        audienceFatigueTriggered,
+        dynamicConstraintsMode,
+        dynamicConstraintsFallback,
+        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
+        errorMessage,
+        durationMs: Date.now() - generationStartTime,
+      });
+    }
+  }
+
   const systemPrompt = (config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT)
     .replace(/\{\{weekStarting\}\}/g, weekStarting)
     .replace(/\{\{firstDay\}\}/g, targetDays[0]);
@@ -800,17 +975,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     if (!response.ok) {
       const errorData = await response.json();
       console.error("Anthropic API error:", errorData);
-      logCalendarGeneration({
-        userId,
-        success: false,
-        stalenessTriggered,
-        audienceFatigueTriggered,
-        dynamicConstraintsMode,
-        dynamicConstraintsFallback,
-        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
-        errorMessage: `AI service error (${response.status})`,
-        durationMs: Date.now() - generationStartTime,
-      });
+      await failClaim(`AI service error (${response.status})`);
       return { success: false, error: "AI service error. Please try again." };
     }
 
@@ -826,17 +991,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       const parseErrorMsg = stopReason === "max_tokens"
         ? "The AI response was too long and got cut off. Please try again."
         : "Failed to parse AI response. Please try again.";
-      logCalendarGeneration({
-        userId,
-        success: false,
-        stalenessTriggered,
-        audienceFatigueTriggered,
-        dynamicConstraintsMode,
-        dynamicConstraintsFallback,
-        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
-        errorMessage: parseErrorMsg,
-        durationMs: Date.now() - generationStartTime,
-      });
+      await failClaim(parseErrorMsg);
       if (stopReason === "max_tokens") {
         return { success: false, error: "The AI response was too long and got cut off. Please try again." };
       }
@@ -845,17 +1000,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
 
     if (!Array.isArray(calendarData.days) || calendarData.days.length < daysToPost) {
       console.error("AI returned insufficient days:", JSON.stringify(calendarData));
-      logCalendarGeneration({
-        userId,
-        success: false,
-        stalenessTriggered,
-        audienceFatigueTriggered,
-        dynamicConstraintsMode,
-        dynamicConstraintsFallback,
-        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
-        errorMessage: "AI returned an incomplete calendar",
-        durationMs: Date.now() - generationStartTime,
-      });
+      await failClaim("AI returned an incomplete calendar");
       return { success: false, error: "AI returned an incomplete calendar. Please try again." };
     }
 
@@ -873,7 +1018,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
 
     // Transactional creation: Calendar + Post + PostVersion (v1) rows together.
     // If any insert fails, the whole generation rolls back — no orphan rows.
-    await prisma.$transaction(async (tx) => {
+    const createdCalendarId = await prisma.$transaction(async (tx) => {
       const calendar = await tx.calendar.create({
         data: {
           userId,
@@ -942,6 +1087,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
           data: { currentVersionId: version.id },
         });
       }
+      return calendar.id;
     });
 
     // Touch memories that were used in this prompt (updates lastUsedAt)
@@ -970,7 +1116,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
     revalidatePath("/dashboard/calendar");
     revalidatePath("/dashboard");
 
-    logCalendarGeneration({
+    const successCtx: GenerationLogContext = {
       userId,
       success: true,
       daysGenerated: calendarData.days.length,
@@ -984,12 +1130,54 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       dynamicConstraintsFallback,
       blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
       durationMs: Date.now() - generationStartTime,
-    });
+    };
 
-    return { success: true };
+    if (claimLogId && claimToken) {
+      // Mark the claim COMPLETED with the resulting calendar id (optimistic lock on token).
+      const completed = await prisma.calendarGenerationLog.updateMany({
+        where: { id: claimLogId, requestClaimToken: claimToken },
+        data: {
+          requestStatus: "COMPLETED",
+          requestCompletedAt: new Date(),
+          requestClaimToken: null,
+          resultingCalendarId: createdCalendarId,
+          success: true,
+          daysGenerated: successCtx.daysGenerated ?? null,
+          freshnessScore: successCtx.freshnessScore ?? null,
+          archetypeDiversity: successCtx.archetypeDiversity ?? null,
+          themeDiversity: successCtx.themeDiversity ?? null,
+          hookSimilarity: successCtx.hookSimilarity ?? null,
+          stalenessTriggered: successCtx.stalenessTriggered ?? false,
+          audienceFatigueTriggered: successCtx.audienceFatigueTriggered ?? false,
+          dynamicConstraintsMode: successCtx.dynamicConstraintsMode ?? null,
+          dynamicConstraintsFallback: successCtx.dynamicConstraintsFallback ?? false,
+          blockMetadata: (successCtx.blockMetadata ?? null) as unknown as Prisma.InputJsonValue,
+          durationMs: successCtx.durationMs ?? null,
+        },
+      });
+      if (completed.count === 0) {
+        // Lost the lease mid-generation — another process may have reclaimed and generated.
+        // Best-effort delete the orphan calendar we just created to avoid duplicates.
+        try {
+          await prisma.calendar.delete({ where: { id: createdCalendarId } });
+        } catch (cleanupErr) {
+          console.error("Failed to clean up orphan calendar after lost lease:", cleanupErr);
+        }
+        return {
+          success: false,
+          error: "Generation completed but could not be recorded. Please retry.",
+          unknownOutcome: true,
+        };
+      }
+    } else {
+      // Legacy path (no requestId) — best-effort log.
+      logCalendarGeneration(successCtx);
+    }
+
+    return { success: true, calendarId: createdCalendarId, duplicate: false };
   } catch (error) {
     console.error("Error generating calendar:", error);
-    logCalendarGeneration({
+    const failCtx: GenerationLogContext = {
       userId,
       success: false,
       stalenessTriggered,
@@ -999,8 +1187,68 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
       errorMessage: error instanceof Error ? error.message : "Unknown error",
       durationMs: Date.now() - generationStartTime,
-    });
+    };
+    if (claimLogId && claimToken) {
+      // Mark the claim FAILED (optimistic lock on token; best-effort).
+      await prisma.calendarGenerationLog.updateMany({
+        where: { id: claimLogId, requestClaimToken: claimToken },
+        data: {
+          requestStatus: "FAILED",
+          requestCompletedAt: new Date(),
+          requestClaimToken: null,
+          success: false,
+          errorMessage: failCtx.errorMessage ?? null,
+          durationMs: failCtx.durationMs ?? null,
+        },
+      }).catch((err) => console.error("Failed to update claim to FAILED:", err));
+    } else {
+      logCalendarGeneration(failCtx);
+    }
     return { success: false, error: "Failed to generate calendar. Please try again." };
+  }
+}
+
+export type CheckGenerationRequestResult =
+  | { status: "COMPLETED"; calendarId: string }
+  | { status: "PROCESSING" }
+  | { status: "FAILED"; errorMessage: string | null }
+  | { status: "NOT_FOUND" };
+
+/**
+ * Read-only check of a generation request's status by requestId.
+ * Used by the client to resolve unknown outcomes (transport errors, aborted fetches)
+ * without triggering a new generation.
+ */
+export async function checkGenerationRequest(
+  requestId: string,
+): Promise<CheckGenerationRequestResult> {
+  const access = await requireDashboardAccess();
+  if (!access.allowed) return { status: "NOT_FOUND" };
+  const userId = access.user.id;
+
+  const row = await prisma.calendarGenerationLog.findUnique({
+    where: { userId_requestId: { userId, requestId } },
+    select: {
+      requestStatus: true,
+      resultingCalendarId: true,
+      errorMessage: true,
+    },
+  });
+
+  if (!row) return { status: "NOT_FOUND" };
+
+  switch (row.requestStatus) {
+    case "COMPLETED":
+      if (row.resultingCalendarId) {
+        return { status: "COMPLETED", calendarId: row.resultingCalendarId };
+      }
+      return { status: "FAILED", errorMessage: "Generation completed but calendar is missing." };
+    case "PROCESSING":
+      return { status: "PROCESSING" };
+    case "FAILED":
+      return { status: "FAILED", errorMessage: row.errorMessage };
+    default:
+      return { status: "NOT_FOUND" };
   }
 }
 

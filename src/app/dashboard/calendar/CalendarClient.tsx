@@ -736,7 +736,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
 
       {/* Today's Edition masthead — static on ≥sm */}
       <div className="hidden sm:block text-center mb-2">
-        <h2 className="text-2xl sm:text-3xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+        <h2 data-calendar-heading tabIndex={-1} className="text-2xl sm:text-3xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
           Today&apos;s Edition
         </h2>
         <div className="flex items-center gap-3 mt-1">
@@ -783,7 +783,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
       {/* Phone masthead + day navigation stay together while scrolling. */}
       <div className="sm:hidden sticky z-20 -mx-4 px-4 pt-2 pb-2 bg-background-secondary" style={{ top: "calc(2.5rem + 1px + max(0.75rem, env(safe-area-inset-top, 0px)))" }}>
         <div className="text-center mb-2">
-          <h2 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+          <h2 data-calendar-heading tabIndex={-1} className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             Today&apos;s Edition
           </h2>
           <div className="flex items-center gap-3 mt-1">
