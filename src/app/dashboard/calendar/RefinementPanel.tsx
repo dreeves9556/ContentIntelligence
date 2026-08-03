@@ -74,6 +74,12 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
   const [messages, setMessages] = useState<SessionMessage[]>([]);
   const [instruction, setInstruction] = useState("");
   const [turn, setTurn] = useState<TurnState | null>(null);
+  // Optimistic UI: the user's just-submitted text, shown as a chat bubble
+  // while the server action is in flight. Cleared once the turn resolves.
+  // For QUICK_ACTION sends, this holds the action's label (e.g. "Stronger CTA")
+  // so the bubble reads naturally; null on retries (the user bubble is already
+  // in `messages` history in that case).
+  const [pendingUserText, setPendingUserText] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<PostHistoryVersion[]>([]);
@@ -161,6 +167,12 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
       if (text.length > MAX_INSTRUCTION) return;
 
       const turnId = newTurnId();
+      // Capture the display text for the optimistic user bubble. For a quick
+      // action, show the chip label; for freeform, show the typed text.
+      const displayText = actionKey
+        ? QUICK_ACTIONS.find((a) => a.key === actionKey)?.label ?? text
+        : text;
+      setPendingUserText(displayText);
       setTurn({
         turnId,
         status: "sending",
@@ -183,6 +195,7 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
           });
 
           if (result.status === "COMPLETE") {
+            setPendingUserText(null);
             setTurn({
               turnId,
               status: "complete",
@@ -200,6 +213,7 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
             setSession(refreshed);
             setMessages(refreshed.messages);
           } else if (result.status === "IN_PROGRESS") {
+            setPendingUserText(null);
             setTurn({
               turnId,
               status: "in_progress",
@@ -211,6 +225,7 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
               attemptCount: result.attemptCount,
             });
           } else {
+            setPendingUserText(null);
             setTurn({
               turnId,
               status: "error",
@@ -223,6 +238,7 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
             });
           }
         } catch (err) {
+          setPendingUserText(null);
           setTurn({
             turnId,
             status: "error",
@@ -453,6 +469,33 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
                   {messages.map((m) => (
                     <ConversationBubble key={m.id} message={m} />
                   ))}
+                </div>
+              )}
+
+              {/* Optimistic in-flight bubbles — give the chat a live feel
+                  instead of the input just clearing to a spinner. The user's
+                  message appears immediately, followed by a "thinking" AI
+                  bubble that swaps for the real preview once the turn resolves. */}
+              {turn?.status === "sending" && (
+                <div className="space-y-3">
+                  {pendingUserText && (
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] rounded-lg rounded-br-sm bg-accent-primary/15 border border-accent-primary/20 px-3 py-2 text-sm text-text-primary">
+                        {pendingUserText}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-start">
+                    <div className="max-w-[85%] rounded-lg rounded-bl-sm bg-background-secondary/60 border border-border-primary px-3 py-2 text-sm text-text-secondary">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-accent-primary mb-1">
+                        <Sparkles className="h-3 w-3" /> AI revision
+                      </div>
+                      <div className="flex items-center gap-2 text-text-muted">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span className="text-xs">Thinking…</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
