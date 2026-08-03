@@ -777,7 +777,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
       </div>
 
       {/* Phone masthead + day navigation stay together while scrolling. */}
-      <div className="sm:hidden sticky top-[60px] z-20 -mx-4 px-4 pt-2 pb-2 bg-background-secondary">
+      <div className="sm:hidden sticky z-20 -mx-4 px-4 pt-2 pb-2 bg-background-secondary" style={{ top: "calc(2.5rem + 1px + max(0.75rem, env(safe-area-inset-top, 0px)))" }}>
         <div className="text-center mb-2">
           <h2 className="text-2xl font-bold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
             Today&apos;s Edition
