@@ -550,7 +550,7 @@ async function runRefinementTurn(
     };
   }
 
-  const parsed = parseRefinementResponse(result.text);
+  const parsed = parseRefinementResponse(result.text, post.format);
   if (!parsed.ok || !parsed.data) {
     await failTurn(session.id, turnId, parsed.errorKind ?? "PARSE_ERROR", parsed.errorMessage ?? "Parse failed", attemptCount);
     return {

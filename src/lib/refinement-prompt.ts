@@ -246,7 +246,10 @@ export interface ParseResult {
  * Parse + validate the AI response. The AI is instructed to return ONLY JSON,
  * but it sometimes wraps in markdown fences — strip those before parsing.
  */
-export function parseRefinementResponse(text: string): ParseResult {
+export function parseRefinementResponse(
+  text: string,
+  fallbackFormat?: string
+): ParseResult {
   const trimmed = text.trim();
   let jsonText = trimmed;
 
@@ -285,6 +288,22 @@ export function parseRefinementResponse(text: string): ParseResult {
 
   const result = RefinementSnapshotSchema.safeParse(parsed);
   if (!result.success) {
+    // AI sometimes omits `format` despite the prompt. If we know the post's
+    // format, backfill it and retry — but only succeed if that was the sole issue.
+    if (
+      fallbackFormat &&
+      parsed &&
+      typeof parsed === "object"
+    ) {
+      const retry = RefinementSnapshotSchema.safeParse({
+        ...(parsed as Record<string, unknown>),
+        format: fallbackFormat,
+      });
+      if (retry.success) {
+        return { ok: true, data: { snapshot: retry.data } };
+      }
+    }
+
     const issues = result.error.issues
       .map((i) => `${i.path.join(".")}: ${i.message}`)
       .join("; ");
