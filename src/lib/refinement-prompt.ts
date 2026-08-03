@@ -17,12 +17,27 @@ export const MAX_TURNS_PER_SESSION = 10;
 // Zod schemas (with explicit length limits — correction #7)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const CONTENT_FORMATS = ["Reel", "Carousel", "Static"] as const;
+export type ContentFormat = (typeof CONTENT_FORMATS)[number];
+
+// Case-insensitive: accepts "reel", "REEL", "Reel" → normalizes to canonical form.
+const formatField = z
+  .string()
+  .transform((s) => {
+    const match = CONTENT_FORMATS.find((f) => f.toLowerCase() === s.trim().toLowerCase());
+    return match ?? s.trim();
+  })
+  .refine((s): s is ContentFormat => (CONTENT_FORMATS as readonly string[]).includes(s), {
+    message: "format must be one of: Reel, Carousel, Static",
+  });
+
 export const RefinementSnapshotSchema = z.object({
   title: z.string().min(1).max(200),
   hook: z.string().min(1).max(500),
   body: z.string().min(1).max(3000),
   cta: z.string().min(1).max(300),
   caption: z.string().min(1).max(2200),
+  format: formatField,
   musicSuggestion: z.string().max(200).optional().nullable(),
   duration: z.string().max(50).optional().nullable(),
   directions: z.string().max(2000).optional().nullable(),
@@ -65,10 +80,11 @@ export const REFINEMENT_SYSTEM_PROMPT = `You are an elite personal brand content
 
 Rules:
 - Return ONLY a JSON object. No prose, no markdown fences, no commentary outside the JSON.
-- JSON shape: { "title", "hook", "body", "cta", "caption", "musicSuggestion", "duration", "directions", "changeSummary" }
-- Optional fields may be null or omitted if not applicable to the format.
+- JSON shape: { "title", "hook", "body", "cta", "caption", "format", "musicSuggestion", "duration", "directions", "changeSummary" }
+- "format" must be one of: Reel, Carousel, Static. Start from the format shown in the working draft; only change it if the user explicitly asks for a different format.
+- Optional fields may be null or omitted if not applicable to the format. If the format changes, set musicSuggestion/duration/directions to null when they are not appropriate for the new format (e.g., a Static post does not need directions or musicSuggestion).
 - "changeSummary" is a short Markdown string (bullet points) describing what you changed and why. Max 1000 characters.
-- Keep the same format (Reel/Carousel/Static). Do not change the bucket unless explicitly asked.
+- Do not change the bucket unless explicitly asked.
 - Honor the user's instruction precisely. If they ask to redirect the CTA to a specific resource, do exactly that.
 - Preserve the creator's brand voice from the provided context.
 - Never use em dashes. Vary sentence length. Write like a human, not a report.
@@ -87,6 +103,7 @@ export interface PostFields {
   body: string;
   cta: string;
   caption: string;
+  format: string;
   musicSuggestion: string | null;
   duration: string | null;
   directions: string | null;
@@ -132,6 +149,7 @@ export interface RefinementPromptContext {
 function fieldsBlock(label: string, fields: PostFields): string {
   const lines = [
     `${label}:`,
+    `format: ${fields.format}`,
     `title: ${fields.title}`,
     `hook: ${fields.hook}`,
     `body: ${fields.body}`,
@@ -274,4 +292,23 @@ export function parseRefinementResponse(text: string): ParseResult {
   }
 
   return { ok: true, data: { snapshot: result.data } };
+}
+
+/**
+ * Parse a snapshot stored in the DB. Tolerates legacy snapshots written
+ * before `format` was added: if format is missing or invalid, it is backfilled
+ * from `fallbackFormat` (the post's current format) so old open sessions can
+ * still be resumed/accepted instead of being marked corrupt.
+ */
+export function parseStoredSnapshot(
+  snapshotJson: unknown,
+  fallbackFormat: string
+): RefinementSnapshot | null {
+  if (!snapshotJson || typeof snapshotJson !== "object") return null;
+  const first = RefinementSnapshotSchema.safeParse(snapshotJson);
+  if (first.success) return first.data;
+  // Retry with format backfilled — only helps when format was the sole issue.
+  const obj = { ...(snapshotJson as Record<string, unknown>), format: fallbackFormat };
+  const retry = RefinementSnapshotSchema.safeParse(obj);
+  return retry.success ? retry.data : null;
 }

@@ -20,7 +20,7 @@ import {
   MAX_TURNS_PER_SESSION,
   TurnIdSchema,
   UserInstructionSchema,
-  RefinementSnapshotSchema,
+  parseStoredSnapshot,
   type PostFields,
   type ConversationTurn,
   type RefinementSnapshot,
@@ -55,16 +55,17 @@ const POST_FIELDS_SELECT = {
   directions: true,
 } as const;
 
-function versionToFields(v: {
-  title: string; hook: string; body: string; cta: string; caption: string;
-  musicSuggestion: string | null; duration: string | null; directions: string | null;
-}): PostFields {
+function versionToFields(
+  v: Omit<PostFields, "format">,
+  format: string
+): PostFields {
   return {
     title: v.title,
     hook: v.hook,
     body: v.body,
     cta: v.cta,
     caption: v.caption,
+    format,
     musicSuggestion: v.musicSuggestion,
     duration: v.duration,
     directions: v.directions,
@@ -93,6 +94,7 @@ function snapshotToFields(snapshot: RefinementSnapshot): PostFields {
     body: snapshot.body,
     cta: snapshot.cta,
     caption: snapshot.caption,
+    format: snapshot.format,
     musicSuggestion: snapshot.musicSuggestion ?? null,
     duration: snapshot.duration ?? null,
     directions: snapshot.directions ?? null,
@@ -126,6 +128,7 @@ export async function startRefinementSession(postId: string): Promise<SessionSta
         userId: true,
         currentVersionId: true,
         status: true,
+        format: true,
         currentVersion: { select: { ...POST_FIELDS_SELECT, id: true, postId: true, versionNumber: true } },
       },
     });
@@ -153,16 +156,16 @@ export async function startRefinementSession(postId: string): Promise<SessionSta
     // Non-stale resume.
     if (existingOpen && existingOpen.baseVersionId === currentVersionId) {
       const baseFields = existingOpen.baseVersion
-        ? versionToFields(existingOpen.baseVersion)
-        : versionToFields(currentVersion);
+        ? versionToFields(existingOpen.baseVersion, freshPost.format)
+        : versionToFields(currentVersion, freshPost.format);
       const lastAssistant = [...existingOpen.messages]
         .reverse()
         .find((m) => m.role === "ASSISTANT" && m.snapshotJson);
       let workingDraftFields = baseFields;
       if (lastAssistant?.snapshotJson) {
-        const parsed = RefinementSnapshotSchema.safeParse(lastAssistant.snapshotJson);
-        if (parsed.success) {
-          workingDraftFields = snapshotToFields(parsed.data);
+        const parsed = parseStoredSnapshot(lastAssistant.snapshotJson, freshPost.format);
+        if (parsed) {
+          workingDraftFields = snapshotToFields(parsed);
         }
       }
 
@@ -171,7 +174,7 @@ export async function startRefinementSession(postId: string): Promise<SessionSta
         resumed: true,
         baseVersion: { ...baseFields, versionNumber: existingOpen.baseVersionNumber },
         workingDraft: { ...workingDraftFields, versionNumber: existingOpen.baseVersionNumber },
-        messages: existingOpen.messages.map(toSessionMessage),
+        messages: existingOpen.messages.map((m) => toSessionMessage(m, freshPost.format)),
       };
     }
 
@@ -197,8 +200,8 @@ export async function startRefinementSession(postId: string): Promise<SessionSta
       return {
         sessionId: session.id,
         resumed: false,
-        baseVersion: { ...versionToFields(currentVersion), versionNumber: currentVersion.versionNumber },
-        workingDraft: { ...versionToFields(currentVersion), versionNumber: currentVersion.versionNumber },
+        baseVersion: { ...versionToFields(currentVersion, freshPost.format), versionNumber: currentVersion.versionNumber },
+        workingDraft: { ...versionToFields(currentVersion, freshPost.format), versionNumber: currentVersion.versionNumber },
         messages: [],
         staleNotice: existingOpen
           ? "Your previous refinement session was closed because the post changed. Started a fresh session."
@@ -235,21 +238,21 @@ export async function startRefinementSession(postId: string): Promise<SessionSta
             return {
               sessionId: fresh.id,
               resumed: false,
-              baseVersion: { ...versionToFields(currentVersion), versionNumber: currentVersion.versionNumber },
-              workingDraft: { ...versionToFields(currentVersion), versionNumber: currentVersion.versionNumber },
+              baseVersion: { ...versionToFields(currentVersion, freshPost.format), versionNumber: currentVersion.versionNumber },
+              workingDraft: { ...versionToFields(currentVersion, freshPost.format), versionNumber: currentVersion.versionNumber },
               messages: [],
               staleNotice: "Your previous refinement session was closed because the post changed. Started a fresh session.",
             };
           }
           const baseFields = survivor.baseVersion
-            ? versionToFields(survivor.baseVersion)
-            : versionToFields(currentVersion);
+            ? versionToFields(survivor.baseVersion, freshPost.format)
+            : versionToFields(currentVersion, freshPost.format);
           return {
             sessionId: survivor.id,
             resumed: true,
             baseVersion: { ...baseFields, versionNumber: survivor.baseVersionNumber },
             workingDraft: { ...baseFields, versionNumber: survivor.baseVersionNumber },
-            messages: survivor.messages.map(toSessionMessage),
+            messages: survivor.messages.map((m) => toSessionMessage(m, freshPost.format)),
           };
         }
       }
@@ -258,17 +261,17 @@ export async function startRefinementSession(postId: string): Promise<SessionSta
   });
 }
 
-function toSessionMessage(m: {
-  id: string; role: "USER" | "ASSISTANT" | "SYSTEM"; message: string;
-  snapshotJson: unknown; createdAt: Date;
-}): SessionMessage {
+function toSessionMessage(
+  m: {
+    id: string; role: "USER" | "ASSISTANT" | "SYSTEM"; message: string;
+    snapshotJson: unknown; createdAt: Date;
+  },
+  fallbackFormat: string
+): SessionMessage {
   let snapshot: PostFields | null = null;
   if (m.role === "ASSISTANT" && m.snapshotJson) {
-    try {
-      snapshot = snapshotToFields(RefinementSnapshotSchema.parse(m.snapshotJson));
-    } catch {
-      snapshot = null;
-    }
+    const parsed = parseStoredSnapshot(m.snapshotJson, fallbackFormat);
+    snapshot = parsed ? snapshotToFields(parsed) : null;
   }
   return {
     id: m.id,
@@ -364,12 +367,12 @@ export async function sendRefinementMessage(
         orderBy: { createdAt: "desc" },
       });
       if (assistant?.snapshotJson) {
-        const snapshotResult = RefinementSnapshotSchema.safeParse(assistant.snapshotJson);
-        if (snapshotResult.success) {
+        const snapshot = parseStoredSnapshot(assistant.snapshotJson, session.post.format);
+        if (snapshot) {
           return {
             status: "COMPLETE",
             assistantMessageId: assistant.id,
-            preview: snapshotToFields(snapshotResult.data),
+            preview: snapshotToFields(snapshot),
             changeSummary: assistant.message,
             attemptCount: existingTurn.attemptCount,
           };
@@ -423,8 +426,8 @@ async function runRefinementTurn(
   session: {
     id: string; postId: string; userId: string; baseVersionId: string | null; baseVersionNumber: number;
     post: {
-      id: string; userId: string; status: PostStatus; currentVersionId: string | null;
-      currentVersion: { id: string; postId: string; versionNumber: number } & PostFields | null;
+      id: string; userId: string; status: PostStatus; currentVersionId: string | null; format: string;
+      currentVersion: { id: string; postId: string; versionNumber: number } & Omit<PostFields, "format"> | null;
     };
   },
   instruction: string,
@@ -481,9 +484,9 @@ async function runRefinementTurn(
       }
       let snapshot: PostFields | null = null;
       if (m.snapshotJson) {
-        const parsed = RefinementSnapshotSchema.safeParse(m.snapshotJson);
-        if (parsed.success) {
-          snapshot = snapshotToFields(parsed.data);
+        const parsed = parseStoredSnapshot(m.snapshotJson, post.format);
+        if (parsed) {
+          snapshot = snapshotToFields(parsed);
         }
       }
       return { role: "ASSISTANT" as const, message: m.message, snapshot };
@@ -496,7 +499,7 @@ async function runRefinementTurn(
   if (!post.currentVersion) {
     throw new PostIntegrityError(post.id, post.currentVersionId, "MISSING_CURRENT_VERSION");
   }
-  const original = versionToFields(post.currentVersion);
+  const original = versionToFields(post.currentVersion, post.format);
   const lastAssistant = [...allTurns].reverse().find((t) => t.role === "ASSISTANT" && t.snapshot);
   const workingDraft = lastAssistant?.snapshot ?? original;
 
@@ -692,12 +695,12 @@ export async function acceptRefinement(
       throw new ValidationError("Selected assistant message has no preview snapshot");
     }
 
-    // Re-validate the snapshot with Zod.
-    const snapshotResult = RefinementSnapshotSchema.safeParse(assistantMessage.snapshotJson);
-    if (!snapshotResult.success) {
+    // Re-validate the snapshot with Zod (tolerates legacy snapshots missing
+    // format by backfilling from the post's current format).
+    const snapshot = parseStoredSnapshot(assistantMessage.snapshotJson, session.post.format);
+    if (!snapshot) {
       throw new ValidationError("Selected snapshot failed validation");
     }
-    const snapshot = snapshotResult.data;
 
     const baseVersionNumber = session.baseVersionNumber;
 
@@ -734,6 +737,7 @@ export async function acceptRefinement(
         body: snapshot.body,
         cta: snapshot.cta,
         caption: snapshot.caption,
+        format: snapshot.format,
         musicSuggestion: snapshot.musicSuggestion ?? null,
         duration: snapshot.duration ?? null,
         directions: snapshot.directions ?? null,
@@ -824,7 +828,7 @@ export async function getPostHistory(postId: string): Promise<PostHistoryVersion
   if (!access.allowed) throw new ForbiddenError(access.error);
   const userId = access.user.id;
 
-  const post = await prisma.post.findUnique({ where: { id: postId }, select: { userId: true } });
+  const post = await prisma.post.findUnique({ where: { id: postId }, select: { userId: true, format: true } });
   if (!post || post.userId !== userId) {
     throw new ForbiddenError("Post not found or not owned by user");
   }
@@ -841,7 +845,7 @@ export async function getPostHistory(postId: string): Promise<PostHistoryVersion
     source: v.source,
     changeSummary: v.changeSummary,
     createdAt: v.createdAt.toISOString(),
-    fields: versionToFields(v),
+    fields: versionToFields(v, post.format),
   }));
 }
 

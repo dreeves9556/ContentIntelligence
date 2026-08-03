@@ -3,6 +3,7 @@
 
 import {
   parseRefinementResponse,
+  parseStoredSnapshot,
   UserInstructionSchema,
   TurnIdSchema,
   summarizeOlderTurns,
@@ -30,6 +31,7 @@ const validSnapshot = {
   body: "Here is the body.",
   cta: "Reply CHART for the guide.",
   caption: "Caption text.",
+  format: "Reel",
   changeSummary: "- Shortened the hook\n- Redirected CTA to the chart guide",
 };
 
@@ -143,8 +145,8 @@ assert(QUICK_ACTIONS.length === 5, "5 quick-action presets defined");
 
 // 22. buildRefinementUserPrompt includes original_post, working_draft, instruction.
 const prompt = buildRefinementUserPrompt({
-  original: { title: "t", hook: "h", body: "b", cta: "c", caption: "cap", musicSuggestion: null, duration: null, directions: null },
-  workingDraft: { title: "t2", hook: "h2", body: "b2", cta: "c2", caption: "cap2", musicSuggestion: null, duration: null, directions: null },
+  original: { title: "t", hook: "h", body: "b", cta: "c", caption: "cap", format: "Static", musicSuggestion: null, duration: null, directions: null },
+  workingDraft: { title: "t2", hook: "h2", body: "b2", cta: "c2", caption: "cap2", format: "Static", musicSuggestion: null, duration: null, directions: null },
   recentTurns: [],
   olderTurns: [],
   instruction: "Make it shorter",
@@ -160,6 +162,36 @@ assert(REFINEMENT_SYSTEM_PROMPT.includes("JSON"), "system prompt mentions JSON")
 
 // 24. MAX_TURNS_BEFORE_SUMMARY is 6.
 assert(MAX_TURNS_BEFORE_SUMMARY === 6, "MAX_TURNS_BEFORE_SUMMARY === 6");
+
+// ─── Format enum + legacy backfill ───────────────────────────────────────────
+
+// 25. format missing entirely → SCHEMA_INVALID.
+const noFormat = { ...validSnapshot, format: undefined };
+const r25 = parseRefinementResponse(JSON.stringify(noFormat));
+assert(r25.ok === false && r25.errorKind === "SCHEMA_INVALID", "missing format rejected");
+
+// 26. format not in enum → SCHEMA_INVALID.
+const badFormat = { ...validSnapshot, format: "Story" };
+const r26 = parseRefinementResponse(JSON.stringify(badFormat));
+assert(r26.ok === false && r26.errorKind === "SCHEMA_INVALID", "unknown format rejected");
+
+// 27. lowercase format normalized to canonical.
+const lowerFormat = { ...validSnapshot, format: "reel" };
+const r27 = parseRefinementResponse(JSON.stringify(lowerFormat));
+assert(r27.ok === true && r27.data?.snapshot.format === "Reel", "lowercase format normalized");
+
+// 28. parseStoredSnapshot backfills missing format from fallback.
+const legacy = { ...validSnapshot, format: undefined };
+const stored = parseStoredSnapshot(legacy, "Static");
+assert(stored !== null && stored.format === "Static", "legacy snapshot backfilled with fallback format");
+
+// 29. parseStoredSnapshot returns null for non-object.
+assert(parseStoredSnapshot(null, "Reel") === null, "parseStoredSnapshot null → null");
+assert(parseStoredSnapshot("oops", "Reel") === null, "parseStoredSnapshot string → null");
+
+// 30. parseStoredSnapshot still rejects when other fields are invalid.
+const brokenLegacy = { ...validSnapshot, format: undefined, body: "x".repeat(3001) };
+assert(parseStoredSnapshot(brokenLegacy, "Static") === null, "legacy with other errors → null");
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 if (failures > 0) {
