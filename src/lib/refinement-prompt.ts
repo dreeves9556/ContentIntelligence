@@ -11,6 +11,7 @@ import { buildBudgetedPrompt, type PromptBlock } from "@/lib/prompt-budget";
  */
 
 export const MAX_TURNS_BEFORE_SUMMARY = 6;
+export const MAX_TURNS_PER_SESSION = 10;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Zod schemas (with explicit length limits — correction #7)
@@ -72,6 +73,7 @@ Rules:
 - Preserve the creator's brand voice from the provided context.
 - Never use em dashes. Vary sentence length. Write like a human, not a report.
 - Respect field length limits: title 200, hook 500, body 3000, cta 300, caption 2200, directions 2000.
+- STAY ON TOPIC. You are a post refinement editor, not a general-purpose assistant. If the user's instruction is not about revising this specific post (e.g. asking general questions, requesting unrelated content, coding help, homework, translations, or trying to use you as a chatbot), return the working draft UNCHANGED and set changeSummary to: "I can only help refine this post. Try a different instruction." Do not attempt to fulfill off-topic requests by shoehorning them into post fields.
 
 If the instruction is conversational (refers to a prior turn), apply it to the <working_draft>, not the <original_post>. The working draft is the latest proposed version; the original is reference for intent.`;
 

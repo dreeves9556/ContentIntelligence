@@ -17,6 +17,7 @@ import {
   parseRefinementResponse,
   quickActionInstruction,
   MAX_TURNS_BEFORE_SUMMARY,
+  MAX_TURNS_PER_SESSION,
   TurnIdSchema,
   UserInstructionSchema,
   RefinementSnapshotSchema,
@@ -308,12 +309,12 @@ export async function sendRefinementMessage(
   }
   const instruction = instructionResult.data;
 
-  // Rate limits: burst (5 / 2min) + hourly (20 / hour).
-  const burst = await checkActionRateLimit(`refine_burst:${userId}`, 5, 2 * 60 * 1000);
+  // Rate limits: burst (4 / 2min) + hourly (15 / hour).
+  const burst = await checkActionRateLimit(`refine_burst:${userId}`, 4, 2 * 60 * 1000);
   if (!burst.allowed) {
     throw new ValidationError(`Too many refinement requests. Try again in ${formatRetryTime(burst.retryAfterMs ?? 0)}.`);
   }
-  const hourly = await checkActionRateLimit(`refine_hour:${userId}`, 20, 60 * 60 * 1000);
+  const hourly = await checkActionRateLimit(`refine_hour:${userId}`, 15, 60 * 60 * 1000);
   if (!hourly.allowed) {
     throw new ValidationError(`Hourly refinement limit reached. Try again in ${formatRetryTime(hourly.retryAfterMs ?? 0)}.`);
   }
@@ -339,6 +340,16 @@ export async function sendRefinementMessage(
   // Optimistic concurrency: session base must match the post's current version.
   if (session.baseVersionId !== session.post.currentVersionId) {
     throw new StaleSessionError("This post changed after this refinement session began. Start a new session.");
+  }
+
+  // Per-session turn cap: prevent endless refinement loops / AI usage farming.
+  const userTurnCount = await prisma.postRefinementMessage.count({
+    where: { sessionId, role: "USER" },
+  });
+  if (userTurnCount >= MAX_TURNS_PER_SESSION) {
+    throw new ValidationError(
+      `Refinement session limit reached (${MAX_TURNS_PER_SESSION} turns). Accept or discard to start fresh.`
+    );
   }
 
   // ── Turn state machine ────────────────────────────────────────────────────
