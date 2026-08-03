@@ -336,10 +336,10 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
               <FileText className="h-4 w-4 shrink-0" />
             )}
             <span className="text-sm font-bold tracking-wider uppercase">
-              {day.format === "Reel" ? "On-Camera Script" : "Post Content"}
+              {day.format === "Reel" ? "On-Camera Script" : day.format === "Static" ? "On-Image Text" : "Post Content"}
             </span>
           </div>
-          <CopyButton text={fullScript} label={day.format === "Reel" ? "Copy script" : "Copy content"} />
+          <CopyButton text={fullScript} label={day.format === "Reel" ? "Copy script" : day.format === "Static" ? "Copy image text" : "Copy content"} />
         </div>
         <div className="space-y-4">
           {/* Hook / Headline */}
@@ -382,8 +382,8 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
           })() : (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold tracking-wider text-text-muted uppercase">Body</span>
-                <CopyButton text={day.body} label="Copy body" />
+                <span className="text-xs font-bold tracking-wider text-text-muted uppercase">{day.format === "Static" ? "Image Text" : "Body"}</span>
+                <CopyButton text={day.body} label={day.format === "Static" ? "Copy image text" : "Copy body"} />
               </div>
               <p className="text-base text-text-secondary leading-relaxed whitespace-pre-line">
                 {day.body}

@@ -364,10 +364,10 @@ export function MobileDayCard({
             <FileText className="h-4 w-4 shrink-0" />
           )}
           <span className="text-xs font-bold tracking-wider uppercase">
-            {day.format === "Reel" ? "On-Camera Script" : "Post Content"}
+            {day.format === "Reel" ? "On-Camera Script" : day.format === "Static" ? "On-Image Text" : "Post Content"}
           </span>
         </div>
-        <CopyButton text={fullScript} label={day.format === "Reel" ? "Copy script" : "Copy content"} iconOnly />
+        <CopyButton text={fullScript} label={day.format === "Reel" ? "Copy script" : day.format === "Static" ? "Copy image text" : "Copy content"} iconOnly />
       </div>
 
       <div className="space-y-3">
@@ -407,9 +407,9 @@ export function MobileDayCard({
           <div className="space-y-1.5">
             <SectionHeader
               icon={FileText}
-              label="Body"
+              label={day.format === "Static" ? "Image Text" : "Body"}
               copyText={day.body}
-              copyLabel="Copy body"
+              copyLabel={day.format === "Static" ? "Copy image text" : "Copy body"}
               iconClass="text-text-muted"
             />
             <p className="text-base text-text-secondary leading-relaxed whitespace-pre-line">{day.body}</p>
@@ -617,7 +617,7 @@ export function MobileDayCard({
       <MobileTabs
         tabs={[
           { id: "create", label: "Create", content: createTab },
-          { id: "script", label: day.format === "Reel" ? "Script" : "Content", content: scriptTab },
+          { id: "script", label: day.format === "Reel" ? "Script" : day.format === "Static" ? "Image" : "Content", content: scriptTab },
           { id: "caption", label: "Caption", content: captionTab },
           { id: "publish", label: "Publish", content: publishTab },
         ]}

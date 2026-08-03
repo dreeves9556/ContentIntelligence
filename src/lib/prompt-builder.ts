@@ -511,14 +511,19 @@ BUCKET DEFINITIONS: read these carefully:
 - "Expert" = professional knowledge, hard-won lessons, industry insights, tips, myth-busting, client stories. Their work expertise front and centre. Even Expert posts should feel like they're coming from a real human with personality, not a corporate newsletter.
 - "Local" = hyper-local content about their city, community, favourite spots, local events, neighbourhood energy. Builds a sense of place and belonging.
 
-Content field definitions:
-- "hook": the opening line the creator should say on camera (for Reels) or the headline of the post (for Carousel/Static). This should be copy-pasteable spoken text.
-- "body": the full spoken script for Reels, or the main body text for Carousel/Static. This should be copy-pasteable text the creator delivers or writes directly into the post. Do NOT include filming instructions here. For Carousel posts, format the body as individual slides, each on its own line(s), prefixed with "Slide N:" (e.g., "Slide 1: ...", "Slide 2: ..."). Each slide should be self-contained text for one carousel image. Aim for 5-8 slides per carousel.
-- "directions": filming, performance, or design directions. Tell the creator HOW to make the piece (e.g., shot type, energy, visuals, slide layout). This is NOT copy-pasteable post text.
-- "cta": the closing call-to-action the creator should say or write.
-- "caption": the social media caption to paste below the post. Do NOT include any hashtags.
+Content field definitions (what goes where depends on the format):
+- "hook": the opening line. For Reels: the first line spoken on camera. For Carousels: the headline on the cover slide. For Static: the headline baked onto the image (short, punchy, 1 line). This should be copy-pasteable spoken or on-image text.
+- "body": depends on format:
+  - Reel: the full spoken script. Copy-pasteable text the creator reads on camera. Do NOT include filming instructions here.
+  - Carousel: individual slides, each on its own line(s), prefixed with "Slide N:" (e.g., "Slide 1: ...", "Slide 2: ..."). Each slide is self-contained text for one carousel image. Aim for 5-8 slides.
+  - Static: the SHORT text baked onto the image itself (a quote, a one-liner, a few bullet points, or a short paragraph). This is OVERLAY TEXT on a picture, NOT a long blog post. Keep it under 300 characters. Think quote card, infographic text, or a single punchy statement. The longer explanation belongs in the caption, NOT here.
+- "directions": filming, performance, or design directions. Tell the creator HOW to make the piece (e.g., shot type, energy, visuals, slide layout, image style for Static). This is NOT copy-pasteable post text.
+- "cta": the closing call-to-action. For Reels: spoken at the end. For Carousels/Static: lives in the caption (see below), so keep it short and pasteable.
+- "caption": the social media caption pasted BELOW the post in the feed. This is where the longer explanation, story, context, and engagement hook go for Static and Carousel posts. Do NOT include any hashtags. Do NOT repeat the on-image text verbatim — expand on it or give the context the image can't carry.
 - "musicSuggestion": a specific song or audio track the creator should overlay on the post using Instagram's music sticker/feature. This applies to ALL formats (Reels, Carousels, AND Static posts). Pick a real, recognizable song that fits the mood and energy of the content. Always include the song name and artist.
 - "duration": target length for Reels (e.g., "45-60 seconds") or read-time estimate for Carousels/Static.
+
+STATIC POST RULE (critical): A Static post is a single image with short text overlaid on it. The "body" is what goes ON the image (under 300 characters). The "caption" is what goes BELOW the image in the feed. Do NOT write a long essay as the body. If you have a lot to say, put it in the caption.
 
 HUMAN WRITING RULES: CRITICAL (obey these in every text field: hook, body, cta, caption, directions):
 The content you generate must NOT sound like AI. These rules are non-negotiable.
