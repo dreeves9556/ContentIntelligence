@@ -669,8 +669,9 @@ function PreviewCard({
 
       <div className="space-y-2 text-sm">
         <PreviewField label="Hook" value={preview.hook} />
-        <PreviewField label="CTA" value={preview.cta} />
-        <PreviewField label="Body" value={preview.body} multiline />
+        {preview.format !== "Static" && <PreviewField label="CTA" value={preview.cta} />}
+        <PreviewField label={preview.format === "Static" ? "Image Text" : "Body"} value={preview.body} multiline />
+        <PreviewField label="Caption" value={preview.caption} multiline />
       </div>
 
       {changeSummary && (

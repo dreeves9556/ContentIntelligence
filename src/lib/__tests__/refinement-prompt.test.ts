@@ -193,6 +193,11 @@ assert(parseStoredSnapshot("oops", "Reel") === null, "parseStoredSnapshot string
 const brokenLegacy = { ...validSnapshot, format: undefined, body: "x".repeat(3001) };
 assert(parseStoredSnapshot(brokenLegacy, "Static") === null, "legacy with other errors → null");
 
+// 31. empty cta accepted (Static posts put CTA in caption).
+const emptyCta = { ...validSnapshot, cta: "" };
+const r31 = parseRefinementResponse(JSON.stringify(emptyCta));
+assert(r31.ok === true, "empty cta accepted (Static-style)");
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed.`);
