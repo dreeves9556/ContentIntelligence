@@ -617,7 +617,7 @@ export function MobileDayCard({
       <MobileTabs
         tabs={[
           { id: "create", label: "Create", content: createTab },
-          { id: "script", label: "Script", content: scriptTab },
+          { id: "script", label: day.format === "Reel" ? "Script" : "Content", content: scriptTab },
           { id: "caption", label: "Caption", content: captionTab },
           { id: "publish", label: "Publish", content: publishTab },
         ]}
