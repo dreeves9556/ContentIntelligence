@@ -570,7 +570,7 @@ export function RefinementPanel({ postId, postTitle, onClose, onPostChanged }: R
                 }}
                 placeholder="Tell the AI how to change this post… (e.g. &quot;Redirect the CTA to my buying-and-selling chart/guide&quot;)"
                 rows={2}
-                className="flex-1 resize-none rounded-lg border border-border-primary bg-background-secondary/40 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/70 focus:outline-none focus:border-accent-primary/50"
+                className="flex-1 resize-none rounded-lg border border-border-primary bg-background-secondary/40 px-3 py-2 text-base sm:text-sm text-text-primary placeholder:text-text-muted/70 focus:outline-none focus:border-accent-primary/50"
                 disabled={isPending || turn?.status === "sending"}
               />
               <button
