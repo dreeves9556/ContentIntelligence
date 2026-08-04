@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  turbopack: {
-    root: "/Users/danielsmac/Documents/CoreOS/my-app",
-  },
   allowedDevOrigins: ["127.0.0.1", "localhost", "*.localhost", "127.0.0.1:*"],
   async headers() {
     return [
