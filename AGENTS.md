@@ -224,11 +224,14 @@ attempt; a retry with the same `requestId` resumes the existing operation.
   Stripe idempotency keys and admin-recovery audit fields.
 - `20260804210000_seat_reconciliation_partial_unique_active` adds a partial
   unique index enforcing at most one active (PENDING or RECOVERY_REQUIRED)
-  operation per organization. The migration includes a pre-cleanup step that
-  demotes duplicate active ops to FAILED (keeping the most recent) before
-  creating the index, so it cannot fail on pre-existing duplicates. This index
-  is NOT in `schema.prisma` — it exists only in the migration SQL. `prisma
-  migrate diff` will report it as drift; this is expected and should be ignored.
+  operation per organization. The migration includes a non-destructive preflight
+  check: if any organization has duplicate active operations, the migration
+  aborts with a `RAISE EXCEPTION` listing the affected organization IDs. The
+  operator must reconcile those records against live Stripe and DB state (via
+  the admin recovery dashboard) before rerunning the migration. No data is
+  modified by the preflight. This index is NOT in `schema.prisma` — it exists
+  only in the migration SQL. `prisma migrate diff` will report it as drift;
+  this is expected and should be ignored.
 
 **Browser-safe DTOs:** Recovery listing and detail APIs return `RecoveryListDTO`
 and `RecoveryDetailDTO` types that exclude sensitive fields (idempotency keys,

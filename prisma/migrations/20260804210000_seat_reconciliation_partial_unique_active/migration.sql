@@ -11,9 +11,12 @@
 --
 -- Safe because:
 --  - It is a new index; no existing column is modified or removed.
---  - Pre-cleanup step below resolves any duplicate active rows that could
---    cause CREATE UNIQUE INDEX to fail. Duplicates are unlikely but possible
---    from a race condition before this migration.
+--  - A non-destructive preflight check below aborts the migration if any
+--    organization has more than one active operation. This is safer than
+--    auto-demoting duplicates: a PENDING op may have already mutated Stripe,
+--    and a RECOVERY_REQUIRED op explicitly means external and DB state may
+--    disagree. Recency cannot identify the correct operation, and demotion
+--    could hide it from the recovery dashboard or permit an unsafe retry.
 --  - The old application version ignores this index (it never references it).
 --
 -- Note: Partial unique indexes cannot be fully represented in Prisma schema
@@ -21,26 +24,45 @@
 -- details on how to distinguish expected unsupported-schema behavior from
 -- real drift.
 
--- Pre-cleanup: if any organization has more than one active (PENDING or
--- RECOVERY_REQUIRED) operation, keep the most recent one and mark older
--- duplicates as FAILED (terminal) so the unique index can be created.
--- The most recent op is determined by createdAt DESC; if ties, by id DESC.
--- Admins can review the lastError on the FAILED rows if follow-up is needed.
-UPDATE "SeatReconciliationOperation" AS older
-SET "status" = 'FAILED',
-    "lastError" = COALESCE("lastError", '') ||
-      ' [MIGRATION 20260804210000: Duplicate active operation demoted to FAILED to allow unique index creation. Review if follow-up needed.]'
-WHERE "older"."status" IN ('PENDING', 'RECOVERY_REQUIRED')
-  AND "older"."id" NOT IN (
-    SELECT DISTINCT latest."id"
+-- Preflight: abort migration if any organization has more than one active
+-- (PENDING or RECOVERY_REQUIRED) operation. The operator must reconcile those
+-- records against live Stripe and DB state before rerunning the migration.
+-- We use a DO block with RAISE EXCEPTION to halt the migration and report
+-- the affected organization IDs in the error message.
+DO $$
+DECLARE
+  dup_count  INTEGER;
+  dup_orgs   TEXT;
+BEGIN
+  SELECT COUNT(*) INTO dup_count
+  FROM (
+    SELECT "organizationId"
+    FROM "SeatReconciliationOperation"
+    WHERE "status" IN ('PENDING', 'RECOVERY_REQUIRED')
+    GROUP BY "organizationId"
+    HAVING COUNT(*) > 1
+  ) AS dups;
+
+  IF dup_count > 0 THEN
+    SELECT string_agg("organizationId", ', ') INTO dup_orgs
     FROM (
-      SELECT DISTINCT ON ("organizationId")
-        "id", "organizationId", "createdAt"
+      SELECT DISTINCT "organizationId"
       FROM "SeatReconciliationOperation"
       WHERE "status" IN ('PENDING', 'RECOVERY_REQUIRED')
-      ORDER BY "organizationId", "createdAt" DESC, "id" DESC
-    ) AS latest
-  );
+      GROUP BY "organizationId"
+      HAVING COUNT(*) > 1
+    ) AS dups;
+
+    RAISE EXCEPTION
+      'Migration 20260804210000 aborted: % organization(s) have duplicate active '
+      'seat reconciliation operations (PENDING or RECOVERY_REQUIRED). '
+      'Affected organization IDs: %. '
+      'Manually reconcile these operations against live Stripe and DB state '
+      '(complete or fail the correct one via the admin recovery dashboard) '
+      'before rerunning this migration.',
+      dup_count, dup_orgs;
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "seat_reconciliation_active_unique_org_idx"
   ON "SeatReconciliationOperation" ("organizationId")
