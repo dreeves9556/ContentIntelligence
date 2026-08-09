@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { zernio } from "@/lib/zernio";
-import { generateAIInsight } from "../actions";
+import { generateAIInsight, type AIInsightResult } from "../actions";
 import { normalizeBestTimeResponse } from "@/lib/best-time";
 import { normalizeFollowerStatsResponse } from "@/lib/follower-stats";
 import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, normalizePostingFrequency } from "@/lib/deep-analytics";
@@ -64,12 +64,13 @@ async function syncSingleAccount(
       endStr
     );
 
-    for (const post of analytics.posts ?? []) {
+    const posts = analytics.posts ?? [];
+    await prisma.$transaction(posts.map((post) => {
       const m = post.analytics;
       // Prefer an actual view count. Some platforms only expose impressions,
       // which remains the documented fallback rather than being mixed via max().
       const viewCount = m.views ?? m.impressions ?? 0;
-      await prisma.postAnalytics.upsert({
+      return prisma.postAnalytics.upsert({
         where: { externalId_userId: { externalId: post._id, userId } },
         update: {
           views: viewCount,
@@ -95,8 +96,8 @@ async function syncSingleAccount(
           postUrl: post.platformPostUrl ?? null,
         },
       });
-      synced++;
-    }
+    }));
+    synced = posts.length;
     analyticsSucceeded = true;
   } catch (err) {
     console.error(`Failed to sync analytics for ${account.platform}:`, err);
@@ -126,9 +127,9 @@ async function syncSingleAccount(
   try {
     const rawFollowerStats = await zernio.analytics.getFollowerStats(account.zernioAccountId);
     const { points } = normalizeFollowerStatsResponse(rawFollowerStats, account.zernioAccountId);
-    for (const point of points) {
+    await prisma.$transaction(points.map((point) => {
       const dateObj = new Date(point.date + "T00:00:00Z");
-      await prisma.followerStats.upsert({
+      return prisma.followerStats.upsert({
         where: {
           userId_platform_date: {
             userId,
@@ -150,7 +151,7 @@ async function syncSingleAccount(
           growthPercent: point.growthPercent,
         },
       });
-    }
+    }));
     followerStatsSucceeded = points.length > 0;
   } catch (err) {
     console.error(`Failed to fetch follower-stats for ${account.platform}:`, err);
@@ -256,18 +257,17 @@ export async function syncAnalytics() {
   const startStr = startDate.toISOString().split("T")[0];
   const endStr = now.toISOString().split("T")[0];
 
-  let synced = 0;
-
-  for (const account of zernioAccounts) {
+  const accountResults = await Promise.all(zernioAccounts.map(async (account) => {
     const result = await syncSingleAccount(userId, account, startStr, endStr);
-    synced += result.syncedPosts;
     if (result.analyticsSucceeded && result.followerStatsSucceeded) {
       await prisma.zernioAccount.update({
         where: { userId_platform: { userId, platform: account.platform } },
         data: { lastSyncAt: now },
       });
     }
-  }
+    return result;
+  }));
+  const synced = accountResults.reduce((total, result) => total + result.syncedPosts, 0);
 
   // Sync profile-level deep analytics (content-decay, daily-metrics, posting-frequency)
   const profileId = zernioAccounts[0].zernioProfileId;
@@ -276,7 +276,7 @@ export async function syncAnalytics() {
     { endpoint: "daily-metrics", dataType: "daily_metrics", normalize: (r) => ({ kind: "dailyMetrics", payload: normalizeDailyMetrics(r) }) },
     { endpoint: "posting-frequency", dataType: "posting_frequency", normalize: (r) => ({ kind: "postingFrequency", payload: normalizePostingFrequency(r) }) },
   ];
-  for (const cfg of profileEndpoints) {
+  await Promise.all(profileEndpoints.map(async (cfg) => {
     try {
       const raw = await zernio.analytics.getProfileAnalytics(profileId, cfg.endpoint);
       const normalized = cfg.normalize(raw);
@@ -299,17 +299,15 @@ export async function syncAnalytics() {
     } catch (err) {
       console.error(`Failed to fetch profile analytics ${cfg.endpoint}:`, err);
     }
-  }
+  }));
 
-  // Regenerate AI insight with fresh data (cheap Haiku call)
+  // Regenerate the insight before responding, so the returned UI always matches this sync.
+  const insightResult: AIInsightResult = await generateAIInsight(userId);
+
   if (synced > 0) {
     // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics
     runLearningPipeline(userId).catch((err) =>
       console.error("Memory learning pipeline failed:", err)
-    );
-
-    generateAIInsight(userId).catch((err) =>
-      console.error("Background AI insight generation failed:", err)
     );
 
     // Check analytics milestones for recently synced posts (background, non-blocking)
@@ -333,7 +331,7 @@ export async function syncAnalytics() {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/analytics");
-  return { success: true, synced };
+  return { success: true, synced, insightResult };
 }
 
 export async function autoSyncAnalyticsIfNeeded() {

@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 import { syncAnalytics } from "./actions";
+import type { AIInsightResult } from "../actions";
 
-export default function SyncButton() {
+interface SyncButtonProps {
+  onInsightRefresh?: (result: AIInsightResult) => void;
+}
+
+export default function SyncButton({ onInsightRefresh }: SyncButtonProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -14,6 +19,7 @@ export default function SyncButton() {
     try {
       const result = await syncAnalytics();
       if (result.success) {
+        if (result.insightResult) onInsightRefresh?.(result.insightResult);
         setStatus("success");
         setMessage(`Synced ${result.synced} post${result.synced === 1 ? "" : "s"}`);
       } else {

@@ -36,7 +36,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { seedPostAnalytics, getCachedInsight } from "./actions";
+import { seedPostAnalytics, getCachedInsight, type AIInsightResult } from "./actions";
 import SyncButton from "./integrations/SyncButton";
 import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 import {
@@ -1092,6 +1092,16 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
     return () => { cancelled = true; };
   }, []);
 
+  const handleInsightRefresh = (result: AIInsightResult) => {
+    setAiLoading(false);
+    if (result.success && result.insight) {
+      setAiError(null);
+      setAiInsight(result.insight);
+    } else {
+      setAiError(result.error || "Unable to refresh insight");
+    }
+  };
+
   const trendData = buildTrendData(filteredPosts);
 
   const totalViews = filteredPosts.reduce((sum, p) => sum + p.views, 0);
@@ -1201,7 +1211,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           </p>
         </div>
         <div className="sm:hidden absolute top-0 right-0">
-          <SyncButton />
+          <SyncButton onInsightRefresh={handleInsightRefresh} />
         </div>
         {posts.length === 0 && (
           <button
@@ -1293,7 +1303,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           })}
         </div>
         <div className="ml-auto hidden sm:block">
-          <SyncButton />
+          <SyncButton onInsightRefresh={handleInsightRefresh} />
         </div>
       </div>
 
