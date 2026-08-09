@@ -870,7 +870,7 @@ async function finalizeRecoveryAtomic(
   summary: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const result = await prisma.$transaction(
+    await prisma.$transaction(
       async (tx) => {
         const finResult = await tx.seatReconciliationOperation.updateMany({
           where: {

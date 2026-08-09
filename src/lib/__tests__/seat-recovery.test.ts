@@ -68,6 +68,7 @@ class FakePrisma implements SeatReconciliationPrisma {
 
   async $transaction<T>(
     fn: (tx: FakeTx) => Promise<T>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _opts?: { isolationLevel?: "Serializable" }
   ): Promise<T> {
     const tx: FakeTx = {

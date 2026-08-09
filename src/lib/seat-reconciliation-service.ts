@@ -922,8 +922,7 @@ export async function executeSeatReconciliation(
       op,
       freshOrg.stripeSubscriptionId as string,
       itemId,
-      originalStripeQuantity,
-      persistedMainKey
+      originalStripeQuantity
     );
 
     if (compResult.ok) {
@@ -1012,8 +1011,7 @@ async function compensateStripe(
   op: SeatReconciliationOpRow,
   subscriptionId: string,
   itemId: string,
-  originalQuantity: number | null,
-  mainKey: string
+  originalQuantity: number | null
 ): Promise<{ ok: boolean; error?: string }> {
   if (originalQuantity == null) {
     return { ok: false, error: "original quantity unknown" };
