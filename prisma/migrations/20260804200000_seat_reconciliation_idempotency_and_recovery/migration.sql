@@ -25,7 +25,7 @@
 --  recoveryClaimedAt         — lease timestamp for recovery claim
 --  resolvedAt                — when an admin resolved a RECOVERY_REQUIRED op
 --  resolvedByUserId          — which admin resolved it
---  resolutionType            — "RESTORED_ORIGINAL" | "COMPLETED_DB" | "MARKED_FAILED"
+--  resolutionType            — "RESTORE_ORIGINAL" | "COMPLETED_DB"
 --  resolutionSummary         — safe human-readable summary of what was done
 --
 -- Safe because:

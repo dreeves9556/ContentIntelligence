@@ -16,11 +16,13 @@ import {
 } from "../seat-recovery-service";
 import {
   executeSeatReconciliation,
+  getReconcileRoster,
   type SeatReconciliationPrisma,
   type SeatReconciliationOpRow,
   type SeatStripeClient,
   type SeatValidationUser,
   type SeatReconciliationDeps,
+  type ReconcileRosterPrisma,
 } from "../seat-reconciliation-service";
 
 let failures = 0;
@@ -65,7 +67,8 @@ class FakePrisma implements SeatReconciliationPrisma {
   stripeRetrieveCalls: number = 0;
 
   async $transaction<T>(
-    fn: (tx: FakeTx) => Promise<T>
+    fn: (tx: FakeTx) => Promise<T>,
+    _opts?: { isolationLevel?: "Serializable" }
   ): Promise<T> {
     const tx: FakeTx = {
       user: {
@@ -100,6 +103,42 @@ class FakePrisma implements SeatReconciliationPrisma {
           this.invites.filter(
             (i) => i.organizationId === args.where.organizationId && i.expiresAt > args.where.expiresAt.gt
           ).length,
+      },
+      seatReconciliationOperation: {
+        findMany: async (args: any) => {
+          let rows = Array.from(this.ops.values());
+          if (args.where?.organizationId) {
+            rows = rows.filter((r) => r.organizationId === args.where.organizationId);
+          }
+          if (args.where?.status) {
+            rows = rows.filter((r) => r.status === args.where.status);
+          }
+          if (args.where?.id?.not) {
+            rows = rows.filter((r) => r.id !== args.where.id.not);
+          }
+          return rows.map((r) => ({ id: r.id }));
+        },
+        updateMany: async (args: any) => {
+          const row = this.ops.get(args.where.id);
+          if (!row) return { count: 0 };
+          if (args.where.recoveryClaimToken !== undefined && row.recoveryClaimToken !== args.where.recoveryClaimToken) {
+            return { count: 0 };
+          }
+          if (args.where.status !== undefined && row.status !== args.where.status) {
+            return { count: 0 };
+          }
+          const data = args.data;
+          if (data.status !== undefined) row.status = data.status;
+          if (data.recoveryClaimToken !== undefined) row.recoveryClaimToken = data.recoveryClaimToken;
+          if (data.recoveryClaimedAt !== undefined) row.recoveryClaimedAt = data.recoveryClaimedAt;
+          if (data.resolvedAt !== undefined) row.resolvedAt = data.resolvedAt;
+          if (data.resolvedByUserId !== undefined) row.resolvedByUserId = data.resolvedByUserId;
+          if (data.resolutionType !== undefined) row.resolutionType = data.resolutionType;
+          if (data.resolutionSummary !== undefined) row.resolutionSummary = data.resolutionSummary;
+          if (data.completedAt !== undefined) row.completedAt = data.completedAt;
+          if (data.lastError !== undefined) row.lastError = data.lastError;
+          return { count: 1 };
+        },
       },
     };
 
@@ -160,6 +199,15 @@ class FakePrisma implements SeatReconciliationPrisma {
       if (args.where?.status) {
         rows = rows.filter((r) => r.status === args.where.status);
       }
+      if (args.where?.organizationId) {
+        rows = rows.filter((r) => r.organizationId === args.where.organizationId);
+      }
+      if (args.where?.id?.not) {
+        rows = rows.filter((r) => r.id !== args.where.id.not);
+      }
+      if (args.take) {
+        rows = rows.slice(0, args.take);
+      }
       return rows;
     },
     updateMany: async (args: any) => {
@@ -208,8 +256,20 @@ class FakePrisma implements SeatReconciliationPrisma {
   };
 
   user = {
-    findMany: async (args: any) =>
-      Array.from(this.users.values()).filter((u) => args.where.id.in.includes(u.id)),
+    findMany: async (args: any): Promise<any[]> => {
+      if (args.where?.id?.in) {
+        return Array.from(this.users.values())
+          .filter((u) => args.where.id.in.includes(u.id));
+      }
+      // Roster query path
+      return Array.from(this.users.values()).filter((u) => {
+        if (args.where?.organizationId && u.organizationId !== args.where.organizationId) return false;
+        if (args.where?.id?.not && u.id === args.where.id.not) return false;
+        if (args.where?.role?.notIn && args.where.role.notIn.includes(u.role)) return false;
+        if (args.where?.accountStatus?.not && u.accountStatus === args.where.accountStatus.not) return false;
+        return true;
+      });
+    },
     findUnique: async (args: any) => {
       const u = this.users.get(args.where.id);
       if (!u) return null;
@@ -234,6 +294,14 @@ class FakePrisma implements SeatReconciliationPrisma {
 
   organization = {
     findUnique: async (args: any) => this.orgs.get(args.where.id) ?? null,
+    findMany: async (args: any) => {
+      if (args.where?.id?.in) {
+        return Array.from(this.orgs.values())
+          .filter((o) => args.where.id.in.includes(o.id))
+          .map((o) => ({ id: o.id, name: o.name, seatLimit: o.seatLimit, stripeSubscriptionId: o.stripeSubscriptionId }));
+      }
+      return Array.from(this.orgs.values());
+    },
     update: async (args: any) => {
       const org = this.orgs.get(args.where.id);
       if (org) org.seatLimit = args.data.seatLimit;
@@ -253,6 +321,10 @@ interface FakeTx {
   user: SeatReconciliationPrisma["user"];
   organization: SeatReconciliationPrisma["organization"];
   inviteToken: SeatReconciliationPrisma["inviteToken"];
+  seatReconciliationOperation: {
+    findMany(args: any): Promise<{ id: string }[]>;
+    updateMany(args: any): Promise<{ count: number }>;
+  };
 }
 
 class FakeStripe implements SeatStripeClient {
@@ -838,20 +910,51 @@ async function testNoKeyUsedWithTwoQuantities() {
   }
 }
 
-// 25. TEAM_ADMIN excluded from reconciliation roster
+// 25. Roster excludes ADMIN and TEAM_ADMIN (production behavior test)
 async function testTeamAdminExcludedFromRoster() {
-  // This is a pure query test — we verify the where clause in seat-actions.ts
-  // uses notIn: ["ADMIN", "TEAM_ADMIN"]. Since we can't call the server action
-  // directly (it requires auth), we verify the query shape by checking the
-  // source code.
-  const fs = await import("fs");
-  const source = fs.readFileSync(
-    "/Users/danielsmac/Documents/CoreOS/my-app/src/app/dashboard/billing/seat-actions.ts",
-    "utf-8"
+  // Test the real getReconcileRoster function with a DI fake prisma.
+  // Supply users with roles USER, TEAM_ADMIN, and ADMIN.
+  // Assert only eligible USER records are returned.
+  const fakeRosterPrisma: ReconcileRosterPrisma = {
+    user: {
+      findMany: async (args) => {
+        const allUsers = [
+          { id: "u1", role: "USER", accountStatus: "ACTIVE" },
+          { id: "u2", role: "USER", accountStatus: "ACTIVE" },
+          { id: "u3", role: "TEAM_ADMIN", accountStatus: "ACTIVE" },
+          { id: "u4", role: "ADMIN", accountStatus: "ACTIVE" },
+          { id: "u5", role: "USER", accountStatus: "ARCHIVED" },
+          { id: "caller", role: "TEAM_ADMIN", accountStatus: "ACTIVE" },
+        ];
+        return allUsers.filter((u) => {
+          if (args.where.organizationId && u.id === "") return false;
+          if (args.where.id?.not && u.id === args.where.id.not) return false;
+          if (args.where.role?.notIn && args.where.role.notIn.includes(u.role)) return false;
+          if (args.where.accountStatus?.not && u.accountStatus === args.where.accountStatus.not) return false;
+          return true;
+        });
+      },
+    },
+  };
+
+  const roster = await getReconcileRoster(fakeRosterPrisma, "org1", "caller");
+
+  assert(roster.length === 2, `roster should return 2 eligible USERs, got ${roster.length}`);
+  assert(
+    roster.every((m) => m.role === "USER"),
+    "all returned members must have role USER"
   );
   assert(
-    source.includes('role: { notIn: ["ADMIN", "TEAM_ADMIN"] }'),
-    "seat-actions.ts excludes ADMIN and TEAM_ADMIN from roster query"
+    !roster.some((m) => m.role === "ADMIN" || m.role === "TEAM_ADMIN"),
+    "no ADMIN or TEAM_ADMIN in roster"
+  );
+  assert(
+    !roster.some((m) => m.id === "caller"),
+    "caller excluded from roster"
+  );
+  assert(
+    !roster.some((m) => m.accountStatus === "ARCHIVED"),
+    "ARCHIVED members excluded from roster"
   );
 }
 

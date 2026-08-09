@@ -59,7 +59,8 @@ class FakePrisma implements SeatReconciliationPrisma {
   stripeUpdateCalls: { id: string; quantity: number; idempotencyKey?: string }[] = [];
 
   async $transaction<T>(
-    fn: (tx: SeatReconciliationTx) => Promise<T>
+    fn: (tx: SeatReconciliationTx) => Promise<T>,
+    _opts?: { isolationLevel?: "Serializable" }
   ): Promise<T> {
     const tx: SeatReconciliationTx = {
       user: {
@@ -100,6 +101,41 @@ class FakePrisma implements SeatReconciliationPrisma {
           this.invites.filter(
             (i) => i.organizationId === args.where.organizationId && i.expiresAt > args.where.expiresAt.gt
           ).length,
+      },
+      seatReconciliationOperation: {
+        findMany: async (args: any) => {
+          let rows = Array.from(this.ops.values());
+          if (args.where?.organizationId) {
+            rows = rows.filter((r) => r.organizationId === args.where.organizationId);
+          }
+          if (args.where?.status) {
+            rows = rows.filter((r) => r.status === args.where.status);
+          }
+          if (args.where?.id?.not) {
+            rows = rows.filter((r) => r.id !== args.where.id.not);
+          }
+          return rows.map((r) => ({ id: r.id }));
+        },
+        updateMany: async (args: any) => {
+          const row = this.ops.get(args.where.id);
+          if (!row) return { count: 0 };
+          if (args.where.recoveryClaimToken !== undefined && row.recoveryClaimToken !== args.where.recoveryClaimToken) {
+            return { count: 0 };
+          }
+          if (args.where.status !== undefined && row.status !== args.where.status) {
+            return { count: 0 };
+          }
+          const data = args.data;
+          if (data.status !== undefined) row.status = data.status;
+          if (data.recoveryClaimToken !== undefined) row.recoveryClaimToken = data.recoveryClaimToken;
+          if (data.resolvedAt !== undefined) row.resolvedAt = data.resolvedAt;
+          if (data.resolvedByUserId !== undefined) row.resolvedByUserId = data.resolvedByUserId;
+          if (data.resolutionType !== undefined) row.resolutionType = data.resolutionType;
+          if (data.resolutionSummary !== undefined) row.resolutionSummary = data.resolutionSummary;
+          if (data.completedAt !== undefined) row.completedAt = data.completedAt;
+          if (data.lastError !== undefined) row.lastError = data.lastError;
+          return { count: 1 };
+        },
       },
     };
 
@@ -154,6 +190,22 @@ class FakePrisma implements SeatReconciliationPrisma {
         return id ? this.ops.get(id) ?? null : null;
       }
       return this.ops.get(args.where.id) ?? null;
+    },
+    findMany: async (args: any) => {
+      let rows = Array.from(this.ops.values());
+      if (args.where?.organizationId) {
+        rows = rows.filter((r) => r.organizationId === args.where.organizationId);
+      }
+      if (args.where?.status) {
+        rows = rows.filter((r) => r.status === args.where.status);
+      }
+      if (args.where?.id?.not) {
+        rows = rows.filter((r) => r.id !== args.where.id.not);
+      }
+      if (args.take) {
+        rows = rows.slice(0, args.take);
+      }
+      return rows;
     },
     updateMany: async (args: any) => {
       const row = this.ops.get(args.where.id);
@@ -246,6 +298,10 @@ interface SeatReconciliationTx {
   user: SeatReconciliationPrisma["user"];
   organization: SeatReconciliationPrisma["organization"];
   inviteToken: SeatReconciliationPrisma["inviteToken"];
+  seatReconciliationOperation: {
+    findMany(args: any): Promise<{ id: string }[]>;
+    updateMany(args: any): Promise<{ count: number }>;
+  };
 }
 
 // ─── Fake Stripe ──────────────────────────────────────────────────────────

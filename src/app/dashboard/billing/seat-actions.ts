@@ -6,6 +6,7 @@ import { getStripe } from "@/lib/stripe";
 import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import {
   executeSeatReconciliation,
+  getReconcileRoster,
   type SeatReconciliationContext,
   type SeatReconciliationDeps,
   type SeatReconciliationPrisma,
@@ -41,31 +42,20 @@ export async function getOrgMembersForReconciliation(): Promise<{
   const ctx = await requireTeamAdminOrganization();
   if (!ctx) return { error: "Unauthorized" };
 
-  const members = await prisma.user.findMany({
-    where: {
-      organizationId: ctx.user.organizationId,
-      id: { not: ctx.user.id },
-      role: { notIn: ["ADMIN", "TEAM_ADMIN"] },
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      accountStatus: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const roster = await getReconcileRoster(
+    prisma as unknown as { user: Parameters<typeof getReconcileRoster>[0]["user"] },
+    ctx.user.organizationId!,
+    ctx.user.id
+  );
 
   return {
-    members: members.map((m) => ({
+    members: roster.map((m) => ({
       id: m.id,
-      name: m.name,
-      email: m.email,
+      name: null,
+      email: null,
       role: m.role,
       accountStatus: m.accountStatus,
-      createdAt: m.createdAt,
+      createdAt: new Date(0),
     })),
   };
 }

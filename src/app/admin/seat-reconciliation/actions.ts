@@ -11,8 +11,8 @@ import {
 } from "@/lib/seat-recovery-service";
 import type {
   RecoveryResolutionType,
-  RecoveryListRow,
-  RecoveryDetailRow,
+  RecoveryListDTO,
+  RecoveryDetailDTO,
   RecoveryDeps,
 } from "@/lib/seat-recovery-service";
 import type { SeatReconciliationPrisma, SeatStripeClient } from "@/lib/seat-reconciliation-service";
@@ -25,7 +25,8 @@ import type { SeatReconciliationPrisma, SeatStripeClient } from "@/lib/seat-reco
  */
 
 export async function listRecoveryOps(): Promise<{
-  rows?: RecoveryListRow[];
+  rows?: RecoveryListDTO[];
+  hasMore?: boolean;
   error?: string;
 }> {
   const session = await auth();
@@ -52,7 +53,7 @@ export async function listRecoveryOps(): Promise<{
 
 export async function getRecoveryOp(
   opId: string
-): Promise<{ row?: RecoveryDetailRow; error?: string }> {
+): Promise<{ row?: RecoveryDetailDTO; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) return { error: "Unauthorized" };
 

@@ -660,11 +660,10 @@ model Organization {
 //                        also failed. Admin must intervene. The row preserves
 //                        the original quantity so a human can reconcile.
 //
-// The Stripe reduction uses an attempt-scoped idempotency key
-// (`seat_reconcile_main_${id}_${attempts}`) so a transport-level retry within
-// the same attempt does not double-charge, while a retry after a FAILED
-// attempt uses a fresh key. Compensation uses a separate key
-// (`seat_reconcile_comp_${id}_${attempts}`).
+// The Stripe reduction uses a persisted idempotency key
+// (`seat_reconcile_main_<uuid>`) generated once at op creation and reused
+// across retries. Compensation uses a separate persisted key
+// (`seat_reconcile_comp_<op-id>`) derived from the immutable operation ID.
 model SeatReconciliationOperation {
   id                        String   @id @default(cuid())
   requestId                 String   @unique

@@ -30,9 +30,11 @@
  *
  *  5. The Stripe reduction uses a PERSISTED idempotency key generated once at
  *     op creation and reused across retries, stale reclaims, and unknown-outcome
- *     retries. Compensation uses a separate persisted key derived from the main
- *     key. Neither key is derived from the attempt counter (which changes on
- *     stale reclaim). See migration 20260804200000 for the persisted key columns.
+ *     retries. Compensation uses a separate persisted key derived from the
+ *     immutable operation ID (`seat_reconcile_comp_<op-id>`), not from the main
+ *     key via string replacement. Neither key is derived from the attempt
+ *     counter (which changes on stale reclaim). See migration 20260804200000
+ *     for the persisted key columns.
  *
  *  6. `originalStripeQuantity` and `originalSeatLimit` are IMMUTABLE after first
  *     set. They are captured once before the first Stripe mutation and never
@@ -168,6 +170,16 @@ export interface SeatReconciliationPrisma {
         | { requestId: string }
         | { id: string };
     }): Promise<SeatReconciliationOpRow | null>;
+    findMany(args: {
+      where: {
+        status?: string;
+        organizationId?: string;
+        id?: { not?: string };
+      };
+      orderBy?: { createdAt: "desc" };
+      take?: number;
+      skip?: number;
+    }): Promise<SeatReconciliationOpRow[]>;
     updateMany(args: {
       where: {
         id: string;
@@ -233,6 +245,33 @@ export interface SeatReconciliationTx {
   user: SeatReconciliationPrisma["user"];
   organization: SeatReconciliationPrisma["organization"];
   inviteToken: SeatReconciliationPrisma["inviteToken"];
+  seatReconciliationOperation: {
+    findMany(args: {
+      where: {
+        organizationId?: string;
+        status?: string;
+        id?: { not?: string };
+      };
+    }): Promise<{ id: string }[]>;
+    updateMany(args: {
+      where: {
+        id: string;
+        recoveryClaimToken?: string | null;
+        status?: SeatReconciliationStatus;
+      };
+      data: {
+        status?: SeatReconciliationStatus;
+        recoveryClaimToken?: string | null;
+        recoveryClaimedAt?: Date | null;
+        resolvedAt?: Date;
+        resolvedByUserId?: string;
+        resolutionType?: string;
+        resolutionSummary?: string;
+        completedAt?: Date | null;
+        lastError?: string | null;
+      };
+    }): Promise<{ count: number }>;
+  };
 }
 
 export interface SeatReconciliationDeps {
@@ -253,6 +292,52 @@ export type SeatReconciliationResult =
       inProgress?: boolean;
       recoveryRequired?: boolean;
     };
+
+// ─── Roster query (extracted for testability) ──────────────────────────────
+
+export interface ReconcileRosterMember {
+  id: string;
+  role: string;
+  accountStatus: string;
+}
+
+export interface ReconcileRosterPrisma {
+  user: {
+    findMany(args: {
+      where: {
+        organizationId: string;
+        id?: { not: string };
+        role?: { notIn: string[] };
+        accountStatus?: { not: string };
+      };
+      select: { id: true; role: true; accountStatus: true };
+      orderBy?: { createdAt: "desc" };
+    }): Promise<ReconcileRosterMember[]>;
+  };
+}
+
+/**
+ * Query eligible members for seat reconciliation.
+ * Excludes ADMIN and TEAM_ADMIN roles (they cannot be locked or removed).
+ * Excludes the caller (they cannot lock/remove themselves).
+ * Excludes ARCHIVED members (they are already inactive).
+ */
+export async function getReconcileRoster(
+  prisma: ReconcileRosterPrisma,
+  organizationId: string,
+  callerUserId: string
+): Promise<ReconcileRosterMember[]> {
+  return prisma.user.findMany({
+    where: {
+      organizationId,
+      id: { not: callerUserId },
+      role: { notIn: ["ADMIN", "TEAM_ADMIN"] },
+      accountStatus: { not: "ARCHIVED" },
+    },
+    select: { id: true, role: true, accountStatus: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
 
 // ─── Pure validation ───────────────────────────────────────────────────────
 
@@ -587,6 +672,49 @@ export async function executeSeatReconciliation(
   // Use the persisted mainIdempotencyKey (from the op row, not the local var).
   const persistedMainKey = op.mainIdempotencyKey ?? mainIdempotencyKey;
 
+  // Finding 6: Check for conflicting active operations for the same org.
+  // Exclude the current operation from its own conflict check.
+  const conflictingOps = await prisma.seatReconciliationOperation.findMany({
+    where: {
+      organizationId: ctx.organizationId,
+      status: "PENDING",
+      id: { not: op.id },
+    },
+  });
+  if (conflictingOps.length > 0) {
+    // Release the claim on our op so it can be retried later.
+    await prisma.seatReconciliationOperation
+      .updateMany({
+        where: { id: op.id, claimToken, status: "PENDING" },
+        data: { status: "FAILED", claimToken: null, lastError: "Conflicting active reconciliation blocked start." },
+      })
+      .catch(() => {});
+    return {
+      success: false,
+      error: "Another seat reconciliation is already in progress for this organization. Wait for it to complete before retrying.",
+    };
+  }
+  // Also check for RECOVERY_REQUIRED operations (those need admin intervention first).
+  const recoveryOps = await prisma.seatReconciliationOperation.findMany({
+    where: {
+      organizationId: ctx.organizationId,
+      status: "RECOVERY_REQUIRED",
+      id: { not: op.id },
+    },
+  });
+  if (recoveryOps.length > 0) {
+    await prisma.seatReconciliationOperation
+      .updateMany({
+        where: { id: op.id, claimToken, status: "PENDING" },
+        data: { status: "FAILED", claimToken: null, lastError: "Existing RECOVERY_REQUIRED blocks start." },
+      })
+      .catch(() => {});
+    return {
+      success: false,
+      error: "A previous seat reconciliation for this organization requires admin recovery. Resolve it before starting a new reduction.",
+    };
+  }
+
   // ── 2. Validate against CURRENT db state ──────────────────────────────
   const allTargetIds = Object.keys(memberActions);
   const [selectedUsers, activeMembers, pendingInvites, freshOrg] = await Promise.all([
@@ -892,11 +1020,12 @@ async function compensateStripe(
   }
 
   // Use a persisted compensation idempotency key. Generate one if not yet
-  // stored, then reuse on retry. Derived from the main key (not the attempt
-  // counter) so it is stable across retries.
+  // stored, then reuse on retry. Derived from the immutable operation ID (not
+  // the main key via string replacement, and not the attempt counter) so it is
+  // stable across retries and independent of the main key format.
   let compKey = op.compensationIdempotencyKey;
   if (!compKey) {
-    compKey = mainKey.replace("seat_reconcile_main_", "seat_reconcile_comp_");
+    compKey = `seat_reconcile_comp_${op.id}`;
     await prisma.seatReconciliationOperation
       .updateMany({
         where: { id: op.id, status: "PENDING" },

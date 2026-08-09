@@ -2,17 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { AlertCircle, Loader2, RotateCcw, CheckCircle2, ArrowLeft } from "lucide-react";
-import type { RecoveryListRow, RecoveryDetailRow } from "@/lib/seat-recovery-service";
+import type { RecoveryListDTO, RecoveryDetailDTO } from "@/lib/seat-recovery-service";
 import { getRecoveryOp, resolveRecoveryOp } from "./actions";
 
 interface Props {
-  initialRows: RecoveryListRow[];
+  initialRows: RecoveryListDTO[];
+  hasMore?: boolean;
 }
 
 export default function SeatReconciliationAdminClient({ initialRows }: Props) {
   const [rows] = useState(initialRows);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<RecoveryDetailRow | null>(null);
+  const [detail, setDetail] = useState<RecoveryDetailDTO | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);

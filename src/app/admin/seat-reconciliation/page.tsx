@@ -14,7 +14,7 @@ export default async function AdminSeatReconciliationPage() {
   if (!session?.user?.id) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const { rows, error } = await listRecoveryOps();
+  const { rows, hasMore, error } = await listRecoveryOps();
 
   if (error) {
     return (
@@ -24,5 +24,5 @@ export default async function AdminSeatReconciliationPage() {
     );
   }
 
-  return <SeatReconciliationAdminClient initialRows={rows ?? []} />;
+  return <SeatReconciliationAdminClient initialRows={rows ?? []} hasMore={hasMore ?? false} />;
 }

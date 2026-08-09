@@ -38,7 +38,7 @@ Each test file uses a local `assert(condition, label)` helper and sets `process.
 - `PostVersion.format` is nullable — existing versions referenced by `Post.currentVersionId` were backfilled to the post's current format by migration `20260804160000`. Historical versions (not the current version) remain NULL; the read path (`versionToFields` in `post-refinement/actions.ts`) and `assertPostMatchesCurrentVersion` (in `post-integrity.ts`) interpret NULL as the post's current format. New versions always capture the real format.
 - `ScheduledPushNotification` has bounded recoverable claim state (`claimToken`, `claimedAt`, `attempts`, `lastError`) added by migration `20260804170000`. The cron route `/api/cron/scheduled-pushes` claims ≤20 rows per pass, processes only claimed rows, and reclaims stale PROCESSING rows after a 10-minute lease.
 - `ZernioEvent` has `claimToken` (migration `20260804180000`) for concurrency-safe claiming matching the Stripe webhook pattern.
-- `SeatReconciliationOperation` (migration `20260804190000`) is the durable, idempotent operation row for seat reductions. Migration `20260804200000` adds persisted Stripe idempotency keys and admin-recovery audit fields. See "Seat reconciliation (durable)" below.
+- `SeatReconciliationOperation` (migration `20260804190000`) is the durable, idempotent operation row for seat reductions. Migration `20260804200000` adds persisted Stripe idempotency keys and admin-recovery audit fields. Migration `20260804210000` adds a partial unique index (`seat_reconciliation_active_unique_org_idx`) enforcing at most one active operation per org (PENDING or RECOVERY_REQUIRED). See "Seat reconciliation (durable)" below.
 - Partial unique indexes (e.g. `WHERE status = 'OPEN'`) aren't supported in `schema.prisma` — append them manually to the generated `migration.sql`.
 
 ### Stripe ownership invariant (critical)
@@ -136,9 +136,10 @@ fakes); the server action `reduceSeatsWithReconciliation` in
    returns a "contact support" error; FAILED → re-claims and re-runs.
 5. The Stripe reduction uses a PERSISTED idempotency key generated once at op
    creation and reused across retries, stale reclaims, and unknown-outcome
-   retries. Compensation uses a separate persisted key derived from the main
-   key. Neither key is derived from the attempt counter. See migration
-   `20260804200000` for the persisted key columns.
+   retries. Compensation uses a separate persisted key derived from the
+   immutable operation ID (`seat_reconcile_comp_<op-id>`), not from the main
+   key via string replacement. Neither key is derived from the attempt
+   counter. See migration `20260804200000` for the persisted key columns.
 6. `originalStripeQuantity` and `originalSeatLimit` are IMMUTABLE after first
    set. They are captured once before the first Stripe mutation and never
    overwritten on retry. This preserves recovery evidence.
@@ -172,18 +173,35 @@ Recovery actions (admin chooses one):
 
 - `RESTORE_ORIGINAL`: restores the Stripe subscription to the original quantity.
   DB members and seatLimit remain unchanged. Use when DB changes were never
-  committed. Verifies the live Stripe quantity equals `originalStripeQuantity`
-  after the mutation.
+  committed. **Hardened:** blocks if the DB `seatLimit` has already changed from
+  `originalSeatLimit` (indicating DB changes were committed). Verifies the live
+  Stripe quantity equals `originalStripeQuantity` after the mutation. Finalization
+  is atomic (serializable transaction, token-scoped, no error swallowing).
 - `COMPLETED_DB`: applies the DB member/seatLimit changes. Requires the live
   Stripe quantity to equal `targetSeats` AND the membership state to be
   compatible (seatLimit unchanged, selected users still in the org, no selected
-  user promoted to admin, active count matches). Blocks with a clear error if
-  state has drifted — the admin should use `RESTORE_ORIGINAL` instead.
+  user promoted to admin, active count matches). **Pending invites are counted
+  inside the serializable transaction** — if remaining active members + pending
+  invites > targetSeats, the transaction rolls back. Finalization is atomic
+  (same serializable transaction as the DB mutations, token-scoped, no error
+  swallowing). Blocks with a clear error if state has drifted — the admin should
+  use `RESTORE_ORIGINAL` instead.
 
 Concurrency: recovery uses a conditional claim (`recoveryClaimToken`) so two
 admins cannot resolve the same operation concurrently. Stale recovery claims
 are reclaimable after a 10-minute lease (`RECOVERY_LEASE_MS`). On failure, the
 claim is released so the same admin or another admin can retry.
+
+**Conflict blocking (Finding 6):** Before starting a new reconciliation or
+resolving a recovery, the service checks for conflicting active operations
+(PENDING or RECOVERY_REQUIRED) for the same organization. If found, the
+operation is blocked with a clear error. A partial unique index
+(`seat_reconciliation_active_unique_org_idx`, migration `20260804210000`)
+enforces this at the database level: at most one non-terminal operation per
+organization. The index covers `status IN ('PENDING', 'RECOVERY_REQUIRED')`.
+This index cannot be represented in `schema.prisma` — it exists only in the
+migration SQL. When `prisma migrate diff` or `prisma db pull` reports drift
+on this index, it is expected and should be ignored.
 
 Idempotency: recovery uses a persisted `recoveryIdempotencyKey` (stored on the
 op row, generated once on first recovery attempt). Retries after a timeout
@@ -198,9 +216,28 @@ A replay of a resolved operation returns idempotent success.
 The client (`SeatManager.tsx`) generates a UUID `requestId` per reconciliation
 attempt; a retry with the same `requestId` resumes the existing operation.
 
-**Migration:** `20260804190000_add_seat_reconciliation_operations` creates the
-table. Run `prisma migrate deploy` BEFORE deploying code that references it
-(the old app ignores the table; the new app requires the columns).
+**Migrations:**
+- `20260804190000_add_seat_reconciliation_operations` creates the table. Run
+  `prisma migrate deploy` BEFORE deploying code that references it (the old app
+  ignores the table; the new app requires the columns).
+- `20260804200000_seat_reconciliation_idempotency_and_recovery` adds persisted
+  Stripe idempotency keys and admin-recovery audit fields.
+- `20260804210000_seat_reconciliation_partial_unique_active` adds a partial
+  unique index enforcing at most one active (PENDING or RECOVERY_REQUIRED)
+  operation per organization. This index is NOT in `schema.prisma` — it exists
+  only in the migration SQL. `prisma migrate diff` will report it as drift;
+  this is expected and should be ignored.
+
+**Browser-safe DTOs:** Recovery listing and detail APIs return `RecoveryListDTO`
+and `RecoveryDetailDTO` types that exclude sensitive fields (idempotency keys,
+claim tokens, lease timestamps, Stripe subscription IDs). The internal
+`RecoveryListRow` and `RecoveryDetailRow` types are never sent to the browser.
+The admin client component (`SeatReconciliationAdminClient.tsx`) and server
+actions (`actions.ts`) use only DTO types.
+
+**Bounded recovery queries:** `listRecoveryRequiredOperations` is bounded to
+100 rows (`RECOVERY_LIST_LIMIT`) with a `hasMore` flag. Organization and actor
+enrichment is batched (single `findMany` per entity type) to avoid N+1 queries.
 
 ### Account and organization deletion hardening
 

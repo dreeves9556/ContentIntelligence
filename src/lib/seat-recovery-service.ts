@@ -82,6 +82,84 @@ export interface RecoveryDetailRow extends RecoveryListRow {
   stripeSubscriptionId: string | null;
 }
 
+// ─── Browser-safe DTOs (no sensitive fields) ───────────────────────────────
+
+export interface RecoveryListDTO {
+  id: string;
+  organizationId: string;
+  organizationName: string | null;
+  actorUserId: string;
+  actorEmail: string | null;
+  originalSeatLimit: number;
+  originalStripeQuantity: number | null;
+  targetSeats: number;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: Date;
+  resolvedAt: Date | null;
+}
+
+export interface RecoveryDetailDTO {
+  id: string;
+  organizationId: string;
+  organizationName: string | null;
+  actorUserId: string;
+  actorEmail: string | null;
+  originalSeatLimit: number;
+  originalStripeQuantity: number | null;
+  targetSeats: number;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: Date;
+  resolvedAt: Date | null;
+  memberActionsJson: Prisma.JsonValue;
+  resolvedByUserId: string | null;
+  resolutionType: string | null;
+  resolutionSummary: string | null;
+}
+
+function toRecoveryListDTO(row: RecoveryListRow): RecoveryListDTO {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    organizationName: row.organizationName,
+    actorUserId: row.actorUserId,
+    actorEmail: row.actorEmail,
+    originalSeatLimit: row.originalSeatLimit,
+    originalStripeQuantity: row.originalStripeQuantity,
+    targetSeats: row.targetSeats,
+    status: row.status,
+    attempts: row.attempts,
+    lastError: row.lastError,
+    createdAt: row.createdAt,
+    resolvedAt: row.resolvedAt,
+  };
+}
+
+function toRecoveryDetailDTO(row: RecoveryDetailRow): RecoveryDetailDTO {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    organizationName: row.organizationName,
+    actorUserId: row.actorUserId,
+    actorEmail: row.actorEmail,
+    originalSeatLimit: row.originalSeatLimit,
+    originalStripeQuantity: row.originalStripeQuantity,
+    targetSeats: row.targetSeats,
+    status: row.status,
+    attempts: row.attempts,
+    lastError: row.lastError,
+    createdAt: row.createdAt,
+    resolvedAt: row.resolvedAt,
+    memberActionsJson: row.memberActionsJson,
+    resolvedByUserId: row.resolvedByUserId,
+    resolutionType: row.resolutionType,
+    resolutionSummary: row.resolutionSummary,
+  };
+}
+
 export type RecoveryResult =
   | { success: true; resolutionType: RecoveryResolutionType; summary: string }
   | { success: false; error: string };
@@ -100,50 +178,72 @@ export function assertAdmin(caller: RecoveryCaller): { ok: boolean; error: strin
 
 // ─── List RECOVERY_REQUIRED operations ──────────────────────────────────────
 
+const RECOVERY_LIST_LIMIT = 100;
+
 export async function listRecoveryRequiredOperations(
   deps: RecoveryDeps,
   caller: RecoveryCaller
-): Promise<{ rows?: RecoveryListRow[]; error?: string }> {
+): Promise<{ rows?: RecoveryListDTO[]; hasMore?: boolean; error?: string }> {
   const auth = assertAdmin(caller);
   if (!auth.ok) return { error: auth.error! };
 
   const { prisma } = deps;
-  // The DI interface doesn't expose findMany on seatReconciliationOperation,
-  // so we use a scan via the organization index. In production, the real
-  // Prisma client supports findMany; the server action uses the real client
-  // directly for listing. For DI tests, the fake provides findMany.
   const ops = await (prisma as unknown as {
     seatReconciliationOperation: {
       findMany(args: {
         where: { status: string };
         orderBy: { createdAt: "desc" };
+        take: number;
       }): Promise<SeatReconciliationOpRow[]>;
     };
   }).seatReconciliationOperation.findMany({
     where: { status: "RECOVERY_REQUIRED" },
     orderBy: { createdAt: "desc" },
+    take: RECOVERY_LIST_LIMIT + 1,
   });
 
-  // Enrich with org name and actor email (trusted server state).
-  const rows: RecoveryListRow[] = [];
-  for (const op of ops) {
-    const org = await prisma.organization.findUnique({
-      where: { id: op.organizationId },
-      select: { id: true, name: true, seatLimit: true, stripeSubscriptionId: true },
-    });
-    const actor = await (prisma as unknown as {
-      user: {
-        findUnique(args: {
-          where: { id: string };
-          select: { id: true; email: true };
-        }): Promise<{ id: string; email: string | null } | null>;
-      };
-    }).user.findUnique({
-      where: { id: op.actorUserId },
-      select: { id: true, email: true },
-    });
+  const hasMore = ops.length > RECOVERY_LIST_LIMIT;
+  const boundedOps = hasMore ? ops.slice(0, RECOVERY_LIST_LIMIT) : ops;
 
-    rows.push({
+  if (boundedOps.length === 0) {
+    return { rows: [], hasMore: false };
+  }
+
+  // Batch: collect unique org IDs and actor IDs, fetch in single queries.
+  const orgIds = [...new Set(boundedOps.map((op) => op.organizationId))];
+  const actorIds = [...new Set(boundedOps.map((op) => op.actorUserId))];
+
+  const orgs = await (prisma as unknown as {
+    organization: {
+      findMany(args: {
+        where: { id: { in: string[] } };
+        select: { id: true; name: true; seatLimit: true; stripeSubscriptionId: true };
+      }): Promise<{ id: string; name: string; seatLimit: number; stripeSubscriptionId: string | null }[]>;
+    };
+  }).organization.findMany({
+    where: { id: { in: orgIds } },
+    select: { id: true, name: true, seatLimit: true, stripeSubscriptionId: true },
+  });
+
+  const actors = await (prisma as unknown as {
+    user: {
+      findMany(args: {
+        where: { id: { in: string[] } };
+        select: { id: true; email: true };
+      }): Promise<{ id: string; email: string | null }[]>;
+    };
+  }).user.findMany({
+    where: { id: { in: actorIds } },
+    select: { id: true, email: true },
+  });
+
+  const orgMap = new Map(orgs.map((o) => [o.id, o]));
+  const actorMap = new Map(actors.map((a) => [a.id, a]));
+
+  const rows: RecoveryListDTO[] = boundedOps.map((op) => {
+    const org = orgMap.get(op.organizationId);
+    const actor = actorMap.get(op.actorUserId);
+    return toRecoveryListDTO({
       id: op.id,
       requestId: op.requestId,
       organizationId: op.organizationId,
@@ -160,9 +260,9 @@ export async function listRecoveryRequiredOperations(
       updatedAt: op.updatedAt,
       resolvedAt: op.resolvedAt,
     });
-  }
+  });
 
-  return { rows };
+  return { rows, hasMore };
 }
 
 // ─── Get a single recovery operation ────────────────────────────────────────
@@ -171,7 +271,7 @@ export async function getRecoveryRequiredOperation(
   deps: RecoveryDeps,
   caller: RecoveryCaller,
   opId: string
-): Promise<{ row?: RecoveryDetailRow; error?: string }> {
+): Promise<{ row?: RecoveryDetailDTO; error?: string }> {
   const auth = assertAdmin(caller);
   if (!auth.ok) return { error: auth.error! };
 
@@ -217,7 +317,7 @@ export async function getRecoveryRequiredOperation(
     stripeSubscriptionId: org?.stripeSubscriptionId ?? null,
   };
 
-  return { row };
+  return { row: toRecoveryDetailDTO(row) };
 }
 
 // ─── Resolve a recovery operation ───────────────────────────────────────────
@@ -286,6 +386,36 @@ export async function resolveRecoveryRequiredOperation(
     return {
       success: false,
       error: "Organization no longer has a Stripe subscription. Contact support.",
+    };
+  }
+
+  // Finding 6: Check for conflicting active operations for the same org.
+  // Exclude the current operation from its own conflict check.
+  const conflictingOps = await prisma.seatReconciliationOperation.findMany({
+    where: {
+      organizationId: op.organizationId,
+      status: "PENDING",
+      id: { not: op.id },
+    },
+  });
+  if (conflictingOps.length > 0) {
+    return {
+      success: false,
+      error: `Cannot resolve: another active reconciliation (PENDING) exists for this organization. Resolve or wait for it first.`,
+    };
+  }
+  // Also check for other RECOVERY_REQUIRED operations (excluding this one).
+  const otherRecoveryOps = await prisma.seatReconciliationOperation.findMany({
+    where: {
+      organizationId: op.organizationId,
+      status: "RECOVERY_REQUIRED",
+      id: { not: op.id },
+    },
+  });
+  if (otherRecoveryOps.length > 0) {
+    return {
+      success: false,
+      error: `Cannot resolve: another RECOVERY_REQUIRED operation exists for this organization. Resolve it first.`,
     };
   }
 
@@ -383,6 +513,15 @@ async function executeRestoreOriginal(
     return { success: false, error: "Organization has no Stripe subscription." };
   }
 
+  // Finding 3: Verify DB reconciliation was not already applied.
+  // If seatLimit has changed from the original, DB changes were committed.
+  if (org.seatLimit !== op.originalSeatLimit) {
+    return {
+      success: false,
+      error: `Cannot restore: DB seatLimit is ${org.seatLimit}, expected original ${op.originalSeatLimit}. DB reconciliation may have already been applied. Review DB state or finalize as COMPLETED_DB.`,
+    };
+  }
+
   const originalQuantity = op.originalStripeQuantity!;
 
   // Read the current Stripe state.
@@ -404,9 +543,15 @@ async function executeRestoreOriginal(
   }
 
   // If Stripe is already at the original quantity, no mutation needed.
+  // On retry after a failed finalization, this path retries only finalization.
   if (currentQuantity === originalQuantity) {
     const summary = `Stripe already at original quantity ${originalQuantity}. No mutation needed. DB unchanged.`;
-    await finalizeRecovery(prisma, op, recoveryToken, caller, now, "RESTORE_ORIGINAL", summary);
+    const finResult = await finalizeRecoveryAtomic(
+      prisma, op, recoveryToken, caller, now, "RESTORE_ORIGINAL", summary
+    );
+    if (!finResult.ok) {
+      return { success: false, error: finResult.error! };
+    }
     return { success: true, resolutionType: "RESTORE_ORIGINAL", summary };
   }
 
@@ -464,9 +609,15 @@ async function executeRestoreOriginal(
     };
   }
 
-  // DB members and seatLimit remain unchanged (they were never committed).
+  // Finding 3: Token-scoped finalization in a serializable transaction.
+  // Do not swallow errors. If finalization fails, return failure.
   const summary = `Restored Stripe from ${currentQuantity} to original ${originalQuantity}. DB members and seatLimit unchanged (still ${org.seatLimit}).`;
-  await finalizeRecovery(prisma, op, recoveryToken, caller, now, "RESTORE_ORIGINAL", summary);
+  const finResult = await finalizeRecoveryAtomic(
+    prisma, op, recoveryToken, caller, now, "RESTORE_ORIGINAL", summary
+  );
+  if (!finResult.ok) {
+    return { success: false, error: finResult.error! };
+  }
   return { success: true, resolutionType: "RESTORE_ORIGINAL", summary };
 }
 
@@ -488,7 +639,7 @@ async function executeCompleteDb(
 
   const targetSeats = op.targetSeats;
 
-  // 1. Live Stripe quantity must equal targetSeats.
+  // 1. Live Stripe quantity must equal targetSeats (checked before the DB tx).
   let liveQuantity: number;
   try {
     const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
@@ -514,7 +665,7 @@ async function executeCompleteDb(
     };
   }
 
-  // 3. Revalidate every selected member.
+  // 3. Revalidate every selected member (before the transaction).
   const memberActions = op.memberActionsJson as Record<string, "lock" | "remove">;
   const allTargetIds = Object.keys(memberActions);
   if (allTargetIds.length === 0) {
@@ -526,7 +677,6 @@ async function executeCompleteDb(
     select: { id: true, organizationId: true, role: true, accountStatus: true },
   });
 
-  // Every selected user must still exist and belong to the same org.
   if (selectedUsers.length !== allTargetIds.length) {
     return {
       success: false,
@@ -548,7 +698,7 @@ async function executeCompleteDb(
     }
   }
 
-  // 4. Check active member count is compatible.
+  // 4. Check active member count is compatible (before the transaction).
   const activeMembers = await prisma.user.count({
     where: { organizationId: op.organizationId, accountStatus: { not: "ARCHIVED" } },
   });
@@ -560,7 +710,7 @@ async function executeCompleteDb(
     };
   }
 
-  // 5. Apply DB member actions + seatLimit atomically.
+  // 5. Apply DB member actions + seatLimit + finalization atomically.
   const lockIds = Object.entries(memberActions)
     .filter(([, a]) => a === "lock")
     .map(([id]) => id);
@@ -568,9 +718,64 @@ async function executeCompleteDb(
     .filter(([, a]) => a === "remove")
     .map(([id]) => id);
 
+  let summary = "";
   try {
     await prisma.$transaction(
       async (tx) => {
+        // Finding 1+2: Re-run all validation inside the serializable transaction
+        // so it cannot become stale before commit.
+
+        // Revalidate org state inside the tx.
+        const orgInTx = await tx.organization.findUnique({
+          where: { id: op.organizationId },
+          select: { id: true, name: true, seatLimit: true, stripeSubscriptionId: true },
+        });
+        if (!orgInTx) {
+          throw new Error("Organization not found inside transaction.");
+        }
+        if (orgInTx.seatLimit !== op.originalSeatLimit) {
+          throw new Error(
+            `SEAT_LIMIT_DRIFTED: seatLimit is ${orgInTx.seatLimit}, expected ${op.originalSeatLimit}.`
+          );
+        }
+
+        // Revalidate members inside the tx.
+        const usersInTx = await tx.user.findMany({
+          where: { id: { in: allTargetIds } },
+          select: { id: true, organizationId: true, role: true, accountStatus: true },
+        });
+        if (usersInTx.length !== allTargetIds.length) {
+          throw new Error("MEMBER_MISSING: A selected member no longer exists.");
+        }
+        for (const u of usersInTx) {
+          if (u.organizationId !== op.organizationId) {
+            throw new Error(`MEMBER_DRIFTED: Member ${u.id} left the organization.`);
+          }
+          if (u.role === "ADMIN" || u.role === "TEAM_ADMIN") {
+            throw new Error(`MEMBER_PROMOTED: Member ${u.id} is now an admin.`);
+          }
+        }
+
+        // Finding 1: Count active members inside the tx.
+        const activeInTx = await tx.user.count({
+          where: { organizationId: op.organizationId, accountStatus: { not: "ARCHIVED" } },
+        });
+        const requiredInTx = activeInTx - targetSeats;
+        if (allTargetIds.length !== requiredInTx) {
+          throw new Error(
+            `MEMBERSHIP_DRIFTED: ${activeInTx} active members, need ${requiredInTx} selections, have ${allTargetIds.length}.`
+          );
+        }
+
+        // Finding 1: Count pending invites inside the tx.
+        const pendingInvitesInTx = await tx.inviteToken.count({
+          where: {
+            organizationId: op.organizationId,
+            expiresAt: { gt: now() },
+          },
+        });
+
+        // Apply member changes.
         if (lockIds.length > 0) {
           await tx.user.updateMany({
             where: { id: { in: lockIds } },
@@ -584,18 +789,61 @@ async function executeCompleteDb(
           });
         }
 
+        // Count remaining active members after changes.
         const activeAfter = await tx.user.count({
           where: { organizationId: op.organizationId, accountStatus: { not: "ARCHIVED" } },
         });
+
+        // Finding 1: remaining active members + pending invites <= targetSeats.
+        if (activeAfter + pendingInvitesInTx > targetSeats) {
+          throw new Error(
+            `SEAT_LIMIT_EXCEEDED: ${activeAfter} active members + ${pendingInvitesInTx} pending invites = ${activeAfter + pendingInvitesInTx} > targetSeats ${targetSeats}. Cancel pending invites before completing.`
+          );
+        }
+
         if (activeAfter > targetSeats) {
           throw new Error(
             `SEAT_MISMATCH: ${activeAfter} active members remain; target is ${targetSeats}.`
           );
         }
 
+        // Update seatLimit.
         await tx.organization.update({
           where: { id: op.organizationId },
           data: { seatLimit: targetSeats },
+        });
+
+        // Finding 2: Token-scoped operation finalization inside the same tx.
+        // Require exactly 1 row affected; otherwise roll back everything.
+        const finResult = await tx.seatReconciliationOperation.updateMany({
+          where: {
+            id: op.id,
+            recoveryClaimToken: recoveryToken,
+            status: "RECOVERY_REQUIRED",
+          },
+          data: {
+            status: "COMPLETED",
+            recoveryClaimToken: null,
+            resolvedAt: now(),
+            resolvedByUserId: caller.userId,
+            resolutionType: "COMPLETED_DB",
+            resolutionSummary: "", // filled below
+            completedAt: now(),
+            lastError: null,
+          },
+        });
+        if (finResult.count !== 1) {
+          throw new Error(
+            "FINALIZATION_FAILED: Token-scoped finalization affected 0 rows. Recovery claim lost or status changed."
+          );
+        }
+
+        summary = `Completed DB reconciliation: archived ${lockIds.length} member(s), detached ${removeIds.length} member(s), seatLimit ${org.seatLimit} → ${targetSeats}. Stripe was already at ${targetSeats}. Pending invites: ${pendingInvitesInTx}.`;
+
+        // Update the summary now that we know the final state.
+        await tx.seatReconciliationOperation.updateMany({
+          where: { id: op.id },
+          data: { resolutionSummary: summary.slice(0, 2000) },
         });
       },
       { isolationLevel: "Serializable" }
@@ -607,14 +855,12 @@ async function executeCompleteDb(
     };
   }
 
-  const summary = `Completed DB reconciliation: archived ${lockIds.length} member(s), detached ${removeIds.length} member(s), seatLimit ${org.seatLimit} → ${targetSeats}. Stripe was already at ${targetSeats}.`;
-  await finalizeRecovery(prisma, op, recoveryToken, caller, now, "COMPLETED_DB", summary);
   return { success: true, resolutionType: "COMPLETED_DB", summary };
 }
 
-// ─── Finalize: record audit trail + transition status ───────────────────────
+// ─── Atomic finalization (no error swallowing) ──────────────────────────────
 
-async function finalizeRecovery(
+async function finalizeRecoveryAtomic(
   prisma: SeatReconciliationPrisma,
   op: SeatReconciliationOpRow,
   recoveryToken: string,
@@ -622,26 +868,41 @@ async function finalizeRecovery(
   now: () => Date,
   resolutionType: RecoveryResolutionType,
   summary: string
-): Promise<void> {
-  await prisma.seatReconciliationOperation
-    .updateMany({
-      where: {
-        id: op.id,
-        recoveryClaimToken: recoveryToken,
-        status: "RECOVERY_REQUIRED",
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const finResult = await tx.seatReconciliationOperation.updateMany({
+          where: {
+            id: op.id,
+            recoveryClaimToken: recoveryToken,
+            status: "RECOVERY_REQUIRED",
+          },
+          data: {
+            status: "COMPLETED",
+            recoveryClaimToken: null,
+            resolvedAt: now(),
+            resolvedByUserId: caller.userId,
+            resolutionType,
+            resolutionSummary: summary.slice(0, 2000),
+            completedAt: now(),
+            lastError: null,
+          },
+        });
+        if (finResult.count !== 1) {
+          throw new Error(
+            "FINALIZATION_FAILED: Token-scoped finalization affected 0 rows. Recovery claim lost or status changed."
+          );
+        }
+        return finResult;
       },
-      data: {
-        status: "COMPLETED",
-        recoveryClaimToken: null,
-        resolvedAt: now(),
-        resolvedByUserId: caller.userId,
-        resolutionType,
-        resolutionSummary: summary.slice(0, 2000),
-        completedAt: now(),
-        lastError: null,
-      },
-    })
-    .catch((e) =>
-      console.error("[SEAT RECOVERY] Failed to finalize recovery:", e)
+      { isolationLevel: "Serializable" }
     );
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Recovery finalization failed: ${err instanceof Error ? err.message : "unknown"}. Retry with the same resolution.`,
+    };
+  }
 }
