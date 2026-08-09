@@ -559,7 +559,7 @@ export default function BillingClient({
                 Cancel {isTrial ? "Trial" : "Subscription"}
               </p>
               <p className="text-xs text-text-muted mt-1">
-                Cancel at the end of your {isTrial ? "free trial" : "current billing period"}. You won't be charged{isTrial ? " at all" : " again"} and will keep access until then. Your data is preserved and your account will be locked when the {isTrial ? "trial" : "period"} ends.
+                Cancel at the end of your {isTrial ? "free trial" : "current billing period"}. You won&rsquo;t be charged{isTrial ? " at all" : " again"} and will keep access until then. Your data is preserved and your account will be locked when the {isTrial ? "trial" : "period"} ends.
               </p>
               {isCancelScheduled && (
                 <p className="text-xs text-yellow-400 mt-2">

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { zernio } from "@/lib/zernio";
 import { generateAIInsight, type AIInsightResult } from "../actions";
@@ -221,8 +222,15 @@ async function syncSingleAccount(
     console.error(`Failed to fetch content-decay for ${account.platform}:`, err);
   }
 
-  ensureBaselineForUserPlatform(userId, account.platform).catch((err) => {
-    console.error(`[impact] baseline creation failed for ${userId}/${account.platform}:`, err);
+  // Wrapped in after() so the work is guaranteed to complete even after
+  // the response is sent — previously fire-and-forget could be dropped
+  // when the serverless function terminated.
+  after(async () => {
+    try {
+      await ensureBaselineForUserPlatform(userId, account.platform);
+    } catch (err) {
+      console.error(`[impact] baseline creation failed for ${userId}/${account.platform}:`, err);
+    }
   });
 
   return { syncedPosts: synced, analyticsSucceeded, followerStatsSucceeded };
@@ -305,13 +313,20 @@ export async function syncAnalytics() {
   const insightResult: AIInsightResult = await generateAIInsight(userId);
 
   if (synced > 0) {
-    // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics
-    runLearningPipeline(userId).catch((err) =>
-      console.error("Memory learning pipeline failed:", err)
-    );
+    // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics.
+    // Wrapped in after() so the work is guaranteed to complete even after
+    // the response is sent — previously fire-and-forget could be dropped
+    // when the serverless function terminated.
+    after(async () => {
+      try {
+        await runLearningPipeline(userId);
+      } catch (err) {
+        console.error("Memory learning pipeline failed:", err);
+      }
+    });
 
     // Check analytics milestones for recently synced posts (background, non-blocking)
-    (async () => {
+    after(async () => {
       const recentPosts = await prisma.postAnalytics.findMany({
         where: { userId },
         orderBy: { publishedAt: "desc" },
@@ -319,14 +334,18 @@ export async function syncAnalytics() {
         select: { title: true, views: true, format: true },
       });
       for (const post of recentPosts) {
-        checkAndSendAnalyticsMilestone(
-          userId,
-          post.title,
-          post.views,
-          post.format
-        ).catch((err) => console.error("[MILESTONE] Check failed:", err));
+        try {
+          await checkAndSendAnalyticsMilestone(
+            userId,
+            post.title,
+            post.views,
+            post.format
+          );
+        } catch (err) {
+          console.error("[MILESTONE] Check failed:", err);
+        }
       }
-    })().catch((err) => console.error("[MILESTONE] Batch failed:", err));
+    });
   }
 
   revalidatePath("/dashboard");
@@ -374,9 +393,13 @@ export async function autoSyncAnalyticsIfNeeded() {
   }
 
   if (synced > 0) {
-    generateAIInsight(userId).catch((err) =>
-      console.error("Background AI insight generation failed:", err)
-    );
+    after(async () => {
+      try {
+        await generateAIInsight(userId);
+      } catch (err) {
+        console.error("Background AI insight generation failed:", err);
+      }
+    });
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/analytics");
   }

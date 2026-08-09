@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateQuestionnaire } from "@/lib/validation";
 import { buildMemoriesFromQuestionnaire } from "@/lib/memory/memory-builder";
@@ -45,10 +46,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Build initial AI memories from questionnaire answers (background, non-blocking)
-    buildMemoriesFromQuestionnaire(userId, data as never).catch((err) =>
-      console.error("Memory creation from questionnaire failed:", err)
-    );
+    // Build initial AI memories from questionnaire answers.
+    // Wrapped in after() so the work is guaranteed to complete even after
+    // the response is sent — previously fire-and-forget could be dropped
+    // when the serverless function terminated, losing questionnaire memories.
+    after(async () => {
+      try {
+        await buildMemoriesFromQuestionnaire(userId, data as never);
+      } catch (err) {
+        console.error("Memory creation from questionnaire failed:", err);
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

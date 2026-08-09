@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { buildMemoriesFromSurvey } from "@/lib/memory/memory-builder";
@@ -59,10 +60,17 @@ export async function saveProfileSurvey(
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard/questionnaire");
 
-  // Build/update memories from survey answers (background, non-blocking)
-  buildMemoriesFromSurvey(userId, surveyType, answers).catch((err) =>
-    console.error("Memory creation from survey failed:", err)
-  );
+  // Build/update memories from survey answers.
+  // Wrapped in after() so the work is guaranteed to complete even after
+  // the response is sent — previously fire-and-forget could be dropped
+  // when the serverless function terminated, losing survey-derived memories.
+  after(async () => {
+    try {
+      await buildMemoriesFromSurvey(userId, surveyType, answers);
+    } catch (err) {
+      console.error("Memory creation from survey failed:", err);
+    }
+  });
 
   return { success: true };
 }

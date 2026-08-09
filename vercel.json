@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/broadcasts",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/notifications",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/billing",
+      "schedule": "0 * * * *"
     }
   ]
 }

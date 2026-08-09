@@ -571,7 +571,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
             <Circle className="h-4 w-4 shrink-0" />
           )}
           <span>
-            {isPending ? "Saving..." : isPosted ? "Posted / scheduled" : "Mark as posted / scheduled"}
+            {isPending ? "Saving..." : isPosted ? "Marked as posted" : "Mark as posted"}
           </span>
         </button>
       </div>

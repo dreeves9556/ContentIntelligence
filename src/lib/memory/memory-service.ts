@@ -11,12 +11,22 @@ import {
   CONFIDENCE_INCREMENT_ON_MERGE,
   CONFIDENCE_INCREMENT_ON_TOUCH,
   IMPORTANCE_FOR_PROMPT,
+  IMPORTANCE_ORDER,
 } from "./memory-types";
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
 function clampConfidence(n: number): number {
   return Math.max(MIN_CONFIDENCE, Math.min(MAX_CONFIDENCE, Math.round(n)));
+}
+
+/**
+ * Returns the higher of two Importance levels based on IMPORTANCE_ORDER
+ * (LOW < MEDIUM < HIGH < CRITICAL). Using indexOf instead of lexicographic
+ * string sort avoids the bug where "MEDIUM" sorts after "CRITICAL".
+ */
+function maxImportance(a: Importance, b: Importance): Importance {
+  return IMPORTANCE_ORDER.indexOf(a) >= IMPORTANCE_ORDER.indexOf(b) ? a : b;
 }
 
 function toData(m: {
@@ -181,7 +191,12 @@ export async function mergeMemory(
     current.confidence + (patch.confidenceDelta ?? 0)
   );
 
-  const newImportance = patch.importance ?? current.importance;
+  // Preserve the higher importance — never downgrade on merge. Previously
+  // this used simple replacement (patch.importance ?? current.importance),
+  // which allowed a LOW incoming value to overwrite an existing CRITICAL.
+  const newImportance = patch.importance
+    ? maxImportance(current.importance, patch.importance)
+    : current.importance;
   const newSource = patch.source ?? current.source;
 
   const mergedEvidence = patch.evidence
@@ -297,7 +312,13 @@ export async function mergeDuplicateMemories(
 
     const allDupes = [memory, ...duplicates];
     const bestConfidence = Math.max(...allDupes.map((d) => d.confidence));
-    const bestImportance = allDupes.map((d) => d.importance).sort().reverse()[0];
+    // Select the highest importance using IMPORTANCE_ORDER, not lexicographic
+    // string sort. Lexicographic sort picks "MEDIUM" over "CRITICAL" because
+    // "M" > "C", causing critical memories to be downgraded and then deleted.
+    const bestImportance = allDupes.reduce(
+      (best, d) => maxImportance(best, d.importance),
+      allDupes[0].importance
+    );
     const combinedEvidence = allDupes
       .map((d) => d.evidence)
       .filter(Boolean)

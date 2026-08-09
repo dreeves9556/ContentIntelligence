@@ -918,3 +918,34 @@ export function buildArcDirectiveBlock(arcTheme: string): string {
 
   return `<content_arc>\nThe creator has defined a thematic arc for this period: "${arcTheme.trim()}". Thread this theme through the week's content. Each post should connect to this arc from a different angle. The arc is a connective thread, not a constraint. Posts should still stand alone, but together they should build toward a narrative or message.\n</content_arc>`;
 }
+
+// ─── Context survey expiration ──────────────────────────────────────
+// These helpers mirror the client-side isExpired logic in QuestionnaireClient.tsx.
+// Used by calendar generation to filter out expired context surveys so stale
+// data doesn't influence AI generation.
+
+export function getLastSunday(date: Date = new Date()): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+export function getFirstOfMonth(date: Date = new Date()): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  return d;
+}
+
+/**
+ * Returns true if a context survey (WEEKLY_CONTEXT, MONTHLY_CONTEXT, STORY_REFRESH)
+ * has expired and should no longer influence AI generation.
+ * Non-timed survey types (COMPLIANCE_GUARDRAILS, OFFER_FUNNEL, etc.) never expire.
+ */
+export function isContextSurveyExpired(surveyType: string, updatedAt: Date): boolean {
+  if (surveyType === "WEEKLY_CONTEXT") return updatedAt < getLastSunday();
+  if (surveyType === "MONTHLY_CONTEXT") return updatedAt < getFirstOfMonth();
+  if (surveyType === "STORY_REFRESH") return updatedAt < new Date(Date.now() - 42 * 24 * 60 * 60 * 1000);
+  return false;
+}

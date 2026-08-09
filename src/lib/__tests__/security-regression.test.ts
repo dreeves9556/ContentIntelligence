@@ -1,10 +1,18 @@
-import { createHash, randomBytes } from "crypto";
+import {
+  createHash,
+  randomBytes,
+  createHmac,
+  timingSafeEqual,
+  scryptSync,
+  createCipheriv,
+  createDecipheriv,
+} from "crypto";
+import sanitizeHtml from "sanitize-html";
 
 // ─── unsubscribe.ts logic (inline, no env needed) ───────────────────────
 const SEPARATOR = "|";
 
 function sign(payload: string, secret: string): string {
-  const { createHmac } = require("crypto");
   return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
@@ -24,7 +32,6 @@ function verifyUnsubscribeToken(token: string, secret: string): { userId: string
     const provided = Buffer.from(signature, "utf8");
     const expected = Buffer.from(expectedSignature, "utf8");
     if (provided.length !== expected.length) return null;
-    const { timingSafeEqual } = require("crypto");
     if (!timingSafeEqual(provided, expected)) return null;
     return { userId, email };
   } catch {
@@ -39,12 +46,10 @@ const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 function getKey(secret: string): Buffer {
-  const { scryptSync } = require("crypto");
   return scryptSync(secret, "coreos-salt", 32);
 }
 
 function encrypt(plaintext: string, secret: string): string {
-  const { createCipheriv, randomBytes } = require("crypto");
   const key = getKey(secret);
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
@@ -54,7 +59,6 @@ function encrypt(plaintext: string, secret: string): string {
 }
 
 function decrypt(ciphertext: string, secret: string): string {
-  const { createDecipheriv } = require("crypto");
   const key = getKey(secret);
   const payload = ciphertext.startsWith(PREFIX) ? ciphertext.slice(PREFIX.length) : ciphertext;
   const buf = Buffer.from(payload, "base64");
@@ -197,7 +201,6 @@ function assert(condition: boolean, label: string) {
 {
   const plaintext = "legacy-api-key";
   // Simulate old-style encryption (without prefix)
-  const { createCipheriv, randomBytes } = require("crypto");
   const key = getKey(TEST_SECRET);
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
@@ -253,7 +256,6 @@ function assert(condition: boolean, label: string) {
 {
   // Inline test of sanitize-html
   try {
-    const sanitizeHtml = require("sanitize-html");
     const html = "<p>Hello <strong>world</strong></p>";
     const cleaned = sanitizeHtml(html, {
       allowedTags: ["p", "strong", "em", "a", "br"],
@@ -268,7 +270,6 @@ function assert(condition: boolean, label: string) {
 // 18. Sanitize: script tags are stripped
 {
   try {
-    const sanitizeHtml = require("sanitize-html");
     const html = '<p>Hello</p><script>alert("xss")</script>';
     const cleaned = sanitizeHtml(html, {
       allowedTags: ["p", "strong", "em", "a", "br"],
@@ -284,7 +285,6 @@ function assert(condition: boolean, label: string) {
 // 19. Sanitize: onload attributes are stripped
 {
   try {
-    const sanitizeHtml = require("sanitize-html");
     const html = '<p onload="alert(1)">Hello</p>';
     const cleaned = sanitizeHtml(html, {
       allowedTags: ["p"],
@@ -298,7 +298,6 @@ function assert(condition: boolean, label: string) {
 
 // 20. timingSafeEqual: different-length buffers don't throw (caught)
 {
-  const { timingSafeEqual } = require("crypto");
   try {
     timingSafeEqual(Buffer.from("short"), Buffer.from("muchlongerstring"));
     assert(false, "timingSafeEqual: should have thrown for different lengths");
@@ -309,7 +308,6 @@ function assert(condition: boolean, label: string) {
 
 // 21. timingSafeEqual: same-length buffers work
 {
-  const { timingSafeEqual } = require("crypto");
   const a = Buffer.from("hello");
   const b = Buffer.from("hello");
   assert(timingSafeEqual(a, b) === true, "timingSafeEqual: identical buffers match");

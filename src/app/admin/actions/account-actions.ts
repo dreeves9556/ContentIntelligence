@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import {
@@ -127,7 +128,13 @@ export async function updateUserAccount(
         select: { email: true, name: true },
       });
       if (updatedUser?.email) {
-        sendAccountStatusChangedEmail({ id: userId, ...updatedUser }, oldStatus, data.accountStatus).catch(() => {});
+        after(async () => {
+          try {
+            await sendAccountStatusChangedEmail({ id: userId, ...updatedUser }, oldStatus, data.accountStatus!);
+          } catch (err) {
+            console.error("[ACCOUNT STATUS EMAIL] Failed:", err);
+          }
+        });
       }
     }
 

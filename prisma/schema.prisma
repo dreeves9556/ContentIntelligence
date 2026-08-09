@@ -651,8 +651,8 @@ model ScheduledPushNotification {
   status       String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
   sentCount    Int      @default(0)
   failedCount  Int      @default(0)
-  createdBy    String
-  creator      User     @relation("ScheduledPushCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdBy    String?
+  creator      User?    @relation("ScheduledPushCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -727,6 +727,20 @@ model StripeEvent {
 
   @@index([status, claimedAt])
   @@map("stripe_events")
+}
+
+model ZernioEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  eventType   String
+  status      String    @default("PROCESSING") // PROCESSING, SUCCEEDED, FAILED
+  attempts    Int       @default(1)
+  claimedAt   DateTime  @default(now())
+  processedAt DateTime?
+  lastError   String?
+
+  @@index([status, claimedAt])
+  @@map("zernio_events")
 }
 
 model RateLimitBucket {
@@ -919,6 +933,7 @@ model PostVersion {
   postId                      String
   versionNumber               Int
   source                      PostVersionSource   @default(GENERATION)
+  format                      String?
   title                       String
   hook                        String
   body                        String

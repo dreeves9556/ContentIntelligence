@@ -334,8 +334,11 @@ export async function assignTeamAdmin(
     // Use sequential transaction to prevent race conditions where two
     // concurrent transfers could result in zero or multiple TEAM_ADMINs
     await prisma.$transaction(async (tx) => {
-      // Demote the current admin to USER and clear their Stripe fields
-      // (billing ownership moves to the new admin)
+      // Demote the current admin to USER and clear any user-level Stripe
+      // fields. Community subscriptions belong to the Organization, not the
+      // User, so user-level Stripe fields should always be null for community
+      // members. Clearing them here corrects any stale data from prior
+      // invariant violations.
       if (currentAdmin && currentAdmin.id !== userId) {
         await tx.user.update({
           where: { id: currentAdmin.id },
@@ -348,15 +351,16 @@ export async function assignTeamAdmin(
         });
       }
 
-      // Promote the new admin and transfer Stripe billing ownership
+      // Promote the new admin. Do NOT copy org Stripe fields onto the User —
+      // the community subscription is owned by the Organization. Copying them
+      // would make the cancel route treat the community sub as a solo sub and
+      // update the wrong record. The portal route already checks
+      // Organization.stripeCustomerId for portal access.
       await tx.user.update({
         where: { id: userId },
         data: {
           role: "TEAM_ADMIN",
           plan: org.seatPlan,
-          stripeCustomerId: org.stripeCustomerId ?? null,
-          stripeSubscriptionId: org.stripeSubscriptionId ?? null,
-          stripeStatus: org.stripeStatus ?? null,
         },
       });
     });
@@ -372,19 +376,57 @@ export async function deleteOrganization(
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return { success: false, error: "Unauthorized" };
 
-  // Wrap member detach + invite delete + org delete in a transaction so
+  // Load the org with Stripe fields so we can cancel the subscription before
+  // deleting the record. Once the Organization row is gone, the subscription
+  // ID is lost and the subscription becomes unmanageable through the app.
+  const org = await prisma.organization.findUnique({
+    where: { id },
+    select: { id: true, stripeSubscriptionId: true, stripeCustomerId: true },
+  });
+  if (!org) return { success: false, error: "Organization not found." };
+
+  // Cancel the active Stripe subscription BEFORE deleting the org record.
+  // If cancellation fails, block deletion so the admin can retry — deleting
+  // the org without canceling would orphan a paid subscription with no way
+  // to manage it through the app.
+  if (org.stripeSubscriptionId) {
+    try {
+      const stripe = getStripe();
+      await stripe.subscriptions.cancel(org.stripeSubscriptionId);
+      console.log(`[DELETE ORG] Cancelled Stripe subscription ${org.stripeSubscriptionId} for org ${id}`);
+    } catch (err) {
+      console.error("[DELETE ORG] Failed to cancel Stripe subscription:", err);
+      return {
+        success: false,
+        error: "Failed to cancel the organization's Stripe subscription. The organization was not deleted. Retry once the subscription is canceled or contact support.",
+      };
+    }
+  }
+
+  // Wrap member downgrade + invite delete + org delete in a transaction so
   // that a partial failure doesn't leave inconsistent state (e.g. members
   // detached but org still exists, or invites orphaned).
+  //
+  // Members are downgraded to CALENDAR_ONLY and ARCHIVED, and their user-level
+  // Stripe fields are cleared. This prevents former members from retaining
+  // PRO access after the org (and its subscription) is deleted.
   //
   // Note: The InviteToken.organization relation has onDelete: Cascade, so
   // deleting the org would automatically delete invites. We do it explicitly
   // inside the transaction for clarity and to ensure ordering.
   try {
     await prisma.$transaction([
-      // Detach all members (set organizationId to null, users keep their accounts)
+      // Downgrade and detach all members
       prisma.user.updateMany({
         where: { organizationId: id },
-        data: { organizationId: null },
+        data: {
+          organizationId: null,
+          plan: "CALENDAR_ONLY",
+          accountStatus: "ARCHIVED",
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          stripeStatus: null,
+        },
       }),
       // Delete pending invites for this org
       prisma.inviteToken.deleteMany({ where: { organizationId: id } }),

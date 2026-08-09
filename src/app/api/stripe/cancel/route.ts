@@ -30,11 +30,17 @@ export async function POST() {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Determine the subscription to cancel — user's own or org's
-  let subscriptionId = user.stripeSubscriptionId;
+  // Determine the subscription to cancel — org's (for community members) or
+  // user's own (for solo subscribers).
+  //
+  // For community members, the subscription lives on the Organization. We
+  // check the org FIRST so that stale user-level Stripe fields (left over
+  // from the pre-Finding-3 bug where registerWithToken/assignTeamAdmin copied
+  // org fields onto the User) don't cause us to update the wrong record.
+  let subscriptionId: string | null = null;
   let isOrgSubscription = false;
 
-  if (!subscriptionId && user.organizationId) {
+  if (user.organizationId) {
     // Only TEAM_ADMIN can cancel the community/org subscription
     if (user.role !== "TEAM_ADMIN") {
       return NextResponse.json(
@@ -51,6 +57,11 @@ export async function POST() {
     });
     subscriptionId = org?.stripeSubscriptionId ?? null;
     isOrgSubscription = !!subscriptionId;
+  }
+
+  // Fall back to user-level subscription for solo subscribers
+  if (!subscriptionId && !user.organizationId) {
+    subscriptionId = user.stripeSubscriptionId;
   }
 
   if (!subscriptionId) {

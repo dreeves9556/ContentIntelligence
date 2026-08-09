@@ -213,7 +213,7 @@ export function PricingSection() {
               )}
             </button>
             <p className="text-center text-xs text-text-muted mt-3">
-              Card required. Cancel anytime in the first 7 days and you won't be charged.
+              Card required. Cancel anytime in the first 7 days and you won&rsquo;t be charged.
             </p>
           </div>
 

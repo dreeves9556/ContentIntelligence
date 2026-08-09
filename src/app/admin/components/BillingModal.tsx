@@ -50,14 +50,11 @@ export default function BillingModal({ user, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<StripeBillingDetails | null>(null);
 
+  // Early-return for missing subscription is handled in render below.
+  // The effect only runs the async fetch to avoid set-state-in-effect.
   useEffect(() => {
-    if (!user.stripeSubscriptionId) {
-      setError("No Stripe subscription found for this user");
-      setLoading(false);
-      return;
-    }
+    if (!user.stripeSubscriptionId) return;
 
-    setLoading(true);
     getStripeBillingDetails(user.stripeSubscriptionId)
       .then((res) => {
         if (res.error) {
@@ -68,6 +65,12 @@ export default function BillingModal({ user, onClose }: Props) {
       })
       .finally(() => setLoading(false));
   }, [user.stripeSubscriptionId]);
+
+  // Derive error/loading state for missing subscription during render instead
+  // of calling setState synchronously inside the effect.
+  const noSubscription = !user.stripeSubscriptionId;
+  const effectiveError = noSubscription ? "No Stripe subscription found for this user" : error;
+  const effectiveLoading = noSubscription ? false : loading;
 
   const statusInfo = details ? formatStatus(details.status) : null;
 
@@ -95,21 +98,21 @@ export default function BillingModal({ user, onClose }: Props) {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          {loading && (
+          {effectiveLoading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-accent-primary" />
               <span className="ml-3 text-sm text-text-muted">Loading billing details...</span>
             </div>
           )}
 
-          {error && (
+          {effectiveError && (
             <div className="flex items-start gap-3 p-4 bg-red-500/5 rounded-lg border border-red-500/20">
               <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-              <p className="text-sm text-red-400">{error}</p>
+              <p className="text-sm text-red-400">{effectiveError}</p>
             </div>
           )}
 
-          {details && !loading && (
+          {details && !effectiveLoading && (
             <>
               {/* Status */}
               <div className="flex items-center gap-3">
@@ -273,7 +276,7 @@ export default function BillingModal({ user, onClose }: Props) {
             </>
           )}
 
-          {!loading && !error && !details && (
+          {!effectiveLoading && !effectiveError && !details && (
             <div className="text-center py-12">
               <p className="text-sm text-text-muted">No billing data available</p>
             </div>

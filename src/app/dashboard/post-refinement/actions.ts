@@ -11,6 +11,7 @@ import { callAnthropic, calculateCostMicrodollars } from "@/lib/anthropic-client
 import { getRelevantMemories } from "@/lib/memory/memory-service";
 import { summarizeMemoriesForPrompt } from "@/lib/memory/memory-summarizer";
 import { buildUserProfileXml } from "@/lib/prompt-builder";
+import { isContextSurveyExpired } from "@/lib/freshness";
 import {
   REFINEMENT_SYSTEM_PROMPT,
   buildRefinementUserPrompt,
@@ -45,6 +46,7 @@ import type {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const POST_FIELDS_SELECT = {
+  format: true,
   title: true,
   hook: true,
   body: true,
@@ -56,8 +58,8 @@ const POST_FIELDS_SELECT = {
 } as const;
 
 function versionToFields(
-  v: Omit<PostFields, "format">,
-  format: string
+  v: Pick<PostFields, "title" | "hook" | "body" | "cta" | "caption" | "musicSuggestion" | "duration" | "directions"> & { format?: string | null },
+  fallbackFormat: string
 ): PostFields {
   return {
     title: v.title,
@@ -65,7 +67,7 @@ function versionToFields(
     body: v.body,
     cta: v.cta,
     caption: v.caption,
-    format,
+    format: v.format ?? fallbackFormat,
     musicSuggestion: v.musicSuggestion,
     duration: v.duration,
     directions: v.directions,
@@ -312,16 +314,6 @@ export async function sendRefinementMessage(
   }
   const instruction = instructionResult.data;
 
-  // Rate limits: burst (4 / 2min) + hourly (15 / hour).
-  const burst = await checkActionRateLimit(`refine_burst:${userId}`, 4, 2 * 60 * 1000);
-  if (!burst.allowed) {
-    throw new ValidationError(`Too many refinement requests. Try again in ${formatRetryTime(burst.retryAfterMs ?? 0)}.`);
-  }
-  const hourly = await checkActionRateLimit(`refine_hour:${userId}`, 15, 60 * 60 * 1000);
-  if (!hourly.allowed) {
-    throw new ValidationError(`Hourly refinement limit reached. Try again in ${formatRetryTime(hourly.retryAfterMs ?? 0)}.`);
-  }
-
   // Load session + post; validate ownership + relation.
   const session = await prisma.postRefinementSession.findUnique({
     where: { id: sessionId },
@@ -345,17 +337,12 @@ export async function sendRefinementMessage(
     throw new StaleSessionError("This post changed after this refinement session began. Start a new session.");
   }
 
-  // Per-session turn cap: prevent endless refinement loops / AI usage farming.
-  const userTurnCount = await prisma.postRefinementMessage.count({
-    where: { sessionId, role: "USER" },
-  });
-  if (userTurnCount >= MAX_TURNS_PER_SESSION) {
-    throw new ValidationError(
-      `Refinement session limit reached (${MAX_TURNS_PER_SESSION} turns). Accept or discard to start fresh.`
-    );
-  }
-
-  // ── Turn state machine ────────────────────────────────────────────────────
+  // ── Turn state machine (idempotency check FIRST) ────────────────────────
+  // Check for an existing turn BEFORE rate limits and turn cap. This ensures
+  // transport retries of completed turns return the cached result without
+  // consuming rate limits or hitting the turn cap. Previously rate limits
+  // and the turn cap ran before this check, so a retry of a completed 10th
+  // turn was rejected by the cap before the cached result could be returned.
   const existingTurn = await prisma.postRefinementTurn.findUnique({
     where: { sessionId_turnId: { sessionId, turnId } },
   });
@@ -402,7 +389,15 @@ export async function sendRefinementMessage(
       return { status: "IN_PROGRESS", attemptCount: existingTurn.attemptCount };
     }
     if (existingTurn.status === "ERROR") {
-      // Atomically claim a retry.
+      // Atomically claim a retry. Rate limits still apply to retries.
+      const burst = await checkActionRateLimit(`refine_burst:${userId}`, 4, 2 * 60 * 1000);
+      if (!burst.allowed) {
+        throw new ValidationError(`Too many refinement requests. Try again in ${formatRetryTime(burst.retryAfterMs ?? 0)}.`);
+      }
+      const hourly = await checkActionRateLimit(`refine_hour:${userId}`, 15, 60 * 60 * 1000);
+      if (!hourly.allowed) {
+        throw new ValidationError(`Hourly refinement limit reached. Try again in ${formatRetryTime(hourly.retryAfterMs ?? 0)}.`);
+      }
       const claimed = await prisma.postRefinementTurn.updateMany({
         where: { id: existingTurn.id, status: "ERROR" },
         data: { status: "PROCESSING", attemptCount: { increment: 1 }, processingAt: new Date(), updatedAt: new Date() },
@@ -416,6 +411,27 @@ export async function sendRefinementMessage(
     }
     // PENDING — treat as in-progress (shouldn't normally happen).
     return { status: "IN_PROGRESS", attemptCount: existingTurn.attemptCount };
+  }
+
+  // No existing turn — this is a new turn. Apply rate limits and turn cap
+  // only for new turns (retries of ERROR turns are handled above).
+  const burst = await checkActionRateLimit(`refine_burst:${userId}`, 4, 2 * 60 * 1000);
+  if (!burst.allowed) {
+    throw new ValidationError(`Too many refinement requests. Try again in ${formatRetryTime(burst.retryAfterMs ?? 0)}.`);
+  }
+  const hourly = await checkActionRateLimit(`refine_hour:${userId}`, 15, 60 * 60 * 1000);
+  if (!hourly.allowed) {
+    throw new ValidationError(`Hourly refinement limit reached. Try again in ${formatRetryTime(hourly.retryAfterMs ?? 0)}.`);
+  }
+
+  // Per-session turn cap: prevent endless refinement loops / AI usage farming.
+  const userTurnCount = await prisma.postRefinementMessage.count({
+    where: { sessionId, role: "USER" },
+  });
+  if (userTurnCount >= MAX_TURNS_PER_SESSION) {
+    throw new ValidationError(
+      `Refinement session limit reached (${MAX_TURNS_PER_SESSION} turns). Accept or discard to start fresh.`
+    );
   }
 
   // No existing turn — create one in PROCESSING and run.
@@ -441,23 +457,29 @@ async function runRefinementTurn(
   // Save USER message only on the initial claim, not on retries.
   if (isNewTurn) {
     try {
-      await prisma.postRefinementTurn.create({
-        data: { sessionId: session.id, turnId, status: "PROCESSING", attemptCount, processingAt: new Date() },
-      });
-      await prisma.postRefinementMessage.create({
-        data: {
-          sessionId: session.id,
-          turnId,
-          role: "USER",
-          inputType: input.inputType ?? "FREEFORM",
-          actionKey: input.actionKey ?? null,
-          // Store the resolved instruction (what the AI actually received) so
-          // quick-actions show readable text in the conversation history
-          // instead of an empty bubble when the user clicked a chip without typing.
-          message: instruction,
-          instructionLength: instruction.length,
-        },
-      });
+      // Wrap turn + message creation in a transaction so a crash between
+      // them doesn't leave a stuck PROCESSING turn with no USER message.
+      // Previously these were two separate awaits — a crash after turn
+      // creation but before message creation left an unrecoverable turn.
+      await prisma.$transaction([
+        prisma.postRefinementTurn.create({
+          data: { sessionId: session.id, turnId, status: "PROCESSING", attemptCount, processingAt: new Date() },
+        }),
+        prisma.postRefinementMessage.create({
+          data: {
+            sessionId: session.id,
+            turnId,
+            role: "USER",
+            inputType: input.inputType ?? "FREEFORM",
+            actionKey: input.actionKey ?? null,
+            // Store the resolved instruction (what the AI actually received) so
+            // quick-actions show readable text in the conversation history
+            // instead of an empty bubble when the user clicked a chip without typing.
+            message: instruction,
+            instructionLength: instruction.length,
+          },
+        }),
+      ]);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         // Concurrent duplicate — another request created the turn first.
@@ -509,7 +531,20 @@ async function runRefinementTurn(
     orderBy: { createdAt: "desc" },
   });
   const answers = (questionnaire?.content ?? {}) as unknown as QuestionnaireFormData;
-  const userProfileXml = buildUserProfileXml({ answers, profileSurveys: [] });
+  // Load profile surveys so compliance guardrails, offer restrictions, proof
+  // bank, and deep-dive context are included in refinement prompts. Previously
+  // this was hardcoded to [], which bypassed all compliance rules during
+  // refinement — allowing AI to generate non-compliant content.
+  // Expired context surveys (WEEKLY_CONTEXT, MONTHLY_CONTEXT, STORY_REFRESH)
+  // are filtered out so stale data doesn't influence refinement.
+  const allProfileSurveys = await prisma.profileSurvey.findMany({
+    where: { userId: session.userId },
+    select: { surveyType: true, answersJson: true, updatedAt: true },
+  });
+  const profileSurveys = allProfileSurveys.filter(
+    (s) => !isContextSurveyExpired(s.surveyType, s.updatedAt)
+  );
+  const userProfileXml = buildUserProfileXml({ answers, profileSurveys });
   const memories = await getRelevantMemories(session.userId);
   const memoriesXml = summarizeMemoriesForPrompt(memories);
 
@@ -711,6 +746,7 @@ export async function acceptRefinement(
         postId: session.postId,
         versionNumber: baseVersionNumber + 1,
         source: "AI_REFINEMENT",
+        format: snapshot.format,
         title: snapshot.title,
         hook: snapshot.hook,
         body: snapshot.body,
@@ -895,6 +931,7 @@ export async function restoreVersion(
         postId,
         versionNumber: nextVersionNumber,
         source: "RESTORE",
+        format: targetVersion.format ?? post.format,
         title: targetVersion.title,
         hook: targetVersion.hook,
         body: targetVersion.body,
@@ -918,6 +955,7 @@ export async function restoreVersion(
         body: targetVersion.body,
         cta: targetVersion.cta,
         caption: targetVersion.caption,
+        format: targetVersion.format ?? post.format,
         musicSuggestion: targetVersion.musicSuggestion,
         duration: targetVersion.duration,
         directions: targetVersion.directions,

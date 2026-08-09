@@ -42,10 +42,10 @@ export function SocialProof() {
               className="text-2xl font-bold text-text-primary"
               style={{ fontFamily: "var(--font-serif)" }}
             >
-              Multi-Platform Ready
+              Multi-Platform Content
             </p>
             <p className="text-sm text-text-muted mt-1">
-              Plan content for Instagram, TikTok, YouTube, LinkedIn, and more.
+              Generate content for Instagram, TikTok, YouTube, LinkedIn, and more.
             </p>
           </div>
         </Reveal>

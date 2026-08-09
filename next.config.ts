@@ -1,9 +1,16 @@
 import type { NextConfig } from "next";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+// Resolve the project root dynamically so the config is portable across
+// machines and CI. Previously this was hard-coded to a macOS user path
+// which broke builds everywhere except the original developer's machine.
+const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
   turbopack: {
-    root: "/Users/danielsmac/Documents/CoreOS/my-app",
+    root: projectRoot,
   },
   allowedDevOrigins: ["127.0.0.1", "localhost", "*.localhost", "127.0.0.1:*"],
   async headers() {

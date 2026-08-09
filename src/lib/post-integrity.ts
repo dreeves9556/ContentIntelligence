@@ -25,6 +25,7 @@ export class PostIntegrityError extends Error {
 }
 
 const CONTENT_FIELDS = [
+  "format",
   "title",
   "hook",
   "body",

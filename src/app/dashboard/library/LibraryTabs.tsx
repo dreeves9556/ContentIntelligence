@@ -74,7 +74,7 @@ export default function LibraryTabs({
             Your archive is empty
           </h2>
           <p className="text-text-muted max-w-sm text-sm">
-            Posts you mark as scheduled or posted from your calendar will appear here.
+            Posts you mark as posted from your calendar will appear here.
           </p>
         </div>
       ) : (

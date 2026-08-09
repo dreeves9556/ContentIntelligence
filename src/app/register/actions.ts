@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
@@ -68,6 +69,14 @@ export async function registerWithToken(
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Ownership invariant: Community subscriptions belong to Organization,
+    // Solo subscriptions belong to User. For community registrations, the
+    // Stripe fields are already on the Organization (set by the webhook) and
+    // must NOT be copied onto the User — copying them would make the cancel
+    // route treat the community sub as a solo sub and update the wrong record.
+    // For solo registrations (no org), the Stripe fields belong on the User.
+    const isCommunity = !!pendingInvite.organizationId;
+
     await prisma.$transaction([
       prisma.user.create({
         data: {
@@ -78,9 +87,9 @@ export async function registerWithToken(
           accountStatus: stripeStatusToAccountStatus((pendingInvite.stripeStatus ?? "active") as Stripe.Subscription.Status),
           isComped: false,
           organizationId: pendingInvite.organizationId ?? null,
-          stripeCustomerId: pendingInvite.stripeCustomerId,
-          stripeSubscriptionId: pendingInvite.stripeSubscriptionId,
-          stripeStatus: pendingInvite.stripeStatus,
+          stripeCustomerId: isCommunity ? null : pendingInvite.stripeCustomerId,
+          stripeSubscriptionId: isCommunity ? null : pendingInvite.stripeSubscriptionId,
+          stripeStatus: isCommunity ? null : pendingInvite.stripeStatus,
           hasUsedTrial: pendingInvite.hasUsedTrial,
           trialEndsAt: pendingInvite.trialEndsAt,
         },
@@ -88,9 +97,16 @@ export async function registerWithToken(
       prisma.pendingStripeInvite.delete({ where: { token } }),
     ]);
 
-    sendSignupNotification(pendingInvite.email, "self-registration").catch((err) =>
-      console.error("[SIGNUP NOTIFICATION] Failed:", err)
-    );
+    // Wrap in after() so the notification email is guaranteed to send even
+    // after the redirect response is sent. Previously fire-and-forget could
+    // be dropped when the serverless function terminated after signIn redirect.
+    after(async () => {
+      try {
+        await sendSignupNotification(pendingInvite.email, "self-registration");
+      } catch (err) {
+        console.error("[SIGNUP NOTIFICATION] Failed:", err);
+      }
+    });
 
     // Sign in the newly created user so the session cookie is set before
     // redirecting to onboarding. Without this, /api/questionnaire rejects
@@ -165,9 +181,13 @@ export async function registerWithToken(
     prisma.inviteToken.delete({ where: { token } }),
   ]);
 
-  sendSignupNotification(invite.email, "self-registration").catch((err) =>
-    console.error("[SIGNUP NOTIFICATION] Failed:", err)
-  );
+  after(async () => {
+    try {
+      await sendSignupNotification(invite.email, "self-registration");
+    } catch (err) {
+      console.error("[SIGNUP NOTIFICATION] Failed:", err);
+    }
+  });
 
   try {
     await signIn("credentials", {

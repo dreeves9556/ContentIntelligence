@@ -52,7 +52,6 @@ export async function POST(request: Request) {
       id: true,
       email: true,
       role: true,
-      stripeCustomerId: true,
       organizationId: true,
     },
   });
@@ -103,14 +102,19 @@ export async function POST(request: Request) {
   };
 
   try {
+    // Always use customer_email (not customer) for switch-to-solo. The
+    // community admin's Stripe customer ID lives on the Organization, not
+    // the User. Reusing it would attach the new solo subscription to the
+    // org's customer, breaking the separation between community and solo
+    // billing. Using email ensures Stripe creates a new customer (or
+    // reuses the user's existing solo customer if they had one before).
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/dashboard/billing?success=1`,
       cancel_url: `${appUrl}/dashboard/billing?canceled=1`,
       client_reference_id: user.id,
-      customer_email: user.stripeCustomerId ? undefined : (user.email ?? undefined),
-      customer: user.stripeCustomerId ?? undefined,
+      customer_email: user.email ?? undefined,
       subscription_data: { metadata },
       metadata,
       allow_promotion_codes: true,

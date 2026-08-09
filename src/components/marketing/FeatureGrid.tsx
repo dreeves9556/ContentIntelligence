@@ -28,9 +28,9 @@ const FEATURES = [
   },
   {
     icon: Share2,
-    title: "Multi-Platform Publishing",
+    title: "Social Account Sync",
     description:
-      "Connect your social accounts in one place. Plan and schedule across all your platforms from a single dashboard.",
+      "Connect your Instagram, TikTok, YouTube, and LinkedIn accounts to automatically sync engagement data back into your calendar.",
   },
   {
     icon: Settings,

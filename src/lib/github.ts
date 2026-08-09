@@ -1,4 +1,5 @@
 import type { ChangelogType } from "@prisma/client";
+import * as crypto from "crypto";
 
 export const GITHUB_REPO = "dreeves9556/ContentIntelligence";
 export const GITHUB_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}/commits`;
@@ -57,7 +58,6 @@ export function parseCommitBody(message: string): string {
  * Verify GitHub webhook signature using HMAC-SHA256.
  */
 export function verifyGithubSignature(payload: string, signature: string, secret: string): boolean {
-  const crypto = require("crypto") as typeof import("crypto");
   const expected = "sha256=" + crypto.createHmac("sha256", secret).update(payload).digest("hex");
   // Timing-safe comparison
   if (expected.length !== signature.length) return false;

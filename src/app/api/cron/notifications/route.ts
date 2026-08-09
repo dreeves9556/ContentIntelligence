@@ -26,14 +26,13 @@ function verifyCronAuth(request: Request): boolean {
 // For each user with a calendar, check if today matches a posting day
 // and send a reminder with the content for that day.
 async function runPostingReminders(): Promise<number> {
-  const today = new Date();
-  const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
+  const now = new Date();
 
   // Find all users who have a calendar with content for today
   const calendars = await prisma.calendar.findMany({
     where: {
       createdAt: {
-        gte: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000),
+        gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
       },
     },
     orderBy: { createdAt: "desc" },
@@ -45,6 +44,13 @@ async function runPostingReminders(): Promise<number> {
   // Deduplicate by user (only latest calendar per user)
   const seenUsers = new Set<string>();
   let sent = 0;
+
+  // TODO: User timezone is not stored on the User model. Until it is,
+  // reminders use the server's timezone. The per-user/per-day dedup below
+  // prevents duplicate reminders if cron runs multiple times per day.
+  const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
 
   for (const cal of calendars) {
     if (seenUsers.has(cal.userId)) continue;
@@ -59,6 +65,19 @@ async function runPostingReminders(): Promise<number> {
     );
 
     if (todayContent) {
+      // Per-user/per-day dedup: check if we already sent a posting
+      // reminder for this user today. Previously dedup was only per-cron-run
+      // (via seenUsers Set), so multiple cron runs per day would send
+      // multiple reminders to the same user.
+      const existing = await prisma.notificationLog.findFirst({
+        where: {
+          userId: cal.userId,
+          type: "posting_reminder",
+          createdAt: { gte: todayStart },
+        },
+      });
+      if (existing) continue;
+
       try {
         await sendPostingReminder(
           cal.userId,
@@ -203,10 +222,30 @@ async function runWeeklyDigest(): Promise<number> {
 
 // ─── Scheduled Admin Push Notifications ─────────────────────────────
 async function runScheduledPushes(): Promise<{ processed: number; sent: number; failed: number }> {
-  const duePushes = await prisma.scheduledPushNotification.findMany({
+  // Atomically claim due pushes by updating PENDING → PROCESSING in a single
+  // updateMany. This prevents concurrent cron workers from both fetching the
+  // same PENDING pushes and double-sending. Previously findMany + update was
+  // non-atomic — two workers could fetch the same rows before either updated.
+  const now = new Date();
+  const claimResult = await prisma.scheduledPushNotification.updateMany({
     where: {
       status: "PENDING",
-      scheduledFor: { lte: new Date() },
+      scheduledFor: { lte: now },
+    },
+    data: {
+      status: "PROCESSING",
+    },
+  });
+
+  if (claimResult.count === 0) {
+    return { processed: 0, sent: 0, failed: 0 };
+  }
+
+  // Fetch the rows we claimed (now in PROCESSING status)
+  const claimedPushes = await prisma.scheduledPushNotification.findMany({
+    where: {
+      status: "PROCESSING",
+      scheduledFor: { lte: now },
     },
     orderBy: { scheduledFor: "asc" },
     take: 20,
@@ -216,7 +255,7 @@ async function runScheduledPushes(): Promise<{ processed: number; sent: number; 
   let totalSent = 0;
   let totalFailed = 0;
 
-  for (const push of duePushes) {
+  for (const push of claimedPushes) {
     processed++;
     try {
       const result = await sendBroadcastToSegment(

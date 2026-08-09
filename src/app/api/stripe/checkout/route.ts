@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, email: true, stripeCustomerId: true, stripeSubscriptionId: true, plan: true, accountStatus: true, isComped: true, hasUsedTrial: true, role: true },
+    select: { id: true, email: true, stripeCustomerId: true, stripeSubscriptionId: true, plan: true, accountStatus: true, isComped: true, hasUsedTrial: true, role: true, organizationId: true },
   });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -104,6 +104,24 @@ export async function POST(request: Request) {
       { error: "You already have an active subscription. Use the billing portal to manage it." },
       { status: 400 }
     );
+  }
+
+  // Block re-purchase for TEAM_ADMINs whose organization already has an
+  // active subscription. The user-level guard above only checks
+  // User.stripeSubscriptionId, which is null for community members (the
+  // subscription lives on the Organization). Without this check, a TEAM_ADMIN
+  // with an active org subscription could start a duplicate checkout.
+  if (user.role === "TEAM_ADMIN" && user.organizationId) {
+    const org = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { stripeSubscriptionId: true },
+    });
+    if (org?.stripeSubscriptionId) {
+      return NextResponse.json(
+        { error: "Your community already has an active subscription. Use the billing portal to manage it." },
+        { status: 400 }
+      );
+    }
   }
 
   const stripe = getStripe();

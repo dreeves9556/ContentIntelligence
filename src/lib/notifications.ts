@@ -193,23 +193,31 @@ export async function checkAndSendAnalyticsMilestone(
   views: number,
   platform: string
 ): Promise<SendResult | null> {
-  const milestone = MILESTONES.find((m) => views >= m);
+  // Select the HIGHEST milestone the views qualify for, not the lowest.
+  // Previously MILESTONES.find() returned the first match (1K for a 100K post).
+  const milestone = [...MILESTONES].reverse().find((m) => views >= m);
   if (!milestone) return null;
 
-  // Check if we already sent a milestone notification for this post + milestone
+  // Check if we already sent THIS specific milestone for this post.
+  // Previously the dedup checked for ANY analytics_milestone notification
+  // for the post in the last 7 days, which blocked higher thresholds once
+  // the lowest was sent. Now we check for the specific milestone value in
+  // the title so each threshold can fire independently.
+  const formatted = milestone >= 1_000_000 ? `${milestone / 1_000_000}M` : `${milestone / 1000}K`;
+  const milestoneTitle = `${formatted} views!`;
+
   const existing = await prisma.notificationLog.findFirst({
     where: {
       userId,
       type: "analytics_milestone",
+      title: milestoneTitle,
       body: { contains: postTitle.slice(0, 40) },
-      createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
     },
   });
   if (existing) return null;
 
-  const formatted = milestone >= 1_000_000 ? `${milestone / 1_000_000}M` : `${milestone / 1000}K`;
   return sendNotificationToUser(userId, "analytics_milestone", {
-    title: `${formatted} views!`,
+    title: milestoneTitle,
     body: `Your ${platform} post "${postTitle}" just hit ${formatted} views. Keep the momentum going.`,
     tag: "analytics-milestone",
     url: "/dashboard/analytics",

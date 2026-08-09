@@ -512,8 +512,11 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const stripeStatus = subscription.status;
 
-  // Check if user already exists
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  // Check if user already exists (case-insensitive — the email from Stripe
+  // may differ in casing from what the user typed at registration)
+  const existingUser = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
 
   if (purchaseType === "community") {
     // Create or update organization (idempotent by stripeCustomerId/stripeSubscriptionId)

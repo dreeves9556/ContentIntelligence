@@ -34,6 +34,8 @@ export async function POST(request: Request) {
 
   let event: {
     type?: string;
+    eventId?: string;
+    id?: string;
     accountId?: string;
     profileId?: string;
     platform?: string;
@@ -53,6 +55,53 @@ export async function POST(request: Request) {
   const eventType = event.type;
   if (!eventType) {
     return NextResponse.json({ error: "Missing event type" }, { status: 400 });
+  }
+
+  // ── Idempotency: deduplicate webhook deliveries ──────────────────────
+  // Zernio may redeliver events on timeout/5xx. Without dedup, each
+  // redelivery sends a duplicate push notification. Use the provider's
+  // eventId/id if present, otherwise derive a deterministic key from the
+  // event payload so identical redeliverions map to the same row.
+  const eventId = event.eventId ?? event.id ?? crypto
+    .createHash("sha256")
+    .update(body)
+    .digest("hex")
+    .slice(0, 64);
+
+  const existingEvent = await prisma.zernioEvent.findUnique({
+    where: { eventId },
+    select: { status: true },
+  });
+
+  if (existingEvent?.status === "SUCCEEDED") {
+    // Already processed — acknowledge without re-sending notifications.
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
+  if (existingEvent?.status === "PROCESSING") {
+    // Another worker is handling this event — acknowledge to stop redelivery.
+    return NextResponse.json({ ok: true, inProgress: true });
+  }
+
+  // Claim the event (insert new, or re-claim a FAILED one).
+  if (existingEvent?.status === "FAILED") {
+    await prisma.zernioEvent.update({
+      where: { eventId },
+      data: { status: "PROCESSING", attempts: { increment: 1 }, claimedAt: new Date() },
+    });
+  } else {
+    try {
+      await prisma.zernioEvent.create({
+        data: { eventId, eventType, status: "PROCESSING" },
+      });
+    } catch (err) {
+      // P2002 = another worker inserted first; acknowledge to stop redelivery.
+      const prismaErr = err as { code?: string };
+      if (prismaErr.code === "P2002") {
+        return NextResponse.json({ ok: true, duplicate: true });
+      }
+      throw err;
+    }
   }
 
   // Find the user by Zernio account ID or profile ID
@@ -80,6 +129,11 @@ export async function POST(request: Request) {
 
   if (!userId) {
     console.warn(`[ZERNIO WEBHOOK] No user found for event ${eventType}`, { accountId: event.accountId, profileId: event.profileId });
+    // Mark as SUCCEEDED — no user to notify, no point retrying.
+    await prisma.zernioEvent.update({
+      where: { eventId },
+      data: { status: "SUCCEEDED", processedAt: new Date() },
+    }).catch((err) => console.error("[ZERNIO WEBHOOK] Failed to mark event SUCCEEDED:", err));
     return NextResponse.json({ ok: true, message: "No matching user" });
   }
 
@@ -108,8 +162,17 @@ export async function POST(request: Request) {
       default:
         console.log(`[ZERNIO WEBHOOK] Unhandled event type: ${eventType}`);
     }
+
+    await prisma.zernioEvent.update({
+      where: { eventId },
+      data: { status: "SUCCEEDED", processedAt: new Date() },
+    }).catch((err) => console.error("[ZERNIO WEBHOOK] Failed to mark event SUCCEEDED:", err));
   } catch (err) {
     console.error(`[ZERNIO WEBHOOK] Failed to process ${eventType}:`, err);
+    await prisma.zernioEvent.update({
+      where: { eventId },
+      data: { status: "FAILED", lastError: String(err).slice(0, 500) },
+    }).catch((e) => console.error("[ZERNIO WEBHOOK] Failed to mark event FAILED:", e));
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 

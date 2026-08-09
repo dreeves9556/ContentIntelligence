@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Debug/inspection scripts — not part of the app, excluded from tsconfig too.
+    "scripts/**",
   ]),
 ]);
 

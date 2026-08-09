@@ -2,6 +2,7 @@
 
 import { randomBytes } from "crypto";
 import { Resend } from "resend";
+import { after } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -155,9 +156,13 @@ export async function createClientProfile(
 
   const emailSent = await sendOnboardingEmail(normalizedEmail);
 
-  sendSignupNotification(normalizedEmail, "admin-add").catch((err) =>
-    console.error("[SIGNUP NOTIFICATION] Failed:", err)
-  );
+  after(async () => {
+    try {
+      await sendSignupNotification(normalizedEmail, "admin-add");
+    } catch (err) {
+      console.error("[SIGNUP NOTIFICATION] Failed:", err);
+    }
+  });
 
   return { error: emailSent ? undefined : "Account created, but welcome email failed to send. The user can request a password reset from the login page." };
 }
@@ -337,9 +342,13 @@ export async function bulkCreateInvites(
   }
 
   if (addedEmails.length > 0) {
-    sendBulkSignupNotification(addedEmails, "admin-bulk-add").catch((err) =>
-      console.error("[BULK SIGNUP NOTIFICATION] Failed:", err)
-    );
+    after(async () => {
+      try {
+        await sendBulkSignupNotification(addedEmails, "admin-bulk-add");
+      } catch (err) {
+        console.error("[BULK SIGNUP NOTIFICATION] Failed:", err);
+      }
+    });
   }
 
   return { results };

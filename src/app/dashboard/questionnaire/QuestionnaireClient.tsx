@@ -825,13 +825,10 @@ function AccordionRow({
   id?: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!id) return;
-    if (typeof window === "undefined") return;
-    if (window.location.hash === `#${id}`) setOpen(true);
-  }, [id]);
+  const [open, setOpen] = useState(() => {
+    if (!id || typeof window === "undefined") return false;
+    return window.location.hash === `#${id}`;
+  });
 
   return (
     <div id={id} className="rounded-2xl border border-border-primary bg-background-card overflow-hidden scroll-mt-24">

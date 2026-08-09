@@ -40,6 +40,7 @@ function expectThrow<T extends Error>(
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
 const baseFields = {
+  format: "Reel",
   title: "5 things I learned selling my first chart",
   hook: "I thought I knew the market.",
   body: "Here is the body text.",

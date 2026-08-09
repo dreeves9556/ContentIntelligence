@@ -53,18 +53,22 @@ export async function POST() {
     },
   });
 
-  let stripeCustomerId = user?.stripeCustomerId ?? null;
+  // For community members, the Stripe customer lives on the Organization.
+  // Check the org FIRST so stale user-level Stripe fields (from the
+  // pre-Finding-3 bug) don't cause us to use the wrong customer ID.
+  let stripeCustomerId: string | null = null;
 
-  if (
-    !stripeCustomerId &&
-    user?.organizationId &&
-    (user.role === "TEAM_ADMIN" || user.role === "ADMIN")
-  ) {
+  if (user?.organizationId && (user.role === "TEAM_ADMIN" || user.role === "ADMIN")) {
     const organization = await prisma.organization.findUnique({
       where: { id: user.organizationId },
       select: { stripeCustomerId: true },
     });
     stripeCustomerId = organization?.stripeCustomerId ?? null;
+  }
+
+  // Fall back to user-level customer ID for solo subscribers
+  if (!stripeCustomerId && !user?.organizationId) {
+    stripeCustomerId = user?.stripeCustomerId ?? null;
   }
 
   if (!stripeCustomerId) {

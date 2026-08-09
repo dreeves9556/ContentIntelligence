@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
 import { dismissLoginAnnouncement, type LoginAnnouncementData } from "@/app/admin/announcements/login-actions";
 
@@ -15,11 +15,9 @@ export function LoginAnnouncementModal({
 
   const current = announcements[index];
 
-  useEffect(() => {
-    if (announcements.length === 0) {
-      setVisible(false);
-    }
-  }, [announcements.length]);
+  // Hide when there are no announcements — derived during render instead of
+  // an effect to avoid the set-state-in-effect anti-pattern.
+  if (announcements.length === 0) return null;
 
   if (!visible || !current) return null;
 

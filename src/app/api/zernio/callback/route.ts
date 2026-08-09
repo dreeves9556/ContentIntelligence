@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
 import { revalidatePath } from "next/cache";
@@ -75,8 +75,15 @@ export async function GET(req: NextRequest) {
 
     revalidatePath("/dashboard/calendar");
 
-    ensureBaselineForUserPlatform(userId, platform).catch((err) => {
-      console.error(`[impact] baseline creation failed for ${userId}/${platform}:`, err);
+    // Wrapped in after() so the work is guaranteed to complete even after
+    // the redirect response is sent — previously fire-and-forget could be
+    // dropped when the serverless function terminated.
+    after(async () => {
+      try {
+        await ensureBaselineForUserPlatform(userId, platform);
+      } catch (err) {
+        console.error(`[impact] baseline creation failed for ${userId}/${platform}:`, err);
+      }
     });
 
     return NextResponse.redirect(
