@@ -65,7 +65,6 @@ import { buildBudgetedPrompt, type PromptBlock, type BudgetedBlockMetadata } fro
 import {
   decideCalendarClaim,
   isValidCalendarRequestId,
-  CALENDAR_CLAIM_LEASE_MS as CLAIM_LEASE_MS,
   CALENDAR_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL_MS,
   type CalendarClaimExistingRow,
 } from "@/lib/calendar-claim-service";

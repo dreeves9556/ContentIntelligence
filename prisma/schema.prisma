@@ -666,22 +666,35 @@ model Organization {
 // attempt uses a fresh key. Compensation uses a separate key
 // (`seat_reconcile_comp_${id}_${attempts}`).
 model SeatReconciliationOperation {
-  id                       String   @id @default(cuid())
-  requestId                String   @unique
-  organizationId           String
-  actorUserId              String
-  originalSeatLimit        Int
-  originalStripeQuantity   Int?
-  targetSeats              Int
-  memberActionsJson        Json
-  status                   String   @default("PENDING")
-  attempts                 Int      @default(0)
-  claimToken               String?
-  claimedAt                DateTime?
-  completedAt              DateTime?
-  lastError                String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  requestId                 String   @unique
+  organizationId            String
+  actorUserId               String
+  originalSeatLimit         Int
+  originalStripeQuantity    Int?
+  targetSeats               Int
+  memberActionsJson         Json
+  status                    String   @default("PENDING")
+  attempts                  Int      @default(0)
+  claimToken                String?
+  claimedAt                 DateTime?
+  completedAt               DateTime?
+  lastError                 String?
+  // Persisted Stripe idempotency keys — one per logical provider mutation.
+  // Reused across retries, stale reclaims, and unknown-outcome retries so the
+  // same logical mutation never sends two different keys to Stripe.
+  mainIdempotencyKey        String?
+  compensationIdempotencyKey String?
+  // Admin recovery fields (migration 20260804200000).
+  recoveryIdempotencyKey    String?
+  recoveryClaimToken        String?
+  recoveryClaimedAt         DateTime?
+  resolvedAt                DateTime?
+  resolvedByUserId          String?
+  resolutionType            String?
+  resolutionSummary         String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   @@index([organizationId, status])
   @@index([status, claimedAt])

@@ -9,15 +9,12 @@
 import {
   executeSeatReconciliation,
   validateSeatReduction,
-  decideClaim,
   type SeatReconciliationDeps,
   type SeatReconciliationPrisma,
   type SeatReconciliationOpRow,
   type SeatStripeClient,
   type SeatValidationUser,
-  SeatReconciliationStatus,
 } from "../seat-reconciliation-service";
-import type { Prisma } from "@prisma/client";
 
 let failures = 0;
 function assert(condition: boolean, label: string): void {
@@ -62,8 +59,7 @@ class FakePrisma implements SeatReconciliationPrisma {
   stripeUpdateCalls: { id: string; quantity: number; idempotencyKey?: string }[] = [];
 
   async $transaction<T>(
-    fn: (tx: SeatReconciliationTx) => Promise<T>,
-    opts?: { isolationLevel?: "Serializable" }
+    fn: (tx: SeatReconciliationTx) => Promise<T>
   ): Promise<T> {
     const tx: SeatReconciliationTx = {
       user: {
@@ -131,6 +127,17 @@ class FakePrisma implements SeatReconciliationPrisma {
         claimedAt: args.data.claimedAt,
         completedAt: null,
         lastError: null,
+        mainIdempotencyKey: args.data.mainIdempotencyKey ?? null,
+        compensationIdempotencyKey: null,
+        recoveryIdempotencyKey: null,
+        recoveryClaimToken: null,
+        recoveryClaimedAt: null,
+        resolvedAt: null,
+        resolvedByUserId: null,
+        resolutionType: null,
+        resolutionSummary: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
       if (this.opsByRequestId.has(args.data.requestId)) {
         const err = new Error("P2002") as Error & { code: string };
@@ -154,6 +161,15 @@ class FakePrisma implements SeatReconciliationPrisma {
       if (args.where.claimToken !== undefined && row.claimToken !== args.where.claimToken) {
         return { count: 0 };
       }
+      if (args.where.recoveryClaimToken !== undefined) {
+        const whereToken = args.where.recoveryClaimToken;
+        if (whereToken === null && row.recoveryClaimToken !== null) {
+          return { count: 0 };
+        }
+        if (whereToken !== null && row.recoveryClaimToken !== whereToken) {
+          return { count: 0 };
+        }
+      }
       if (args.where.status !== undefined && row.status !== args.where.status) {
         return { count: 0 };
       }
@@ -167,6 +183,15 @@ class FakePrisma implements SeatReconciliationPrisma {
       if (data.originalStripeQuantity !== undefined) row.originalStripeQuantity = data.originalStripeQuantity;
       if (data.status !== undefined) row.status = data.status;
       if (data.completedAt !== undefined) row.completedAt = data.completedAt;
+      if (data.mainIdempotencyKey !== undefined) row.mainIdempotencyKey = data.mainIdempotencyKey;
+      if (data.compensationIdempotencyKey !== undefined) row.compensationIdempotencyKey = data.compensationIdempotencyKey;
+      if (data.recoveryIdempotencyKey !== undefined) row.recoveryIdempotencyKey = data.recoveryIdempotencyKey;
+      if (data.recoveryClaimToken !== undefined) row.recoveryClaimToken = data.recoveryClaimToken;
+      if (data.recoveryClaimedAt !== undefined) row.recoveryClaimedAt = data.recoveryClaimedAt;
+      if (data.resolvedAt !== undefined) row.resolvedAt = data.resolvedAt;
+      if (data.resolvedByUserId !== undefined) row.resolvedByUserId = data.resolvedByUserId;
+      if (data.resolutionType !== undefined) row.resolutionType = data.resolutionType;
+      if (data.resolutionSummary !== undefined) row.resolutionSummary = data.resolutionSummary;
       if (data.attempts !== undefined && typeof data.attempts === "object") {
         row.attempts += (data.attempts as { increment: number }).increment;
       }
@@ -231,7 +256,7 @@ class FakeStripe implements SeatStripeClient {
     this.prisma = prisma;
   }
   subscriptions = {
-    retrieve: async (id: string) => ({
+    retrieve: async () => ({
       items: {
         data: [{ id: "item_1", quantity: this.prisma.stripeQuantity }],
       },

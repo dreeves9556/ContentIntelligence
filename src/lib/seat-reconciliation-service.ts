@@ -28,10 +28,20 @@
  *     - fresh in-progress → returns "in progress".
  *     - stale in-progress → re-claimed with a new attempt.
  *
- *  5. The Stripe reduction uses an attempt-scoped idempotency key
- *     `seat_reconcile_main_${id}_${attempts}` so a transport retry within the
- *     same attempt does not double-charge. Compensation uses
- *     `seat_reconcile_comp_${id}_${attempts}`.
+ *  5. The Stripe reduction uses a PERSISTED idempotency key generated once at
+ *     op creation and reused across retries, stale reclaims, and unknown-outcome
+ *     retries. Compensation uses a separate persisted key derived from the main
+ *     key. Neither key is derived from the attempt counter (which changes on
+ *     stale reclaim). See migration 20260804200000 for the persisted key columns.
+ *
+ *  6. `originalStripeQuantity` and `originalSeatLimit` are IMMUTABLE after first
+ *     set. They are captured once before the first Stripe mutation and never
+ *     overwritten on retry. This preserves recovery evidence.
+ *
+ *  7. Before applying DB changes, the orchestrator verifies the LIVE Stripe
+ *     quantity equals `targetSeats`. After compensation, it verifies the live
+ *     quantity equals `originalStripeQuantity`. This catches unknown-outcome
+ *     crashes where Stripe may or may not have been mutated.
  *
  * Transaction-isolation and true concurrency guarantees require a real
  * PostgreSQL integration test (Serializable isolation, conditional
@@ -112,6 +122,19 @@ export interface SeatReconciliationOpRow {
   claimedAt: Date | null;
   completedAt: Date | null;
   lastError: string | null;
+  // Persisted idempotency keys (migration 20260804200000).
+  mainIdempotencyKey: string | null;
+  compensationIdempotencyKey: string | null;
+  // Admin recovery fields (migration 20260804200000).
+  recoveryIdempotencyKey: string | null;
+  recoveryClaimToken: string | null;
+  recoveryClaimedAt: Date | null;
+  resolvedAt: Date | null;
+  resolvedByUserId: string | null;
+  resolutionType: string | null;
+  resolutionSummary: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -137,6 +160,7 @@ export interface SeatReconciliationPrisma {
         attempts: number;
         claimToken: string;
         claimedAt: Date;
+        mainIdempotencyKey?: string;
       };
     }): Promise<SeatReconciliationOpRow>;
     findUnique(args: {
@@ -145,7 +169,12 @@ export interface SeatReconciliationPrisma {
         | { id: string };
     }): Promise<SeatReconciliationOpRow | null>;
     updateMany(args: {
-      where: { id: string; claimToken?: string; status?: SeatReconciliationStatus };
+      where: {
+        id: string;
+        claimToken?: string | null;
+        status?: SeatReconciliationStatus;
+        recoveryClaimToken?: string | null;
+      };
       data: {
         claimToken?: string | null;
         claimedAt?: Date;
@@ -157,6 +186,15 @@ export interface SeatReconciliationPrisma {
         status?: SeatReconciliationStatus;
         completedAt?: Date | null;
         attempts?: { increment: number };
+        mainIdempotencyKey?: string;
+        compensationIdempotencyKey?: string;
+        recoveryIdempotencyKey?: string;
+        recoveryClaimToken?: string | null;
+        recoveryClaimedAt?: Date | null;
+        resolvedAt?: Date;
+        resolvedByUserId?: string;
+        resolutionType?: string;
+        resolutionSummary?: string;
       };
     }): Promise<{ count: number }>;
   };
@@ -425,6 +463,10 @@ export async function executeSeatReconciliation(
   // ── 1. Claim or resume the durable operation row ──────────────────────
   const claimToken = uuid();
   const claimNow = now();
+  // Generate the main idempotency key now so it is persisted with the op row.
+  // On a retry/stale-reclaim, the existing key is reused — never derived from
+  // the attempt counter (which changes on stale reclaim).
+  const mainIdempotencyKey = `seat_reconcile_main_${uuid()}`;
 
   let op: SeatReconciliationOpRow;
   try {
@@ -441,6 +483,7 @@ export async function executeSeatReconciliation(
         attempts: 1,
         claimToken,
         claimedAt: claimNow,
+        mainIdempotencyKey,
       },
     });
   } catch (err) {
@@ -467,6 +510,7 @@ export async function executeSeatReconciliation(
           attempts: 1,
           claimToken,
           claimedAt: claimNow,
+          mainIdempotencyKey,
         },
       });
     } else {
@@ -507,6 +551,8 @@ export async function executeSeatReconciliation(
       }
 
       // decision.kind === "claimed" → re-claim with a new token + attempt.
+      // CRITICAL: do NOT overwrite mainIdempotencyKey, originalStripeQuantity,
+      // or originalSeatLimit — those are immutable after first set.
       const reClaim = await prisma.seatReconciliationOperation.updateMany({
         where: {
           id: existing.id,
@@ -538,7 +584,8 @@ export async function executeSeatReconciliation(
   }
 
   // From here, this worker holds `claimToken` on `op`.
-  const attempt = op.attempts;
+  // Use the persisted mainIdempotencyKey (from the op row, not the local var).
+  const persistedMainKey = op.mainIdempotencyKey ?? mainIdempotencyKey;
 
   // ── 2. Validate against CURRENT db state ──────────────────────────────
   const allTargetIds = Object.keys(memberActions);
@@ -582,8 +629,8 @@ export async function executeSeatReconciliation(
     return { success: false, error: validation.error };
   }
 
-  // ── 3. Read the original Stripe quantity ──────────────────────────────
-  let originalStripeQuantity: number | null;
+  // ── 3. Read the current Stripe subscription ───────────────────────────
+  let currentStripeQuantity: number | null;
   let itemId: string;
   try {
     const subscription = await stripe.subscriptions.retrieve(freshOrg.stripeSubscriptionId as string);
@@ -593,7 +640,7 @@ export async function executeSeatReconciliation(
       return { success: false, error: "Could not find subscription item to update. Contact support." };
     }
     itemId = item.id;
-    originalStripeQuantity = item.quantity;
+    currentStripeQuantity = item.quantity;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Stripe retrieve failed";
     await markFailed(prisma, op, claimToken, now(), msg);
@@ -603,18 +650,50 @@ export async function executeSeatReconciliation(
     };
   }
 
-  // Persist the original quantity + fresh seatLimit on the op row (durable
-  // evidence for compensation / recovery).
-  await prisma.seatReconciliationOperation.updateMany({
-    where: { id: op.id, claimToken, status: "PENDING" },
-    data: {
-      originalSeatLimit: freshOrg.seatLimit,
-      originalStripeQuantity,
-    },
-  });
+  // ── 3b. Persist original snapshot (IMMUTABLE — set only if NULL) ──────
+  //
+  // The original Stripe quantity is captured ONCE, before the first Stripe
+  // mutation. On retry/stale-reclaim, the stored value is preserved — we
+  // never overwrite it with the current (possibly already reduced) Stripe
+  // quantity. This is the durable evidence for compensation and admin recovery.
+  //
+  // originalSeatLimit was set at create time and is never overwritten.
+  if (op.originalStripeQuantity === null && currentStripeQuantity !== null) {
+    const snapshotResult = await prisma.seatReconciliationOperation.updateMany({
+      where: { id: op.id, claimToken, status: "PENDING" },
+      data: { originalStripeQuantity: currentStripeQuantity },
+    });
+    if (snapshotResult.count === 0) {
+      return {
+        success: false,
+        inProgress: true,
+        error: "A seat reduction for this request is already in progress.",
+      };
+    }
+    // Re-read the op to get the canonical stored values.
+    op = (await prisma.seatReconciliationOperation.findUnique({
+      where: { id: op.id },
+    })) as SeatReconciliationOpRow;
+  }
 
-  // ── 4. Stripe reduction (attempt-scoped idempotency key) ──────────────
-  const mainIdempotencyKey = `seat_reconcile_main_${op.id}_${attempt}`;
+  // Use the STORED original values as canonical (not the local variable).
+  const originalStripeQuantity = op.originalStripeQuantity;
+  const originalSeatLimit = op.originalSeatLimit;
+
+  // Validate internal consistency.
+  if (originalStripeQuantity !== null && originalStripeQuantity < targetSeats) {
+    await markFailed(
+      prisma, op, claimToken, now(),
+      `Internal inconsistency: originalStripeQuantity (${originalStripeQuantity}) < targetSeats (${targetSeats}).`
+    );
+    return { success: false, error: "Internal inconsistency detected. Contact support." };
+  }
+
+  // ── 4. Stripe reduction (persisted idempotency key, reused on retry) ──
+  //
+  // The key was generated at create time and persisted. On retry/stale-reclaim,
+  // the same key is reused. If the first attempt timed out with an unknown
+  // outcome, Stripe deduplicates the retry to the same logical mutation.
   try {
     await stripe.subscriptions.update(
       freshOrg.stripeSubscriptionId as string,
@@ -623,20 +702,44 @@ export async function executeSeatReconciliation(
         proration_behavior: "none",
         metadata: {
           purchaseType: "community",
-          seatUpdate: `remove:${freshOrg.seatLimit}->${targetSeats}`,
+          seatUpdate: `remove:${originalSeatLimit}->${targetSeats}`,
           reconciliationOpId: op.id,
         },
       },
-      { idempotencyKey: mainIdempotencyKey }
+      { idempotencyKey: persistedMainKey }
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Stripe update failed";
-    // Stripe failed BEFORE any DB member change. Members untouched.
     await markFailed(prisma, op, claimToken, now(), msg);
     return {
       success: false,
       error:
         "Failed to update the Stripe subscription. No members were changed. Retry the seat reduction, or contact support.",
+    };
+  }
+
+  // ── 4b. Verify Stripe is at targetSeats before touching the DB ────────
+  let liveStripeQuantity: number;
+  try {
+    const liveSub = await stripe.subscriptions.retrieve(freshOrg.stripeSubscriptionId as string);
+    liveStripeQuantity = liveSub.items.data[0]?.quantity ?? -1;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Stripe retrieve failed";
+    await markFailed(prisma, op, claimToken, now(), `Post-update verify failed: ${msg}`);
+    return {
+      success: false,
+      error: "Failed to verify the Stripe subscription after the update. Retry, or contact support.",
+    };
+  }
+  if (liveStripeQuantity !== targetSeats) {
+    await markFailed(
+      prisma, op, claimToken, now(),
+      `Stripe quantity mismatch after update: expected ${targetSeats}, got ${liveStripeQuantity}.`
+    );
+    return {
+      success: false,
+      error:
+        "The Stripe subscription quantity does not match the target after the update. No members were changed. Contact support.",
     };
   }
 
@@ -687,11 +790,12 @@ export async function executeSeatReconciliation(
     const dbErr = err instanceof Error ? err.message : "DB transaction failed";
     const compResult = await compensateStripe(
       stripe,
+      prisma,
+      op,
       freshOrg.stripeSubscriptionId as string,
       itemId,
       originalStripeQuantity,
-      op.id,
-      attempt
+      persistedMainKey
     );
 
     if (compResult.ok) {
@@ -776,18 +880,31 @@ async function markFailed(
 
 async function compensateStripe(
   stripe: SeatStripeClient,
+  prisma: SeatReconciliationPrisma,
+  op: SeatReconciliationOpRow,
   subscriptionId: string,
   itemId: string,
   originalQuantity: number | null,
-  opId: string,
-  attempt: number
+  mainKey: string
 ): Promise<{ ok: boolean; error?: string }> {
   if (originalQuantity == null) {
-    // We never read the original quantity (retrieve failed before we stored
-    // it). We cannot safely compensate. Treat as recovery-required.
     return { ok: false, error: "original quantity unknown" };
   }
-  const compKey = `seat_reconcile_comp_${opId}_${attempt}`;
+
+  // Use a persisted compensation idempotency key. Generate one if not yet
+  // stored, then reuse on retry. Derived from the main key (not the attempt
+  // counter) so it is stable across retries.
+  let compKey = op.compensationIdempotencyKey;
+  if (!compKey) {
+    compKey = mainKey.replace("seat_reconcile_main_", "seat_reconcile_comp_");
+    await prisma.seatReconciliationOperation
+      .updateMany({
+        where: { id: op.id, status: "PENDING" },
+        data: { compensationIdempotencyKey: compKey },
+      })
+      .catch(() => {});
+  }
+
   try {
     await stripe.subscriptions.update(
       subscriptionId,
@@ -797,16 +914,37 @@ async function compensateStripe(
         metadata: {
           purchaseType: "community",
           seatUpdate: `compensate:->${originalQuantity}`,
-          reconciliationOpId: opId,
+          reconciliationOpId: op.id,
         },
       },
       { idempotencyKey: compKey }
     );
-    return { ok: true };
   } catch (err) {
     return {
       ok: false,
       error: err instanceof Error ? err.message : "compensation failed",
     };
   }
+
+  // Verify the live Stripe quantity equals the original after compensation.
+  let liveQuantity: number;
+  try {
+    const liveSub = await stripe.subscriptions.retrieve(subscriptionId);
+    liveQuantity = liveSub.items.data[0]?.quantity ?? -1;
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Compensation may have succeeded but verification failed: ${
+        err instanceof Error ? err.message : "retrieve failed"
+      }`,
+    };
+  }
+  if (liveQuantity !== originalQuantity) {
+    return {
+      ok: false,
+      error: `Stripe quantity ${liveQuantity} does not match original ${originalQuantity} after compensation`,
+    };
+  }
+
+  return { ok: true };
 }

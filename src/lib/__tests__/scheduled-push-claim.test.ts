@@ -15,7 +15,6 @@ export {};
 import {
   claimScheduledPushes,
   processClaimedScheduledPushes,
-  SCHEDULED_PUSH_BATCH_SIZE,
   SCHEDULED_PUSH_LEASE_MS,
   type ScheduledPushDeps,
   type ScheduledPushPrisma,

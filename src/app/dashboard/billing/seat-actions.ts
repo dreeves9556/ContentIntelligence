@@ -45,7 +45,7 @@ export async function getOrgMembersForReconciliation(): Promise<{
     where: {
       organizationId: ctx.user.organizationId,
       id: { not: ctx.user.id },
-      role: { not: "ADMIN" },
+      role: { notIn: ["ADMIN", "TEAM_ADMIN"] },
     },
     select: {
       id: true,

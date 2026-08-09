@@ -29,7 +29,7 @@ Each test file uses a local `assert(condition, label)` helper and sets `process.
 
 ### Known pre-existing tsc errors
 
-`scripts/` is excluded from `tsconfig.json` and `eslint.config.mjs` — debug scripts are not type-checked or linted. `npx tsc --noEmit` and `npm run lint` now report 0 errors in app code (57 pre-existing warnings, all unused-vars style).
+`scripts/` is excluded from `tsconfig.json` and `eslint.config.mjs` — debug scripts are not type-checked or linted. `npx tsc --noEmit` and `npm run lint` now report 0 errors in app code (57 pre-existing warnings, all unused-vars style). No new warnings are introduced by the seat-reconciliation or recovery changes.
 
 ### Prisma schema gotchas
 
@@ -38,7 +38,7 @@ Each test file uses a local `assert(condition, label)` helper and sets `process.
 - `PostVersion.format` is nullable — existing versions referenced by `Post.currentVersionId` were backfilled to the post's current format by migration `20260804160000`. Historical versions (not the current version) remain NULL; the read path (`versionToFields` in `post-refinement/actions.ts`) and `assertPostMatchesCurrentVersion` (in `post-integrity.ts`) interpret NULL as the post's current format. New versions always capture the real format.
 - `ScheduledPushNotification` has bounded recoverable claim state (`claimToken`, `claimedAt`, `attempts`, `lastError`) added by migration `20260804170000`. The cron route `/api/cron/scheduled-pushes` claims ≤20 rows per pass, processes only claimed rows, and reclaims stale PROCESSING rows after a 10-minute lease.
 - `ZernioEvent` has `claimToken` (migration `20260804180000`) for concurrency-safe claiming matching the Stripe webhook pattern.
-- `SeatReconciliationOperation` (migration `20260804190000`) is the durable, idempotent operation row for seat reductions. See "Seat reconciliation (durable)" below.
+- `SeatReconciliationOperation` (migration `20260804190000`) is the durable, idempotent operation row for seat reductions. Migration `20260804200000` adds persisted Stripe idempotency keys and admin-recovery audit fields. See "Seat reconciliation (durable)" below.
 - Partial unique indexes (e.g. `WHERE status = 'OPEN'`) aren't supported in `schema.prisma` — append them manually to the generated `migration.sql`.
 
 ### Stripe ownership invariant (critical)
@@ -55,7 +55,7 @@ Four crons are registered:
 
 ### Fire-and-forget background work
 
-Critical background tasks (memory learning, onboarding surveys, signup emails, analytics milestones, calendar strategy generation) are wrapped in `after()` from `next/server` to guarantee completion after the response is sent. Do NOT revert these to bare `.catch()` — serverless functions can terminate before unawaited promises resolve.
+Critical background tasks (memory learning, onboarding surveys, signup emails, analytics milestones, calendar strategy generation) are wrapped in `after()` from `next/server`. `after()` allows work to continue after the response is sent, but it is best-effort and is not durable job infrastructure; serverless termination can still interrupt it. Do NOT revert these to bare `.catch()` — `after()` extends the function lifetime to give background work a better chance of completing. For truly durable work, use database claims, leases, cron jobs, and retryable background processing.
 
 ### Context survey expiration (`src/lib/freshness.ts`)
 
@@ -134,9 +134,18 @@ fakes); the server action `reduceSeatsWithReconciliation` in
 4. A retry with the same `requestId` resumes the existing operation:
    COMPLETED → returns the existing successful result; RECOVERY_REQUIRED →
    returns a "contact support" error; FAILED → re-claims and re-runs.
-5. The Stripe reduction uses an attempt-scoped idempotency key
-   `seat_reconcile_main_${opId}_${attempt}`; compensation uses
-   `seat_reconcile_comp_${opId}_${attempt}`.
+5. The Stripe reduction uses a PERSISTED idempotency key generated once at op
+   creation and reused across retries, stale reclaims, and unknown-outcome
+   retries. Compensation uses a separate persisted key derived from the main
+   key. Neither key is derived from the attempt counter. See migration
+   `20260804200000` for the persisted key columns.
+6. `originalStripeQuantity` and `originalSeatLimit` are IMMUTABLE after first
+   set. They are captured once before the first Stripe mutation and never
+   overwritten on retry. This preserves recovery evidence.
+7. Before applying DB changes, the orchestrator verifies the LIVE Stripe
+   quantity equals `targetSeats`. After compensation, it verifies the live
+   quantity equals `originalStripeQuantity`. This catches unknown-outcome
+   crashes where Stripe may or may not have been mutated.
 
 **Admin recovery for a RECOVERY_REQUIRED operation:**
 
@@ -147,6 +156,44 @@ fakes); the server action `reduceSeatsWithReconciliation` in
    (or apply the intended `targetSeats` if the DB failure was transient and the
    admin wants to complete the reduction manually).
 4. Update the row status to `COMPLETED` or `FAILED` to clear the recovery flag.
+
+**Automated admin recovery (`/admin/seat-reconciliation`):**
+
+The admin recovery service (`src/lib/seat-recovery-service.ts`) provides a UI-driven
+workflow for resolving RECOVERY_REQUIRED operations. It is extracted as a DI service
+with the same Prisma/Stripe interfaces as the reconciliation service, so it is fully
+unit-testable with injected fakes.
+
+Authorization: every function requires a global ADMIN caller. TEAM_ADMIN and regular
+users are denied. The caller's role is passed as a parameter loaded from trusted
+server state by the server action (`src/app/admin/seat-reconciliation/actions.ts`).
+
+Recovery actions (admin chooses one):
+
+- `RESTORE_ORIGINAL`: restores the Stripe subscription to the original quantity.
+  DB members and seatLimit remain unchanged. Use when DB changes were never
+  committed. Verifies the live Stripe quantity equals `originalStripeQuantity`
+  after the mutation.
+- `COMPLETED_DB`: applies the DB member/seatLimit changes. Requires the live
+  Stripe quantity to equal `targetSeats` AND the membership state to be
+  compatible (seatLimit unchanged, selected users still in the org, no selected
+  user promoted to admin, active count matches). Blocks with a clear error if
+  state has drifted — the admin should use `RESTORE_ORIGINAL` instead.
+
+Concurrency: recovery uses a conditional claim (`recoveryClaimToken`) so two
+admins cannot resolve the same operation concurrently. Stale recovery claims
+are reclaimable after a 10-minute lease (`RECOVERY_LEASE_MS`). On failure, the
+claim is released so the same admin or another admin can retry.
+
+Idempotency: recovery uses a persisted `recoveryIdempotencyKey` (stored on the
+op row, generated once on first recovery attempt). Retries after a timeout
+reuse the same key — Stripe deduplicates the retry to the same logical
+mutation.
+
+Audit trail: `resolvedAt`, `resolvedByUserId`, `resolutionType`, and
+`resolutionSummary` are recorded on the op row. Recovery evidence
+(`originalStripeQuantity`, `originalSeatLimit`, `lastError`) is never deleted.
+A replay of a resolved operation returns idempotent success.
 
 The client (`SeatManager.tsx`) generates a UUID `requestId` per reconciliation
 attempt; a retry with the same `requestId` resumes the existing operation.
