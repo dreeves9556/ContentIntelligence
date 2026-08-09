@@ -244,6 +244,10 @@ function SeatReconciliationModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"select" | "confirm">("select");
+  // Stable per-attempt requestId. Generated once when the modal mounts; a
+  // retry with the same requestId resumes the existing durable operation on
+  // the server instead of creating a second reduction.
+  const [requestId] = useState(() => crypto.randomUUID());
 
   const mustSelect = memberCount - targetSeats;
   const selectedCount = Object.keys(selections).length;
@@ -282,13 +286,12 @@ function SeatReconciliationModal({
     setError(null);
 
     try {
-      // Single server-owned operation: the server archives/detaches the
-      // selected members, validates the active count fits the new seat
-      // count, updates the org seatLimit, and calls Stripe — all in one
-      // serialized transaction followed by the Stripe API call. The client
-      // no longer orchestrates multiple separate calls that can partially
-      // succeed and leave the org/subscription out of sync.
-      const res = await reduceSeatsWithReconciliation(targetSeats, selections);
+      // Single durable server-owned operation: the server calls Stripe FIRST,
+      // then archives/detaches members and updates seatLimit in one
+      // serializable transaction. If Stripe fails, no members are touched and
+      // the operation is retryable with the same requestId. If the DB fails
+      // after Stripe succeeds, Stripe is compensated to the original quantity.
+      const res = await reduceSeatsWithReconciliation(requestId, targetSeats, selections);
       if (!res.success) {
         setError(res.error || "Failed to reduce seats.");
         setSubmitting(false);

@@ -17,7 +17,8 @@
 --
 -- Safe because:
 -- - Only rows referenced by posts.currentVersionId are touched.
--- - Only NULL formats are set (COALESCE preserves any already-recorded format).
+-- - Only NULL formats are set (the WHERE ... IS NULL filter ensures any
+--   already-recorded format is preserved untouched).
 -- - The value is copied from the owning post's format, which is the canonical
 --   current state.
 -- - Historical versions are left NULL.

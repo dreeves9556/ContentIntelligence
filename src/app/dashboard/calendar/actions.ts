@@ -62,6 +62,14 @@ import {
   isContextSurveyExpired,
 } from "@/lib/freshness";
 import { buildBudgetedPrompt, type PromptBlock, type BudgetedBlockMetadata } from "@/lib/prompt-budget";
+import {
+  decideCalendarClaim,
+  isValidCalendarRequestId,
+  CALENDAR_CLAIM_LEASE_MS as CLAIM_LEASE_MS,
+  CALENDAR_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL_MS,
+  type CalendarClaimExistingRow,
+} from "@/lib/calendar-claim-service";
+import { replacePromptPlaceholders, replaceStrategySystemPlaceholders, type PromptPlaceholderContext } from "@/lib/prompt-placeholders";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -275,13 +283,17 @@ Write the strategy note now.`;
   const primaryGoal = (answers.primaryGoal ?? "").trim() || "Not specified";
   const antiBrandWords = (answers.antiBrandWords ?? "").trim() || "None specified";
 
-  const systemPrompt = (config.calendarStrategyPromptTemplate ?? CALENDAR_STRATEGY_SYSTEM_PROMPT)
-    .replace(/\{\{weekStarting\}\}/g, calendar.weekStarting)
-    .replace(/\{\{formatMix\}\}/g, formatMixStr)
-    .replace(/\{\{bucketMix\}\}/g, bucketMixStr)
-    .replace(/\{\{daySummary\}\}/g, daySummary)
-    .replace(/\{\{primaryGoal\}\}/g, primaryGoal)
-    .replace(/\{\{antiBrandWords\}\}/g, antiBrandWords);
+  const systemPrompt = replaceStrategySystemPlaceholders(
+    config.calendarStrategyPromptTemplate ?? CALENDAR_STRATEGY_SYSTEM_PROMPT,
+    {
+      weekStarting: calendar.weekStarting,
+      formatMix: formatMixStr,
+      bucketMix: bucketMixStr,
+      daySummary,
+      primaryGoal,
+      antiBrandWords,
+    }
+  );
 
   const userPrompt = defaultUserPrompt;
 
@@ -416,7 +428,7 @@ export async function generateWeeklyCalendar(
   // requestId) is removed — every real caller (CalendarGenerationShell)
   // generates a UUID client-side. A missing or malformed requestId would
   // bypass idempotency and allow duplicate generations.
-  if (!requestId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+  if (!isValidCalendarRequestId(requestId)) {
     return { success: false, error: "A valid requestId is required." };
   }
 
@@ -461,9 +473,8 @@ export async function generateWeeklyCalendar(
   // Previously rate limits, DB queries, RSS fetching, AI pre-calls, and
   // questionnaire mutations all occurred before this claim — wasting rate
   // limits, duplicating AI costs, and allowing race-losers to mutate data.
-  // See plan-f61b9b29c33f91cd.md for the full state machine.
-  const CLAIM_LEASE_MS = 120_000; // stale PROCESSING threshold
-  const HEARTBEAT_INTERVAL_MS = 30_000; // refresh claimedAt so a live worker is never reclaimed
+  // The pure decision logic lives in `decideCalendarClaim` (calendar-claim-service.ts)
+  // and is unit-tested there; this block performs the DB writes the decision prescribes.
   let claimLogId: string | null = null;
   let claimToken: string | null = null;
 
@@ -472,7 +483,8 @@ export async function generateWeeklyCalendar(
 
   const claimResult = await serializableTransaction(async (tx) => {
     // Try to insert a new PROCESSING claim. P2002 on @@unique([userId, requestId])
-    // means a row already exists — we re-read it below.
+    // means a row already exists — we re-read it and let decideCalendarClaim
+    // determine the correct action.
     try {
       const row = await tx.calendarGenerationLog.create({
         data: {
@@ -492,7 +504,7 @@ export async function generateWeeklyCalendar(
     } catch (err) {
       const prismaErr = err as { code?: string };
       if (prismaErr.code !== "P2002") throw err;
-      // Row exists — re-read the winner and decide.
+      // Row exists — re-read and delegate the decision to the pure helper.
       const existing = await tx.calendarGenerationLog.findUnique({
         where: { userId_requestId: { userId, requestId } },
       });
@@ -515,67 +527,51 @@ export async function generateWeeklyCalendar(
         return { kind: "claimed" as const, logId: row.id };
       }
 
-      if (existing.requestStatus === "COMPLETED") {
-        return {
-          kind: "completed" as const,
-          calendarId: existing.resultingCalendarId,
-        };
-      }
+      const decision = decideCalendarClaim(
+        existing as unknown as CalendarClaimExistingRow,
+        { requestId, userId, daysToPost, timezoneOffsetHours },
+        now
+      );
 
-      if (existing.requestStatus === "PROCESSING") {
-        const isStale =
-          existing.requestClaimedAt &&
-          now.getTime() - existing.requestClaimedAt.getTime() > CLAIM_LEASE_MS;
-        if (isStale) {
-          // Reclaim via optimistic lock on the old token.
-          const updated = await tx.calendarGenerationLog.updateMany({
-            where: {
-              id: existing.id,
-              requestClaimToken: existing.requestClaimToken,
-            },
-            data: {
-              requestClaimToken: newClaimToken,
-              requestClaimedAt: now,
-              requestAttempts: { increment: 1 },
-            },
-          });
+      switch (decision.kind) {
+        case "COMPLETED":
+          return { kind: "completed" as const, calendarId: decision.calendarId };
+        case "IN_PROGRESS":
+          return { kind: "in_progress" as const };
+        case "PARAM_MISMATCH":
+          return { kind: "param_mismatch" as const };
+        case "CLAIM_NEW":
+          // Unreachable inside the P2002 branch, but handle defensively.
+          return { kind: "in_progress" as const };
+        case "RECLAIM": {
+          // Reclaim via optimistic lock. The conditional where-clause depends
+          // on the from-status: for stale PROCESSING, lock on the old token;
+          // for FAILED, lock on the FAILED status.
+          const where =
+            decision.fromStatus === "PROCESSING"
+              ? { id: decision.rowId, requestClaimToken: existing.requestClaimToken }
+              : { id: decision.rowId, requestStatus: "FAILED" as const };
+          const data =
+            decision.fromStatus === "PROCESSING"
+              ? {
+                  requestClaimToken: newClaimToken,
+                  requestClaimedAt: now,
+                  requestAttempts: { increment: 1 },
+                }
+              : {
+                  requestStatus: "PROCESSING" as const,
+                  requestClaimToken: newClaimToken,
+                  requestClaimedAt: now,
+                  requestAttempts: { increment: 1 },
+                };
+          const updated = await tx.calendarGenerationLog.updateMany({ where, data });
           if (updated.count > 0) {
-            return { kind: "claimed" as const, logId: existing.id };
+            return { kind: "claimed" as const, logId: decision.rowId };
           }
           // Lost the race — another process reclaimed first.
           return { kind: "in_progress" as const };
         }
-        return { kind: "in_progress" as const };
       }
-
-      if (existing.requestStatus === "FAILED") {
-        // Validate inputs match the original request.
-        if (
-          existing.requestDaysToPost !== daysToPost ||
-          existing.requestTimezoneOffset !== timezoneOffsetHours ||
-          existing.requestUserId !== userId
-        ) {
-          return { kind: "param_mismatch" as const };
-        }
-        // Reclaim via optimistic lock on FAILED status.
-        const updated = await tx.calendarGenerationLog.updateMany({
-          where: { id: existing.id, requestStatus: "FAILED" },
-          data: {
-            requestStatus: "PROCESSING",
-            requestClaimToken: newClaimToken,
-            requestClaimedAt: now,
-            requestAttempts: { increment: 1 },
-          },
-        });
-        if (updated.count > 0) {
-          return { kind: "claimed" as const, logId: existing.id };
-        }
-        // Lost the race — another process reclaimed first.
-        return { kind: "in_progress" as const };
-      }
-
-      // Unknown status — treat as in-progress.
-      return { kind: "in_progress" as const };
     }
   });
 
@@ -1017,38 +1013,30 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
   // are replaced with empty strings so a custom template referencing them
   // does not leak literal {{...}} text; their content is already inlined into
   // the budgeted user prompt.
-  function replacePromptPlaceholders(text: string): string {
-    return text
-      .replace(/\{\{questionnaireAnswers\}\}/g, userProfileXml)
-      .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
-      .replace(/\{\{bestTimesBlock\}\}/g, bestTimesBlock)
-      .replace(/\{\{demographicsBlock\}\}/g, demographicsBlock)
-      .replace(/\{\{memoryBlock\}\}/g, memoryBlock)
-      .replace(/\{\{performanceBlock\}\}/g, performanceBlock)
-      .replace(/\{\{contentPerformanceBlock\}\}/g, contentPerformanceBlock)
-      .replace(/\{\{followerTrendBlock\}\}/g, followerTrendBlock)
-      .replace(/\{\{cadenceBlock\}\}/g, cadenceBlock)
-      .replace(/\{\{feedbackBlock\}\}/g, feedbackBlock)
-      .replace(/\{\{trendingTopicsBlock\}\}/g, trendingTopicsBlock)
-      .replace(/\{\{deepDiveBlock\}\}/g, "")
-      .replace(/\{\{goalBlock\}\}/g, "")
-      .replace(/\{\{guardrailBlock\}\}/g, "")
-      .replace(/\{\{voiceBlock\}\}/g, "")
-      .replace(/\{\{offerBlock\}\}/g, "")
-      .replace(/\{\{audienceBlock\}\}/g, "")
-      .replace(/\{\{boundariesBlock\}\}/g, "")
-      .replace(/\{\{personalContextBlock\}\}/g, "")
-      .replace(/\{\{formattingBlock\}\}/g, "")
-      .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
-      .replace(/\{\{currentDay\}\}/g, currentDay)
-      .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))
-      .replace(/\{\{formatMix\}\}/g, formatMixStr)
-      .replace(/\{\{bucketDistribution\}\}/g, bucketDistStr)
-      .replace(/\{\{weekStarting\}\}/g, weekStarting)
-      .replace(/\{\{firstDay\}\}/g, targetDays[0]);
-  }
+  const placeholderCtx: PromptPlaceholderContext = {
+    questionnaireAnswers: userProfileXml,
+    usedTitlesBlock: usedTitlesXml,
+    bestTimesBlock,
+    demographicsBlock,
+    memoryBlock,
+    performanceBlock,
+    contentPerformanceBlock,
+    followerTrendBlock,
+    cadenceBlock,
+    feedbackBlock,
+    trendingTopicsBlock,
+    daysToPost,
+    currentDay,
+    targetDays,
+    formatMix: formatMixStr,
+    bucketDistribution: bucketDistStr,
+    weekStarting,
+  };
 
-  const systemPrompt = replacePromptPlaceholders(config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT);
+  const systemPrompt = replacePromptPlaceholders(
+    config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT,
+    placeholderCtx
+  );
 
   // Always use defaultUserPrompt as the user prompt, even when a custom
   // calendarPromptTemplate is set. Previously this was set to "" when a
@@ -1056,7 +1044,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
   // (questionnaire, memories, performance, trends, compliance, etc.).
   // The custom template replaces the SYSTEM prompt; the user prompt always
   // carries the assembled context. Placeholders in both prompts are replaced.
-  const userPrompt = replacePromptPlaceholders(defaultUserPrompt);
+  const userPrompt = replacePromptPlaceholders(defaultUserPrompt, placeholderCtx);
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

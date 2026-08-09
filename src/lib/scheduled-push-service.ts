@@ -1,6 +1,4 @@
 import { randomUUID } from "crypto";
-import { prisma } from "@/lib/prisma";
-import { sendBroadcastToSegment, type PushSegment } from "@/lib/notifications";
 
 /**
  * Bounded, recoverable scheduled-push processing.
@@ -24,6 +22,16 @@ import { sendBroadcastToSegment, type PushSegment } from "@/lib/notifications";
  *     reclaimed. FAILED rows are left for manual/operator retry (a failed
  *     broadcast should not silently retry forever).
  *  5. Record failures with lastError; the row transitions to FAILED.
+ *
+ * Dependency injection: the service accepts a `ScheduledPushDeps` object so
+ * tests can inject fakes. The production wiring (`runScheduledPushPass`)
+ * constructs deps from the real Prisma client and `sendBroadcastToSegment`.
+ *
+ * Crash-after-send behavior: if a worker crashes after `sendBroadcastToSegment`
+ * succeeds but before the finalizing updateMany, the row stays PROCESSING
+ * until the lease expires, then is reclaimed and re-sent. This is at-least-once
+ * delivery — documented and inherent to any crash-recoverable queue without
+ * transactional outbox support.
  */
 
 /** Maximum rows claimed per invocation. */
@@ -43,6 +51,81 @@ export interface ScheduledPushResult {
   reclaimed: number;
 }
 
+export type ScheduledPushStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "SENT"
+  | "CANCELLED"
+  | "FAILED";
+
+export interface ScheduledPushRow {
+  id: string;
+  title: string;
+  body: string;
+  url: string | null;
+  segment: string;
+  status: ScheduledPushStatus;
+  claimToken: string | null;
+  claimedAt: Date | null;
+  scheduledFor: Date;
+  attempts: number;
+  lastError: string | null;
+  sentCount: number;
+  failedCount: number;
+}
+
+export interface BroadcastResult {
+  sent: number;
+  failed: number;
+}
+
+/** Minimal Prisma interface for scheduled-push processing. */
+export interface ScheduledPushPrisma {
+  scheduledPushNotification: {
+    updateMany(args: {
+      where: {
+        status?: ScheduledPushStatus;
+        claimedAt?: { lt: Date };
+        id?: string | { in: string[] };
+        claimToken?: string;
+      };
+      data: {
+        status?: ScheduledPushStatus;
+        claimToken?: string | null;
+        claimedAt?: Date | null;
+        lastError?: string | null;
+        attempts?: { increment: number };
+        sentCount?: number;
+        failedCount?: number;
+      };
+    }): Promise<{ count: number }>;
+    findMany(args: {
+      where: {
+        status?: ScheduledPushStatus;
+        scheduledFor?: { lte: Date };
+        claimToken?: string;
+        id?: string | { in: string[] };
+      };
+      orderBy?: { scheduledFor: "asc" | "desc" };
+      take?: number;
+      select?: { id: true };
+    }): Promise<ScheduledPushRow[] | { id: string }[]>;
+  };
+}
+
+export interface ScheduledPushDeps {
+  prisma: ScheduledPushPrisma;
+  /** Broadcast sender. Tests inject a fake. */
+  sendBroadcast: (
+    segment: string,
+    title: string,
+    body: string,
+    url?: string
+  ) => Promise<BroadcastResult>;
+  now?: () => Date;
+  randomUUID?: () => string;
+}
+
 /**
  * Claim up to `batchSize` due scheduled pushes for the current worker.
  *
@@ -55,12 +138,14 @@ export interface ScheduledPushResult {
  * eligible for claiming by this or another worker.
  */
 export async function claimScheduledPushes(
+  deps: ScheduledPushDeps,
   batchSize: number = SCHEDULED_PUSH_BATCH_SIZE,
   leaseMs: number = SCHEDULED_PUSH_LEASE_MS
 ): Promise<{ claimedIds: string[]; reclaimed: number }> {
-  const now = new Date();
+  const { prisma } = deps;
+  const now = (deps.now ?? (() => new Date()))();
   const staleBefore = new Date(now.getTime() - leaseMs);
-  const claimToken = randomUUID();
+  const claimToken = (deps.randomUUID ?? randomUUID)();
 
   // Reclaim stale PROCESSING rows: reset to PENDING so they can be claimed.
   // Conditional on status = 'PROCESSING' AND claimedAt < staleBefore so we
@@ -97,7 +182,7 @@ export async function claimScheduledPushes(
     return { claimedIds: [], reclaimed: reclaimResult.count };
   }
 
-  const candidateIds = candidates.map((c) => c.id);
+  const candidateIds = candidates.map((c) => (c as { id: string }).id);
 
   const claimResult = await prisma.scheduledPushNotification.updateMany({
     where: {
@@ -121,10 +206,10 @@ export async function claimScheduledPushes(
   if (claimResult.count === candidateIds.length) {
     claimedIds = candidateIds;
   } else {
-    const ours = await prisma.scheduledPushNotification.findMany({
+    const ours = (await prisma.scheduledPushNotification.findMany({
       where: { claimToken },
       select: { id: true },
-    });
+    })) as { id: string }[];
     claimedIds = ours.map((r) => r.id);
   }
 
@@ -137,16 +222,19 @@ export async function claimScheduledPushes(
  * claim was lost (stale-reclaimed by another worker) is skipped.
  */
 export async function processClaimedScheduledPushes(
+  deps: ScheduledPushDeps,
   claimedIds: string[]
 ): Promise<{ processed: number; sent: number; failed: number }> {
+  const { prisma, sendBroadcast } = deps;
+
   if (claimedIds.length === 0) {
     return { processed: 0, sent: 0, failed: 0 };
   }
 
-  const pushes = await prisma.scheduledPushNotification.findMany({
+  const pushes = (await prisma.scheduledPushNotification.findMany({
     where: { id: { in: claimedIds } },
     orderBy: { scheduledFor: "asc" },
-  });
+  })) as ScheduledPushRow[];
 
   let processed = 0;
   let totalSent = 0;
@@ -163,8 +251,8 @@ export async function processClaimedScheduledPushes(
     }
 
     try {
-      const result = await sendBroadcastToSegment(
-        push.segment as PushSegment,
+      const result = await sendBroadcast(
+        push.segment,
         push.title,
         push.body,
         push.url ?? undefined
@@ -210,12 +298,28 @@ export async function processClaimedScheduledPushes(
 /**
  * Run one pass of the scheduled-push processor: claim a bounded batch
  * (including stale recovery), then process only the claimed rows.
+ *
+ * Production wiring: constructs deps from the real Prisma client and
+ * `sendBroadcastToSegment`. Tests call `claimScheduledPushes` /
+ * `processClaimedScheduledPushes` directly with injected deps.
  */
 export async function runScheduledPushPass(
   batchSize: number = SCHEDULED_PUSH_BATCH_SIZE,
   leaseMs: number = SCHEDULED_PUSH_LEASE_MS
 ): Promise<ScheduledPushResult> {
-  const { claimedIds, reclaimed } = await claimScheduledPushes(batchSize, leaseMs);
-  const { processed, sent, failed } = await processClaimedScheduledPushes(claimedIds);
+  // Late imports to avoid a circular dependency at module load time and to
+  // keep the DI surface clean (tests never call this function).
+  const { prisma } = await import("@/lib/prisma");
+  const { sendBroadcastToSegment } = await import("@/lib/notifications");
+  type PushSegment = "all" | "CALENDAR_ONLY" | "PRO";
+
+  const deps: ScheduledPushDeps = {
+    prisma: prisma as unknown as ScheduledPushPrisma,
+    sendBroadcast: (segment, title, body, url) =>
+      sendBroadcastToSegment(segment as PushSegment, title, body, url),
+  };
+
+  const { claimedIds, reclaimed } = await claimScheduledPushes(deps, batchSize, leaseMs);
+  const { processed, sent, failed } = await processClaimedScheduledPushes(deps, claimedIds);
   return { processed, sent, failed, reclaimed };
 }

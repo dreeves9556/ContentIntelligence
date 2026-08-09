@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import { generateUniqueSlug } from "@/lib/organizations";
 import { sendTeamInviteEmail } from "@/lib/invite-email";
 import { getStripe } from "@/lib/stripe";
+import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
+import { decideOrgDelete, decideAfterStripeCancelFailure } from "@/lib/deletion-hardening";
 import type { UserPlan } from "@/lib/tiers";
 
 const INVITE_EXPIRY_DAYS = 7;
@@ -386,14 +388,17 @@ export async function deleteOrganization(
   });
   if (!org) return { success: false, error: "Organization not found." };
 
-  // Typed confirmation: the admin must type the organization's exact name.
-  // This prevents accidental deletion via a stray click or CSRF-style request
-  // — a simple confirm() dialog is too easy to dismiss without reading.
-  if (!confirmName || confirmName.trim() !== org.name) {
-    return {
-      success: false,
-      error: `Type the organization name "${org.name}" exactly to confirm deletion.`,
-    };
+  // Delegate the hardening decision (auth + typed confirmation + Stripe
+  // configuration check) to the pure helper (unit-tested).
+  const decision = decideOrgDelete({
+    callerRole: session.user.role,
+    confirmName,
+    orgName: org.name,
+    hasStripeSubscription: !!org.stripeSubscriptionId,
+    stripeConfigured: isStripeCheckoutConfigured(),
+  });
+  if (decision.kind === "BLOCK") {
+    return { success: false, error: decision.error };
   }
 
   // Cancel the active Stripe subscription BEFORE deleting the org record.
@@ -407,10 +412,8 @@ export async function deleteOrganization(
       console.log(`[DELETE ORG] Cancelled Stripe subscription ${org.stripeSubscriptionId} for org ${id}`);
     } catch (err) {
       console.error("[DELETE ORG] Failed to cancel Stripe subscription:", err);
-      return {
-        success: false,
-        error: "Failed to cancel the organization's Stripe subscription. The organization was not deleted. Retry once the subscription is canceled or contact support.",
-      };
+      const fail = decideAfterStripeCancelFailure("org");
+      return { success: false, error: fail.error };
     }
   }
 

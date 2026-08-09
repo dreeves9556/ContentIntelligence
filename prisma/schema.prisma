@@ -641,6 +641,53 @@ model Organization {
   @@map("organizations")
 }
 
+// Durable, idempotent seat-reduction operation.
+//
+// A seat reduction touches two independent systems (Stripe + the DB) and must
+// remain retryable if either side fails. This row is the single source of
+// truth for an in-flight reduction: it records the original Stripe quantity,
+// original seat limit, target quantity, selected member actions, actor, and
+// the current state-machine status. The client generates a UUID `requestId`
+// so a retry resumes the same operation instead of creating a second one.
+//
+// Status state machine:
+//   PENDING            — claimed, validation done, Stripe call not yet applied
+//   COMPLETED          — Stripe reduced AND DB member/seatLimit changes applied
+//   FAILED             — retryable: Stripe rejected/timeout (members untouched)
+//                        OR Stripe succeeded + DB failed + Stripe compensation
+//                        succeeded (members untouched, Stripe restored)
+//   RECOVERY_REQUIRED  — Stripe succeeded + DB failed + Stripe compensation
+//                        also failed. Admin must intervene. The row preserves
+//                        the original quantity so a human can reconcile.
+//
+// The Stripe reduction uses an attempt-scoped idempotency key
+// (`seat_reconcile_main_${id}_${attempts}`) so a transport-level retry within
+// the same attempt does not double-charge, while a retry after a FAILED
+// attempt uses a fresh key. Compensation uses a separate key
+// (`seat_reconcile_comp_${id}_${attempts}`).
+model SeatReconciliationOperation {
+  id                       String   @id @default(cuid())
+  requestId                String   @unique
+  organizationId           String
+  actorUserId              String
+  originalSeatLimit        Int
+  originalStripeQuantity   Int?
+  targetSeats              Int
+  memberActionsJson        Json
+  status                   String   @default("PENDING")
+  attempts                 Int      @default(0)
+  claimToken               String?
+  claimedAt                DateTime?
+  completedAt              DateTime?
+  lastError                String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([status, claimedAt])
+  @@map("seat_reconciliation_operations")
+}
+
 model ScheduledPushNotification {
   id           String   @id @default(cuid())
   title        String

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
 import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import { severZernioForUser } from "@/lib/zernio-sever";
+import { decideAccountDelete, decideAfterStripeCancelFailure } from "@/lib/deletion-hardening";
 
 /**
  * Permanently delete the user's account and all associated data.
@@ -60,27 +61,18 @@ export async function POST(request: Request) {
   }
 
   const passwordValid = await bcrypt.compare(body.password, user.password);
-  if (!passwordValid) {
-    return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
-  }
 
-  // TEAM_ADMIN must transfer admin role before deleting their account
-  if (user.role === "TEAM_ADMIN") {
-    return NextResponse.json(
-      {
-        error:
-          "You are the team admin for your organization. Please transfer your admin role to another member before deleting your account.",
-      },
-      { status: 400 }
-    );
-  }
-
-  // Global admins cannot self-delete
-  if (user.role === "ADMIN") {
-    return NextResponse.json(
-      { error: "Admin accounts cannot be self-deleted." },
-      { status: 400 }
-    );
+  // Delegate the hardening decision to the pure helper (unit-tested).
+  const decision = decideAccountDelete({
+    userId: user.id,
+    role: user.role,
+    hasPassword: !!user.password,
+    passwordValid,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    stripeConfigured: isStripeCheckoutConfigured(),
+  });
+  if (decision.kind === "BLOCK") {
+    return NextResponse.json({ error: decision.error }, { status: decision.status });
   }
 
   // Cancel Stripe subscription immediately if the user has one.
@@ -94,32 +86,14 @@ export async function POST(request: Request) {
   // Their stripeSubscriptionId is already captured above (if any).
 
   if (subscriptionId) {
-    if (!isStripeCheckoutConfigured()) {
-      // There is a subscription ID but Stripe is not configured — we cannot
-      // cancel it. Block deletion so the subscription is not orphaned (once
-      // the User row is gone, the subscription ID is lost and the subscription
-      // becomes unmanageable through the app).
-      console.error("[ACCOUNT DELETE] Stripe not configured but user has a subscription — blocking deletion");
-      return NextResponse.json(
-        { error: "Your account has an active subscription but Stripe is not configured. Please contact support to cancel your subscription before deleting your account." },
-        { status: 500 }
-      );
-    }
-
     try {
       const stripe = getStripe();
       await stripe.subscriptions.cancel(subscriptionId);
       console.log(`[ACCOUNT DELETE] Cancelled Stripe subscription ${subscriptionId} for user ${user.id}`);
     } catch (error) {
-      // Block deletion — the subscription may still be active. Once the User
-      // row is gone, the subscription ID is lost and the subscription becomes
-      // unmanageable through the app. The user can retry once the
-      // subscription is canceled or contact support.
       console.error("[ACCOUNT DELETE] Failed to cancel Stripe subscription:", error);
-      return NextResponse.json(
-        { error: "Failed to cancel your Stripe subscription. Your account was not deleted. Retry once the subscription is canceled, or contact support." },
-        { status: 500 }
-      );
+      const fail = decideAfterStripeCancelFailure("account");
+      return NextResponse.json({ error: fail.error }, { status: fail.status });
     }
   }
 

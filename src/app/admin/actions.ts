@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { getStripe } from "@/lib/stripe";
 import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import { severZernioForUser } from "@/lib/zernio-sever";
+import { decideAfterStripeCancelFailure } from "@/lib/deletion-hardening";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, ExpirationAction } from "@/lib/account-access";
 import { sendSignupNotification, sendBulkSignupNotification } from "@/lib/signup-notification";
@@ -454,10 +455,8 @@ export async function deleteUser(
       // row is gone, the subscription ID is lost and the subscription becomes
       // unmanageable through the app.
       console.error("[ADMIN DELETE USER] Failed to cancel Stripe subscription:", error);
-      return {
-        success: false,
-        error: "Failed to cancel the user's Stripe subscription. The account was not deleted. Retry once the subscription is canceled or contact support.",
-      };
+      const fail = decideAfterStripeCancelFailure("account");
+      return { success: false, error: fail.error };
     }
   }
 

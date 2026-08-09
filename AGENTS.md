@@ -38,6 +38,7 @@ Each test file uses a local `assert(condition, label)` helper and sets `process.
 - `PostVersion.format` is nullable — existing versions referenced by `Post.currentVersionId` were backfilled to the post's current format by migration `20260804160000`. Historical versions (not the current version) remain NULL; the read path (`versionToFields` in `post-refinement/actions.ts`) and `assertPostMatchesCurrentVersion` (in `post-integrity.ts`) interpret NULL as the post's current format. New versions always capture the real format.
 - `ScheduledPushNotification` has bounded recoverable claim state (`claimToken`, `claimedAt`, `attempts`, `lastError`) added by migration `20260804170000`. The cron route `/api/cron/scheduled-pushes` claims ≤20 rows per pass, processes only claimed rows, and reclaims stale PROCESSING rows after a 10-minute lease.
 - `ZernioEvent` has `claimToken` (migration `20260804180000`) for concurrency-safe claiming matching the Stripe webhook pattern.
+- `SeatReconciliationOperation` (migration `20260804190000`) is the durable, idempotent operation row for seat reductions. See "Seat reconciliation (durable)" below.
 - Partial unique indexes (e.g. `WHERE status = 'OPEN'`) aren't supported in `schema.prisma` — append them manually to the generated `migration.sql`.
 
 ### Stripe ownership invariant (critical)
@@ -79,7 +80,7 @@ Used by calendar generation (`calendar/actions.ts`) and refinement (`post-refine
 
 ### Post Refinement Core V1 (implemented)
 
-See `/Users/danielsmac/.devin/plans/plan-f7b85223f1738654.md` for the full design. Key entry points:
+See `docs/post-refinement-core-v1.md` for the full design (repository-relative). Key entry points:
 
 - `src/app/dashboard/post-refinement/actions.ts` — server actions (turn state machine, accept/restore, `abandonStaleSessions` cron helper).
 - `src/app/dashboard/calendar/RefinementPanel.tsx` — responsive UI (phone full-screen sheet, tablet/desktop slide-over).
@@ -95,19 +96,81 @@ Refinement compliance: `sendRefinementMessage` loads `profileSurveys` from the D
 
 `generateWeeklyCalendar` claims an idempotency row (via `serializableTransaction`) BEFORE rate limits, RSS fetches, and AI pre-calls. Previously the claim ran too late, consuming rate-limit tokens on every retry and burning AI cost on duplicate runs. The claim must stay before `checkActionRateLimit` and `fetchTrendingHeadlines`.
 
-`requestId` is a required parameter (UUID, validated). The legacy non-idempotent path (no requestId) is removed. Every post-claim failure path (rate limit, missing API key, AI error, parse error, incomplete calendar, prework exception) transitions the owned claim to FAILED via `failClaim` or the outer catch. A heartbeat refreshes `requestClaimedAt` every 30 seconds so a long generation is not reclaimed as stale. `finally` always stops the heartbeat. The claim is finalized with a conditional update on `claimToken` so a worker cannot finalize a lease it no longer owns.
+`requestId` is a required parameter (UUID, validated via `isValidCalendarRequestId`). The legacy non-idempotent path (no requestId) is removed. The pure claim-decision logic (`decideCalendarClaim`) lives in `src/lib/calendar-claim-service.ts` and is unit-tested there; the action performs the DB writes the decision prescribes. Every post-claim failure path (rate limit, missing API key, AI error, parse error, incomplete calendar, prework exception) transitions the owned claim to FAILED via `failClaim` or the outer catch. A heartbeat refreshes `requestClaimedAt` every 30 seconds so a long generation is not reclaimed as stale. `finally` always stops the heartbeat. The claim is finalized with a conditional update on `claimToken` so a worker cannot finalize a lease it no longer owns.
 
 ### Custom prompt template semantics
 
-A custom `calendarPromptTemplate` or `calendarStrategyPromptTemplate` replaces the SYSTEM prompt; the USER prompt is always the assembled context (calendar data + profile XML). Placeholders in both prompts are replaced. For the calendar path, all placeholders (`{{questionnaireAnswers}}`, `{{daysToPost}}`, `{{targetDays}}`, `{{formatMix}}`, `{{bucketDistribution}}`, etc.) are replaced in both system and user prompts via a shared `replacePromptPlaceholders` helper. Stale block placeholders (`{{deepDiveBlock}}`, `{{goalBlock}}`, etc.) are replaced with empty strings. For the strategy path, `{{weekStarting}}`, `{{formatMix}}`, `{{bucketMix}}`, `{{daySummary}}`, `{{primaryGoal}}`, and `{{antiBrandWords}}` are replaced in the system prompt.
+A custom `calendarPromptTemplate` or `calendarStrategyPromptTemplate` replaces the SYSTEM prompt; the USER prompt is always the assembled context (calendar data + profile XML). Placeholders in both prompts are replaced. For the calendar path, all placeholders (`{{questionnaireAnswers}}`, `{{daysToPost}}`, `{{targetDays}}`, `{{formatMix}}`, `{{bucketDistribution}}`, etc.) are replaced in both system and user prompts via the shared `replacePromptPlaceholders` helper in `src/lib/prompt-placeholders.ts` (unit-tested there). Stale block placeholders (`{{deepDiveBlock}}`, `{{goalBlock}}`, etc.) are replaced with empty strings. For the strategy path, `replaceStrategySystemPlaceholders` replaces `{{weekStarting}}`, `{{formatMix}}`, `{{bucketMix}}`, `{{daySummary}}`, `{{primaryGoal}}`, and `{{antiBrandWords}}` in the system prompt only. Unknown placeholders are left as-is (literal `{{...}}`) so a typo is visible to the admin.
 
-### Seat reconciliation (server-owned)
+### Seat reconciliation (durable)
 
-Seat reduction is a single server action: `reduceSeatsWithReconciliation` in `src/app/dashboard/billing/seat-actions.ts`. It archives/detaches selected members, validates the active count fits the new seat count, updates the org seatLimit, and calls Stripe — all server-side in a serialized transaction followed by the Stripe API call. The client (`SeatManager.tsx`) no longer orchestrates multiple separate calls.
+Seat reduction is a durable, idempotent operation that preserves consistency
+between Stripe and the database across failures. The orchestration lives in
+`src/lib/seat-reconciliation-service.ts` (unit-tested with injected Prisma/Stripe
+fakes); the server action `reduceSeatsWithReconciliation` in
+`src/app/dashboard/billing/seat-actions.ts` wires real Prisma and Stripe.
+
+**State machine** (status on `SeatReconciliationOperation`):
+
+- `PENDING` — claimed, validation done, Stripe call not yet applied.
+- `COMPLETED` — Stripe reduced AND DB member/seatLimit changes applied.
+- `FAILED` — retryable: Stripe rejected/timeout (members untouched, seatLimit
+  unchanged) OR Stripe succeeded + DB failed + Stripe compensation succeeded
+  (members untouched, Stripe restored to original quantity).
+- `RECOVERY_REQUIRED` — Stripe succeeded + DB failed + Stripe compensation also
+  failed. Admin must intervene. The row preserves the original quantity and
+  last error so a human can reconcile the subscription manually.
+
+**Invariants:**
+
+1. Stripe is called BEFORE any member or seatLimit mutation. If Stripe rejects
+   or times out, no member loses access and seatLimit is unchanged.
+2. If Stripe succeeds but the DB transaction fails, the orchestrator compensates
+   by restoring the Stripe subscription to the original quantity (separate
+   idempotency key). If compensation succeeds, the operation is FAILED
+   (retryable, members untouched).
+3. If compensation also fails, the operation is RECOVERY_REQUIRED — never
+   silently converted to a generic success.
+4. A retry with the same `requestId` resumes the existing operation:
+   COMPLETED → returns the existing successful result; RECOVERY_REQUIRED →
+   returns a "contact support" error; FAILED → re-claims and re-runs.
+5. The Stripe reduction uses an attempt-scoped idempotency key
+   `seat_reconcile_main_${opId}_${attempt}`; compensation uses
+   `seat_reconcile_comp_${opId}_${attempt}`.
+
+**Admin recovery for a RECOVERY_REQUIRED operation:**
+
+1. Query `SeatReconciliationOperation` rows with `status = 'RECOVERY_REQUIRED'`.
+2. Read `originalStripeQuantity` and `lastError` — the subscription was reduced
+   to `targetSeats` but the DB was not updated and compensation failed.
+3. Manually restore the Stripe subscription quantity to `originalStripeQuantity`
+   (or apply the intended `targetSeats` if the DB failure was transient and the
+   admin wants to complete the reduction manually).
+4. Update the row status to `COMPLETED` or `FAILED` to clear the recovery flag.
+
+The client (`SeatManager.tsx`) generates a UUID `requestId` per reconciliation
+attempt; a retry with the same `requestId` resumes the existing operation.
+
+**Migration:** `20260804190000_add_seat_reconciliation_operations` creates the
+table. Run `prisma migrate deploy` BEFORE deploying code that references it
+(the old app ignores the table; the new app requires the columns).
 
 ### Account and organization deletion hardening
 
-Both self-delete (`/api/account/delete`) and admin delete (`deleteUser` in `src/app/admin/actions.ts`) block deletion if Stripe cancellation fails — an orphaned paid subscription is worse than a retryable error. If Stripe is not configured but a subscription ID exists, deletion is blocked. Organization deletion (`deleteOrganization` in `src/app/admin/organizations/actions.ts`) requires the admin to type the org name exactly (`confirmName` parameter); the UI shows a typed-confirmation modal.
+Both self-delete (`/api/account/delete`) and admin delete (`deleteUser` in
+`src/app/admin/actions.ts`) block deletion if Stripe cancellation fails — an
+orphaned paid subscription is worse than a retryable error. If Stripe is not
+configured but a subscription ID exists, deletion is blocked. Organization
+deletion (`deleteOrganization` in `src/app/admin/organizations/actions.ts`)
+requires the admin to type the org name exactly (`confirmName` parameter); the
+UI shows a typed-confirmation modal. The org deletion also checks
+`isStripeCheckoutConfigured()` before calling `getStripe()`, matching the
+account-deletion paths.
+
+The pure decision logic (`decideAccountDelete`, `decideOrgDelete`,
+`decideAfterStripeCancelFailure`) lives in `src/lib/deletion-hardening.ts` and
+is unit-tested there. The route/action handlers call these helpers and perform
+the actual DB/Stripe calls based on the returned decision.
 
 ### Build configuration
 

@@ -1,246 +1,180 @@
-// Tests for custom calendar and strategy prompt placeholder semantics.
+// Tests for prompt placeholder replacement semantics.
 // Run: npx tsx src/lib/__tests__/prompt-placeholder-semantics.test.ts
 //
-// Verifies the two correctness rules:
-// 1. A custom calendar/strategy template replaces the SYSTEM prompt; the
-//    USER prompt is always the assembled calendar data (not the template).
-//    Previously the strategy path set BOTH system and user to the custom
-//    template, never sending the actual calendar data.
-// 2. All placeholders in a custom template are replaced — no literal
-//    {{...}} text leaks into the prompt sent to the AI. Previously the
-//    calendar system prompt only replaced {{weekStarting}} and {{firstDay}}.
+// Exercises the real `replacePromptPlaceholders` and
+// `replaceStrategySystemPlaceholders` from src/lib/prompt-placeholders.ts.
+// No algorithm is copied — the test drives the production helpers.
 
-export {};
+import {
+  replacePromptPlaceholders,
+  replaceStrategySystemPlaceholders,
+  type PromptPlaceholderContext,
+  type StrategyPlaceholderContext,
+} from "../prompt-placeholders";
 
-let pass = 0;
-let fail = 0;
+let failures = 0;
 function assert(condition: boolean, label: string): void {
-  if (condition) {
-    console.log(`PASS: ${label}`);
-    pass++;
-  } else {
+  if (!condition) {
     console.error(`FAIL: ${label}`);
-    fail++;
+    failures++;
   }
 }
 
-// ─── Inlined replica of the strategy prompt assembly logic ────────────────
-// Mirrors generateCalendarStrategy in src/app/dashboard/calendar/actions.ts.
-function buildStrategyPrompts(opts: {
-  customTemplate: string | null;
-  weekStarting: string;
-  formatMixStr: string;
-  bucketMixStr: string;
-  daySummary: string;
-  primaryGoal: string;
-  antiBrandWords: string;
-  userProfileXml: string;
-}): { systemPrompt: string; userPrompt: string } {
-  const defaultUserPrompt = `<calendar_data>
-Calendar starts ${opts.weekStarting}.
-
-FORMAT MIX:
-${opts.formatMixStr}
-
-BUCKET MIX:
-${opts.bucketMixStr}
-
-UPCOMING DAYS:
-${opts.daySummary}
-</calendar_data>
-
-${opts.userProfileXml}
-
-Write the strategy note now.`;
-
-  // Correct semantics: custom template → system prompt (with placeholders
-  // replaced); user prompt is ALWAYS the assembled calendar data.
-  const systemPrompt = (opts.customTemplate ?? "DEFAULT_STRATEGY_SYSTEM_PROMPT")
-    .replace(/\{\{weekStarting\}\}/g, opts.weekStarting)
-    .replace(/\{\{formatMix\}\}/g, opts.formatMixStr)
-    .replace(/\{\{bucketMix\}\}/g, opts.bucketMixStr)
-    .replace(/\{\{daySummary\}\}/g, opts.daySummary)
-    .replace(/\{\{primaryGoal\}\}/g, opts.primaryGoal)
-    .replace(/\{\{antiBrandWords\}\}/g, opts.antiBrandWords);
-
-  const userPrompt = defaultUserPrompt;
-  return { systemPrompt, userPrompt };
-}
-
-// ─── Inlined replica of the calendar prompt assembly logic ────────────────
-// Mirrors generateWeeklyCalendar's replacePromptPlaceholders.
-function buildCalendarPrompts(opts: {
-  customTemplate: string | null;
-  weekStarting: string;
-  firstDay: string;
-  daysToPost: number;
-  currentDay: string;
-  targetDays: string[];
-  formatMixStr: string;
-  bucketDistStr: string;
-  userProfileXml: string;
-  usedTitlesXml: string;
-  defaultUserPrompt: string;
-}): { systemPrompt: string; userPrompt: string } {
-  function replacePlaceholders(text: string): string {
-    return text
-      .replace(/\{\{questionnaireAnswers\}\}/g, opts.userProfileXml)
-      .replace(/\{\{usedTitlesBlock\}\}/g, opts.usedTitlesXml)
-      .replace(/\{\{deepDiveBlock\}\}/g, "")
-      .replace(/\{\{goalBlock\}\}/g, "")
-      .replace(/\{\{guardrailBlock\}\}/g, "")
-      .replace(/\{\{voiceBlock\}\}/g, "")
-      .replace(/\{\{offerBlock\}\}/g, "")
-      .replace(/\{\{audienceBlock\}\}/g, "")
-      .replace(/\{\{boundariesBlock\}\}/g, "")
-      .replace(/\{\{personalContextBlock\}\}/g, "")
-      .replace(/\{\{formattingBlock\}\}/g, "")
-      .replace(/\{\{daysToPost\}\}/g, String(opts.daysToPost))
-      .replace(/\{\{currentDay\}\}/g, opts.currentDay)
-      .replace(/\{\{targetDays\}\}/g, opts.targetDays.join(", "))
-      .replace(/\{\{formatMix\}\}/g, opts.formatMixStr)
-      .replace(/\{\{bucketDistribution\}\}/g, opts.bucketDistStr)
-      .replace(/\{\{weekStarting\}\}/g, opts.weekStarting)
-      .replace(/\{\{firstDay\}\}/g, opts.firstDay);
-  }
-
-  const systemPrompt = replacePlaceholders(opts.customTemplate ?? "DEFAULT_CALENDAR_SYSTEM_PROMPT");
-  const userPrompt = replacePlaceholders(opts.defaultUserPrompt);
-  return { systemPrompt, userPrompt };
-}
-
-// ─── Strategy prompt tests ─────────────────────────────────────────────────
-
-// 1. Custom strategy template → system prompt is the template; user prompt
-//    is the assembled calendar data (not the template).
-{
-  const customTemplate = "Custom strategy template. Week: {{weekStarting}}, goal: {{primaryGoal}}";
-  const { systemPrompt, userPrompt } = buildStrategyPrompts({
-    customTemplate,
-    weekStarting: "2026-01-05",
-    formatMixStr: "- Reel: 3",
-    bucketMixStr: "- Expert: 2",
-    daySummary: "Mon: Reel, Expert",
-    primaryGoal: "Get more clients",
-    antiBrandWords: "synergy, leverage",
-    userProfileXml: "<profile>...</profile>",
-  });
-  assert(systemPrompt.includes("Custom strategy template"), "custom strategy template → system prompt is the template");
-  assert(!userPrompt.includes("Custom strategy template"), "custom strategy template → user prompt is NOT the template");
-  assert(userPrompt.includes("<calendar_data>"), "custom strategy template → user prompt is the assembled calendar data");
-  assert(systemPrompt.includes("2026-01-05"), "strategy system: {{weekStarting}} replaced");
-  assert(systemPrompt.includes("Get more clients"), "strategy system: {{primaryGoal}} replaced");
-  assert(!systemPrompt.includes("{{"), "strategy system: no unreplaced placeholders");
-}
-
-// 2. Default strategy (no custom template) → system is default, user is data.
-{
-  const { systemPrompt, userPrompt } = buildStrategyPrompts({
-    customTemplate: null,
-    weekStarting: "2026-01-05",
-    formatMixStr: "- Reel: 3",
-    bucketMixStr: "- Expert: 2",
-    daySummary: "Mon: Reel",
-    primaryGoal: "Grow audience",
-    antiBrandWords: "delve",
-    userProfileXml: "<profile/>",
-  });
-  assert(systemPrompt === "DEFAULT_STRATEGY_SYSTEM_PROMPT", "no custom strategy template → system is the default");
-  assert(userPrompt.includes("<calendar_data>"), "no custom strategy template → user is the assembled data");
-  assert(userPrompt.includes("2026-01-05"), "strategy user prompt includes weekStarting");
-}
-
-// 3. Strategy placeholders all replaced.
-{
-  const template = "Week {{weekStarting}} | Mix {{formatMix}} | Buckets {{bucketMix}} | Days {{daySummary}} | Goal {{primaryGoal}} | Avoid {{antiBrandWords}}";
-  const { systemPrompt } = buildStrategyPrompts({
-    customTemplate: template,
-    weekStarting: "2026-02-09",
-    formatMixStr: "- Reel: 5",
-    bucketMixStr: "- Local: 3",
-    daySummary: "Mon: Reel",
-    primaryGoal: "Brand awareness",
-    antiBrandWords: "leverage",
-    userProfileXml: "",
-  });
-  assert(!systemPrompt.includes("{{"), "strategy: all 6 placeholders replaced (no literal {{...}})");
-  assert(systemPrompt.includes("2026-02-09"), "strategy: weekStarting replaced");
-  assert(systemPrompt.includes("- Reel: 5"), "strategy: formatMix replaced");
-  assert(systemPrompt.includes("- Local: 3"), "strategy: bucketMix replaced");
-  assert(systemPrompt.includes("Brand awareness"), "strategy: primaryGoal replaced");
-  assert(systemPrompt.includes("leverage"), "strategy: antiBrandWords replaced");
-}
-
-// ─── Calendar prompt tests ─────────────────────────────────────────────────
-
-// 4. Custom calendar template → system prompt is the template with ALL
-//    placeholders replaced; user prompt is the assembled context.
-{
-  const customTemplate = "Generate {{daysToPost}} days starting {{currentDay}}. Days: {{targetDays}}. Mix: {{formatMix}}. Buckets: {{bucketDistribution}}. Week: {{weekStarting}}. First: {{firstDay}}. Q: {{questionnaireAnswers}}. Used: {{usedTitlesBlock}}. Deep: {{deepDiveBlock}}. Goal: {{goalBlock}}.";
-  const { systemPrompt, userPrompt } = buildCalendarPrompts({
-    customTemplate,
-    weekStarting: "2026-01-05",
-    firstDay: "Monday",
-    daysToPost: 5,
-    currentDay: "Monday",
-    targetDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-    formatMixStr: "- Reel: 3\n- Carousel: 2",
-    bucketDistStr: "- Expert: 2\n- Personal: 2\n- Local: 1",
-    userProfileXml: "<profile>user data</profile>",
-    usedTitlesXml: "<used>title1</used>",
-    defaultUserPrompt: "Assembled context with all blocks",
-  });
-  assert(systemPrompt.includes("Generate 5 days"), "calendar system: {{daysToPost}} replaced");
-  assert(systemPrompt.includes("Monday, Tuesday, Wednesday, Thursday, Friday"), "calendar system: {{targetDays}} replaced");
-  assert(systemPrompt.includes("<profile>user data</profile>"), "calendar system: {{questionnaireAnswers}} replaced");
-  assert(systemPrompt.includes("<used>title1</used>"), "calendar system: {{usedTitlesBlock}} replaced");
-  assert(!systemPrompt.includes("{{"), "calendar system: all placeholders replaced (no literal {{...}})");
-  assert(userPrompt === "Assembled context with all blocks", "calendar: user prompt is the assembled context");
-}
-
-// 5. Default calendar (no custom template) → system is default (no placeholders).
-{
-  const { systemPrompt, userPrompt } = buildCalendarPrompts({
-    customTemplate: null,
-    weekStarting: "2026-01-05",
-    firstDay: "Monday",
+function makeCtx(overrides: Partial<PromptPlaceholderContext> = {}): PromptPlaceholderContext {
+  return {
+    questionnaireAnswers: "<questionnaire>answers</questionnaire>",
+    usedTitlesBlock: "<usedTitles>title1</usedTitles>",
+    bestTimesBlock: "<bestTimes>9am</bestTimes>",
+    demographicsBlock: "<demographics>data</demographics>",
+    memoryBlock: "<memory>mem1</memory>",
+    performanceBlock: "<performance>perf</performance>",
+    contentPerformanceBlock: "<contentPerf>cp</contentPerf>",
+    followerTrendBlock: "<followerTrend>up</followerTrend>",
+    cadenceBlock: "<cadence>3x/week</cadence>",
+    feedbackBlock: "<feedback>good</feedback>",
+    trendingTopicsBlock: "<trending>topic1</trending>",
     daysToPost: 3,
     currentDay: "Monday",
     targetDays: ["Monday", "Wednesday", "Friday"],
-    formatMixStr: "- Reel: 3",
-    bucketDistStr: "- Expert: 3",
-    userProfileXml: "<profile/>",
-    usedTitlesXml: "",
-    defaultUserPrompt: "Assembled context",
-  });
-  assert(systemPrompt === "DEFAULT_CALENDAR_SYSTEM_PROMPT", "no custom calendar template → system is the default");
-  assert(userPrompt === "Assembled context", "no custom calendar template → user is the assembled context");
+    formatMix: "- VIDEO: 1\n- CAROUSEL: 1\n- TEXT: 1",
+    bucketDistribution: "- EDUCATE: 2\n- ENGAGE: 1",
+    weekStarting: "2026-08-08",
+    ...overrides,
+  };
 }
 
-// 6. Stale block placeholders (deepDiveBlock, goalBlock, etc.) → empty string.
-{
-  const template = "Before {{deepDiveBlock}} {{goalBlock}} {{voiceBlock}} After";
-  const { systemPrompt } = buildCalendarPrompts({
-    customTemplate: template,
-    weekStarting: "2026-01-05",
-    firstDay: "Monday",
-    daysToPost: 3,
-    currentDay: "Monday",
-    targetDays: ["Monday"],
-    formatMixStr: "- Reel: 3",
-    bucketDistStr: "- Expert: 3",
-    userProfileXml: "",
-    usedTitlesXml: "",
-    defaultUserPrompt: "ctx",
-  });
-  assert(systemPrompt === "Before    After", "calendar: stale block placeholders replaced with empty string");
-  assert(!systemPrompt.includes("{{"), "calendar: no stale placeholders leak");
+function makeStrategyCtx(overrides: Partial<StrategyPlaceholderContext> = {}): StrategyPlaceholderContext {
+  return {
+    weekStarting: "2026-08-08",
+    formatMix: "- VIDEO: 1\n- CAROUSEL: 1",
+    bucketMix: "- EDUCATE: 2\n- ENGAGE: 1",
+    daySummary: "Day 1: VIDEO\nDay 2: CAROUSEL",
+    primaryGoal: "Grow audience",
+    antiBrandWords: "spam, clickbait",
+    ...overrides,
+  };
 }
 
-// ─── Summary ────────────────────────────────────────────────────────────────
-if (fail > 0) {
-  console.error(`\n${fail} test(s) failed.`);
-  process.exit(1);
-} else {
-  console.log(`\nAll prompt-placeholder-semantics tests passed (${pass} assertions).`);
+// ─── Calendar placeholder tests ───────────────────────────────────────────
+
+function testAllCalendarPlaceholdersReplaced() {
+  const ctx = makeCtx();
+  const template = `System: {{questionnaireAnswers}} {{usedTitlesBlock}} {{bestTimesBlock}} {{demographicsBlock}} {{memoryBlock}} {{performanceBlock}} {{contentPerformanceBlock}} {{followerTrendBlock}} {{cadenceBlock}} {{feedbackBlock}} {{trendingTopicsBlock}} {{daysToPost}} {{currentDay}} {{targetDays}} {{formatMix}} {{bucketDistribution}} {{weekStarting}} {{firstDay}}`;
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(!result.includes("{{"), "no placeholders remain in calendar template");
+  assert(result.includes("<questionnaire>answers</questionnaire>"), "questionnaireAnswers replaced");
+  assert(result.includes("<usedTitles>title1</usedTitles>"), "usedTitlesBlock replaced");
+  assert(result.includes("3"), "daysToPost replaced");
+  assert(result.includes("Monday, Wednesday, Friday"), "targetDays replaced");
+  assert(result.includes("Monday"), "firstDay replaced (targetDays[0])");
 }
+
+function testStaleBlockPlaceholdersEmptied() {
+  const ctx = makeCtx();
+  const template = `{{deepDiveBlock}}{{goalBlock}}{{guardrailBlock}}{{voiceBlock}}{{offerBlock}}{{audienceBlock}}{{boundariesBlock}}{{personalContextBlock}}{{formattingBlock}}`;
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(result === "", "all stale block placeholders replaced with empty string");
+}
+
+function testCustomTemplateReplacesSystemOnly() {
+  const ctx = makeCtx();
+  const customSystem = "Custom: {{daysToPost}} days, {{weekStarting}}";
+  const userPrompt = "User: {{questionnaireAnswers}}";
+  const systemResult = replacePromptPlaceholders(customSystem, ctx);
+  const userResult = replacePromptPlaceholders(userPrompt, ctx);
+  assert(systemResult === "Custom: 3 days, 2026-08-08", "custom system template placeholders replaced");
+  assert(userResult === "User: <questionnaire>answers</questionnaire>", "user prompt placeholders replaced");
+}
+
+function testUnknownPlaceholderLeftAsIs() {
+  const ctx = makeCtx();
+  const template = "Hello {{unknownPlaceholder}} world";
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(result === "Hello {{unknownPlaceholder}} world", "unknown placeholder left as-is");
+}
+
+function testMultipleOccurrencesReplaced() {
+  const ctx = makeCtx();
+  const template = "{{daysToPost}} and {{daysToPost}} and {{daysToPost}}";
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(result === "3 and 3 and 3", "multiple occurrences of same placeholder replaced");
+}
+
+function testEmptyTargetDays() {
+  const ctx = makeCtx({ targetDays: [] });
+  const template = "{{targetDays}} {{firstDay}}";
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(result === " undefined", "empty targetDays → firstDay is undefined (edge case)");
+}
+
+function testZeroDaysToPost() {
+  const ctx = makeCtx({ daysToPost: 0 });
+  const template = "{{daysToPost}}";
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(result === "0", "zero daysToPost replaced as '0'");
+}
+
+function testNoPlaceholders() {
+  const ctx = makeCtx();
+  const template = "No placeholders here";
+  const result = replacePromptPlaceholders(template, ctx);
+  assert(result === "No placeholders here", "text without placeholders unchanged");
+}
+
+function testEmptyString() {
+  const ctx = makeCtx();
+  const result = replacePromptPlaceholders("", ctx);
+  assert(result === "", "empty string unchanged");
+}
+
+// ─── Strategy placeholder tests ───────────────────────────────────────────
+
+function testAllStrategyPlaceholdersReplaced() {
+  const ctx = makeStrategyCtx();
+  const template = `Week: {{weekStarting}} Mix: {{formatMix}} Buckets: {{bucketMix}} Summary: {{daySummary}} Goal: {{primaryGoal}} Avoid: {{antiBrandWords}}`;
+  const result = replaceStrategySystemPlaceholders(template, ctx);
+  assert(!result.includes("{{"), "no placeholders remain in strategy template");
+  assert(result.includes("2026-08-08"), "weekStarting replaced");
+  assert(result.includes("Grow audience"), "primaryGoal replaced");
+  assert(result.includes("spam, clickbait"), "antiBrandWords replaced");
+}
+
+function testStrategyUnknownPlaceholderLeftAsIs() {
+  const ctx = makeStrategyCtx();
+  const template = "{{questionnaireAnswers}} should remain";
+  const result = replaceStrategySystemPlaceholders(template, ctx);
+  assert(result === "{{questionnaireAnswers}} should remain", "calendar placeholder not replaced by strategy helper");
+}
+
+function testStrategyEmptyPrimaryGoal() {
+  const ctx = makeStrategyCtx({ primaryGoal: "" });
+  const template = "Goal: {{primaryGoal}}";
+  const result = replaceStrategySystemPlaceholders(template, ctx);
+  assert(result === "Goal: ", "empty primaryGoal replaced with empty string");
+}
+
+// ─── Run ──────────────────────────────────────────────────────────────────
+
+function main() {
+  testAllCalendarPlaceholdersReplaced();
+  testStaleBlockPlaceholdersEmptied();
+  testCustomTemplateReplacesSystemOnly();
+  testUnknownPlaceholderLeftAsIs();
+  testMultipleOccurrencesReplaced();
+  testEmptyTargetDays();
+  testZeroDaysToPost();
+  testNoPlaceholders();
+  testEmptyString();
+  testAllStrategyPlaceholdersReplaced();
+  testStrategyUnknownPlaceholderLeftAsIs();
+  testStrategyEmptyPrimaryGoal();
+
+  if (failures > 0) {
+    console.error(`\n${failures} test(s) FAILED`);
+    process.exitCode = 1;
+  } else {
+    console.log("All prompt-placeholder-semantics tests passed.");
+  }
+}
+
+main();

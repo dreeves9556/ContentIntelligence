@@ -1,315 +1,192 @@
 // Tests for the calendar-generation claim state machine.
 // Run: npx tsx src/lib/__tests__/calendar-claim-state.test.ts
 //
-// No DB harness exists, so this file inlines an in-memory claim store that
-// mimics the state machine in generateWeeklyCalendar
-// (src/app/dashboard/calendar/actions.ts). The guarantee proven here:
-// every post-claim failure path transitions the owned claim to FAILED (or
-// COMPLETED on success). No path leaves the claim stuck in PROCESSING.
+// Exercises the real `decideCalendarClaim` and `isValidCalendarRequestId`
+// from src/lib/calendar-claim-service.ts. No algorithm is copied — the test
+// drives the production decision function with synthetic rows.
+//
+// Transaction-isolation and true concurrency guarantees (Serializable
+// isolation, conditional updateMany races) require a real PostgreSQL
+// integration test. The unit tests here exercise the pure decision logic;
+// staging concurrency QA is still required.
 
-export {};
+import {
+  decideCalendarClaim,
+  isValidCalendarRequestId,
+  CALENDAR_CLAIM_LEASE_MS,
+  type CalendarClaimExistingRow,
+} from "../calendar-claim-service";
 
-type ClaimStatus = "PROCESSING" | "COMPLETED" | "FAILED";
-
-interface ClaimRow {
-  id: string;
-  userId: string;
-  requestId: string;
-  requestStatus: ClaimStatus;
-  requestClaimToken: string | null;
-  requestClaimedAt: number;
-  requestAttempts: number;
-  requestDaysToPost: number;
-  requestTimezoneOffset: number;
-  requestUserId: string;
-  resultingCalendarId: string | null;
-  errorMessage: string | null;
-  durationMs: number | null;
-  success: boolean;
-}
-
-class ClaimStore {
-  rows: Map<string, ClaimRow> = new Map();
-
-  claim(
-    userId: string,
-    requestId: string,
-    token: string,
-    now: number,
-    daysToPost: number,
-    tz: number
-  ): { kind: "claimed"; id: string } | { kind: "completed"; calendarId: string | null } | { kind: "in_progress" } | { kind: "param_mismatch" } {
-    const key = `${userId}:${requestId}`;
-    const existing = this.rows.get(key);
-    if (!existing) {
-      const row: ClaimRow = {
-        id: `log_${this.rows.size + 1}`,
-        userId,
-        requestId,
-        requestStatus: "PROCESSING",
-        requestClaimToken: token,
-        requestClaimedAt: now,
-        requestAttempts: 1,
-        requestDaysToPost: daysToPost,
-        requestTimezoneOffset: tz,
-        requestUserId: userId,
-        resultingCalendarId: null,
-        errorMessage: null,
-        durationMs: null,
-        success: false,
-      };
-      this.rows.set(key, row);
-      return { kind: "claimed", id: row.id };
-    }
-
-    if (existing.requestStatus === "COMPLETED") {
-      return { kind: "completed", calendarId: existing.resultingCalendarId };
-    }
-    if (existing.requestStatus === "PROCESSING") {
-      // Stale check omitted for simplicity — non-stale → in_progress.
-      return { kind: "in_progress" };
-    }
-    if (existing.requestStatus === "FAILED") {
-      if (
-        existing.requestDaysToPost !== daysToPost ||
-        existing.requestTimezoneOffset !== tz ||
-        existing.requestUserId !== userId
-      ) {
-        return { kind: "param_mismatch" };
-      }
-      existing.requestStatus = "PROCESSING";
-      existing.requestClaimToken = token;
-      existing.requestClaimedAt = now;
-      existing.requestAttempts += 1;
-      existing.errorMessage = null;
-      return { kind: "claimed", id: existing.id };
-    }
-    return { kind: "in_progress" };
-  }
-
-  failClaim(id: string, token: string, errorMessage: string, durationMs: number): boolean {
-    const row = [...this.rows.values()].find((r) => r.id === id);
-    if (!row || row.requestClaimToken !== token) return false;
-    row.requestStatus = "FAILED";
-    row.requestClaimToken = null;
-    row.success = false;
-    row.errorMessage = errorMessage;
-    row.durationMs = durationMs;
-    return true;
-  }
-
-  completeClaim(id: string, token: string, calendarId: string, durationMs: number): boolean {
-    const row = [...this.rows.values()].find((r) => r.id === id);
-    if (!row || row.requestClaimToken !== token) return false;
-    row.requestStatus = "COMPLETED";
-    row.requestClaimToken = null;
-    row.success = true;
-    row.resultingCalendarId = calendarId;
-    row.durationMs = durationMs;
-    return true;
-  }
-
-  getRow(userId: string, requestId: string): ClaimRow | undefined {
-    return this.rows.get(`${userId}:${requestId}`);
-  }
-}
-
-let pass = 0;
-let fail = 0;
+let failures = 0;
 function assert(condition: boolean, label: string): void {
-  if (condition) {
-    console.log(`PASS: ${label}`);
-    pass++;
-  } else {
+  if (!condition) {
     console.error(`FAIL: ${label}`);
-    fail++;
+    failures++;
   }
 }
 
-const USER = "user_1";
-const REQ = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-const DAYS = 3;
-const TZ = 0;
+const NOW = new Date("2026-08-08T12:00:00Z");
+const LEASE = CALENDAR_CLAIM_LEASE_MS; // 120_000
 
-// ─── Test 1: rate-limit failure → claim FAILED ───────────────────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok1", 1000, DAYS, TZ);
-  assert(claim.kind === "claimed", "rate-limit path: claim acquired");
-  if (claim.kind === "claimed") {
-    store.failClaim(claim.id, "tok1", "Rate limited", 50);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "FAILED", "rate-limit failure → claim FAILED");
-    assert(row.errorMessage === "Rate limited", "rate-limit failure records errorMessage");
-    assert(row.success === false, "rate-limit failure → success=false");
-    assert(row.requestClaimToken === null, "rate-limit failure clears claimToken");
+function makeRow(overrides: Partial<CalendarClaimExistingRow> = {}): CalendarClaimExistingRow {
+  return {
+    id: "log_1",
+    requestStatus: "PROCESSING",
+    requestClaimToken: "token_abc",
+    requestClaimedAt: NOW,
+    requestDaysToPost: 3,
+    requestTimezoneOffset: -5,
+    requestUserId: "user_1",
+    resultingCalendarId: null,
+    ...overrides,
+  };
+}
+
+const baseRequest = {
+  requestId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  userId: "user_1",
+  daysToPost: 3,
+  timezoneOffsetHours: -5,
+};
+
+// ─── Tests ────────────────────────────────────────────────────────────────
+
+function testNewClaim() {
+  const decision = decideCalendarClaim(null, baseRequest, NOW, LEASE);
+  assert(decision.kind === "CLAIM_NEW", "no existing row → CLAIM_NEW");
+}
+
+function testDuplicateCompleted() {
+  const row = makeRow({
+    requestStatus: "COMPLETED",
+    resultingCalendarId: "cal_123",
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "COMPLETED", "COMPLETED row → COMPLETED");
+  assert((decision as { calendarId: string }).calendarId === "cal_123", "COMPLETED returns calendarId");
+}
+
+function testDuplicateCompletedNoCalendar() {
+  const row = makeRow({
+    requestStatus: "COMPLETED",
+    resultingCalendarId: null,
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "COMPLETED", "COMPLETED with no calendar → COMPLETED");
+  assert((decision as { calendarId: string | null }).calendarId === null, "COMPLETED null calendarId");
+}
+
+function testFreshProcessing() {
+  const row = makeRow({
+    requestStatus: "PROCESSING",
+    requestClaimedAt: new Date(NOW.getTime() - 30_000), // 30s ago, fresh
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "IN_PROGRESS", "fresh PROCESSING → IN_PROGRESS");
+}
+
+function testStaleReclaim() {
+  const row = makeRow({
+    requestStatus: "PROCESSING",
+    requestClaimedAt: new Date(NOW.getTime() - LEASE - 1000), // stale
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "RECLAIM", "stale PROCESSING → RECLAIM");
+  assert((decision as { fromStatus: string }).fromStatus === "PROCESSING", "RECLAIM fromStatus PROCESSING");
+}
+
+function testStaleReclaimNullClaimedAt() {
+  const row = makeRow({
+    requestStatus: "PROCESSING",
+    requestClaimedAt: null,
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "RECLAIM", "PROCESSING with null claimedAt → RECLAIM");
+}
+
+function testFailedReclaimMatchingParams() {
+  const row = makeRow({
+    requestStatus: "FAILED",
+    requestDaysToPost: 3,
+    requestTimezoneOffset: -5,
+    requestUserId: "user_1",
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "RECLAIM", "FAILED with matching params → RECLAIM");
+  assert((decision as { fromStatus: string }).fromStatus === "FAILED", "RECLAIM fromStatus FAILED");
+}
+
+function testFailedReclaimParamMismatchDays() {
+  const row = makeRow({
+    requestStatus: "FAILED",
+    requestDaysToPost: 5, // different
+    requestTimezoneOffset: -5,
+    requestUserId: "user_1",
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "PARAM_MISMATCH", "FAILED with different daysToPost → PARAM_MISMATCH");
+}
+
+function testFailedReclaimParamMismatchTz() {
+  const row = makeRow({
+    requestStatus: "FAILED",
+    requestDaysToPost: 3,
+    requestTimezoneOffset: 0, // different
+    requestUserId: "user_1",
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "PARAM_MISMATCH", "FAILED with different timezone → PARAM_MISMATCH");
+}
+
+function testFailedReclaimParamMismatchUser() {
+  const row = makeRow({
+    requestStatus: "FAILED",
+    requestDaysToPost: 3,
+    requestTimezoneOffset: -5,
+    requestUserId: "user_other", // different
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "PARAM_MISMATCH", "FAILED with different userId → PARAM_MISMATCH");
+}
+
+function testUnknownStatus() {
+  const row = makeRow({
+    requestStatus: "WEIRD",
+  });
+  const decision = decideCalendarClaim(row, baseRequest, NOW, LEASE);
+  assert(decision.kind === "IN_PROGRESS", "unknown status → IN_PROGRESS (safe default)");
+}
+
+function testRequestIdValidation() {
+  assert(isValidCalendarRequestId("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "valid UUID accepted");
+  assert(!isValidCalendarRequestId(""), "empty requestId rejected");
+  assert(!isValidCalendarRequestId("not-a-uuid"), "non-UUID rejected");
+  assert(!isValidCalendarRequestId("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa"), "too-short UUID rejected");
+  assert(isValidCalendarRequestId("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), "uppercase UUID accepted");
+}
+
+// ─── Run ──────────────────────────────────────────────────────────────────
+
+function main() {
+  testNewClaim();
+  testDuplicateCompleted();
+  testDuplicateCompletedNoCalendar();
+  testFreshProcessing();
+  testStaleReclaim();
+  testStaleReclaimNullClaimedAt();
+  testFailedReclaimMatchingParams();
+  testFailedReclaimParamMismatchDays();
+  testFailedReclaimParamMismatchTz();
+  testFailedReclaimParamMismatchUser();
+  testUnknownStatus();
+  testRequestIdValidation();
+
+  if (failures > 0) {
+    console.error(`\n${failures} test(s) FAILED`);
+    process.exitCode = 1;
+  } else {
+    console.log("All calendar-claim-state tests passed.");
   }
 }
 
-// ─── Test 2: API key missing → claim FAILED ──────────────────────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok2", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    store.failClaim(claim.id, "tok2", "Anthropic API key not configured", 100);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "FAILED", "API key missing → claim FAILED");
-  }
-}
-
-// ─── Test 3: AI service error → claim FAILED ──────────────────────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok3", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    store.failClaim(claim.id, "tok3", "AI service error (500)", 5000);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "FAILED", "AI service error → claim FAILED");
-  }
-}
-
-// ─── Test 4: parse error → claim FAILED ───────────────────────────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok4", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    store.failClaim(claim.id, "tok4", "Failed to parse AI response", 8000);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "FAILED", "parse error → claim FAILED");
-  }
-}
-
-// ─── Test 5: incomplete calendar → claim FAILED ───────────────────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok5", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    store.failClaim(claim.id, "tok5", "AI returned an incomplete calendar", 9000);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "FAILED", "incomplete calendar → claim FAILED");
-  }
-}
-
-// ─── Test 6: prework exception (outer catch) → claim FAILED ───────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok6", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    store.failClaim(claim.id, "tok6", "Unknown error during prework", 200);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "FAILED", "prework exception → claim FAILED");
-  }
-}
-
-// ─── Test 7: success → claim COMPLETED ────────────────────────────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok7", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    store.completeClaim(claim.id, "tok7", "cal_123", 15000);
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "COMPLETED", "success → claim COMPLETED");
-    assert(row.resultingCalendarId === "cal_123", "success records resultingCalendarId");
-    assert(row.success === true, "success → success=true");
-    assert(row.requestClaimToken === null, "success clears claimToken");
-  }
-}
-
-// ─── Test 8: duplicate request after COMPLETED → returns calendarId ───────
-{
-  const store = new ClaimStore();
-  store.claim(USER, REQ, "tok8", 1000, DAYS, TZ);
-  const row = store.getRow(USER, REQ)!;
-  store.completeClaim(row.id, "tok8", "cal_456", 10000);
-  const second = store.claim(USER, REQ, "tok8b", 2000, DAYS, TZ);
-  assert(second.kind === "completed", "duplicate COMPLETED request returns completed");
-  if (second.kind === "completed") {
-    assert(second.calendarId === "cal_456", "duplicate returns correct calendarId");
-  }
-}
-
-// ─── Test 9: retry after FAILED with matching params → re-claimed ─────────
-{
-  const store = new ClaimStore();
-  const c1 = store.claim(USER, REQ, "tok9", 1000, DAYS, TZ);
-  if (c1.kind === "claimed") {
-    store.failClaim(c1.id, "tok9", "transient error", 100);
-  }
-  const c2 = store.claim(USER, REQ, "tok9b", 2000, DAYS, TZ);
-  assert(c2.kind === "claimed", "retry after FAILED with matching params re-claimed");
-  const row = store.getRow(USER, REQ)!;
-  assert(row.requestAttempts === 2, "retry increments attempts");
-  assert(row.requestStatus === "PROCESSING", "retry sets status back to PROCESSING");
-}
-
-// ─── Test 10: retry after FAILED with mismatched params → param_mismatch ──
-{
-  const store = new ClaimStore();
-  const c1 = store.claim(USER, REQ, "tok10", 1000, DAYS, TZ);
-  if (c1.kind === "claimed") {
-    store.failClaim(c1.id, "tok10", "error", 100);
-  }
-  const c2 = store.claim(USER, REQ, "tok10b", 2000, 5, TZ); // different daysToPost
-  assert(c2.kind === "param_mismatch", "retry with mismatched params → param_mismatch");
-  const row = store.getRow(USER, REQ)!;
-  assert(row.requestStatus === "FAILED", "param_mismatch does not change claim status");
-}
-
-// ─── Test 11: lost lease — completeClaim with wrong token is no-op ────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok11", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    const ok = store.completeClaim(claim.id, "wrong_token", "cal_789", 1000);
-    assert(ok === false, "completeClaim with wrong token is no-op (lost lease)");
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "PROCESSING", "lost-lease complete does not change status");
-  }
-}
-
-// ─── Test 12: lost lease — failClaim with wrong token is no-op ────────────
-{
-  const store = new ClaimStore();
-  const claim = store.claim(USER, REQ, "tok12", 1000, DAYS, TZ);
-  if (claim.kind === "claimed") {
-    const ok = store.failClaim(claim.id, "wrong_token", "error", 100);
-    assert(ok === false, "failClaim with wrong token is no-op (lost lease)");
-    const row = store.getRow(USER, REQ)!;
-    assert(row.requestStatus === "PROCESSING", "lost-lease fail does not change status");
-  }
-}
-
-// ─── Test 13: every failure path is terminal (no stuck PROCESSING) ────────
-// Simulate all failure paths and verify none leave PROCESSING.
-{
-  const store = new ClaimStore();
-  const failurePaths = [
-    "Rate limited",
-    "Anthropic API key not configured",
-    "AI service error (500)",
-    "Failed to parse AI response",
-    "AI returned an incomplete calendar",
-    "Unknown error during prework",
-  ];
-  let allTerminal = true;
-  for (let i = 0; i < failurePaths.length; i++) {
-    const reqId = `bbbbbbbb-bbbb-bbbb-bbbb-${i.toString().padStart(12, "0")}`;
-    const claim = store.claim(USER, reqId, `tok_${i}`, 1000, DAYS, TZ);
-    if (claim.kind === "claimed") {
-      store.failClaim(claim.id, `tok_${i}`, failurePaths[i], 100);
-      const row = store.getRow(USER, reqId)!;
-      if (row.requestStatus !== "FAILED") allTerminal = false;
-    } else {
-      allTerminal = false;
-    }
-  }
-  assert(allTerminal, "all 6 failure paths transition claim to FAILED (none stuck PROCESSING)");
-}
-
-// ─── Summary ────────────────────────────────────────────────────────────────
-if (fail > 0) {
-  console.error(`\n${fail} test(s) failed.`);
-  process.exit(1);
-} else {
-  console.log(`\nAll calendar-claim-state tests passed (${pass} assertions).`);
-}
+main();
