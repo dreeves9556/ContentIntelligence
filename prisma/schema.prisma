@@ -648,7 +648,7 @@ model ScheduledPushNotification {
   url          String?
   segment      String   @default("all") // all, CALENDAR_ONLY, CREATOR, PRO
   scheduledFor DateTime
-  status       String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
+  status       String   @default("PENDING") // PENDING, PROCESSING, SENT, CANCELLED, FAILED
   sentCount    Int      @default(0)
   failedCount  Int      @default(0)
   createdBy    String?
@@ -656,7 +656,18 @@ model ScheduledPushNotification {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // ── Bounded recoverable claim state ──────────────────────────────────
+  // A worker claims a due PENDING row by atomically setting status →
+  // PROCESSING and stamping claimToken + claimedAt. Only the worker holding
+  // claimToken may finalize the row (SENT/FAILED). Stale PROCESSING rows
+  // (claimedAt older than the lease) are reclaimable by another worker.
+  claimToken   String?
+  claimedAt    DateTime?
+  attempts     Int      @default(0)
+  lastError    String?
+
   @@index([status, scheduledFor])
+  @@index([status, claimedAt])
   @@map("scheduled_push_notifications")
 }
 
@@ -735,6 +746,7 @@ model ZernioEvent {
   eventType   String
   status      String    @default("PROCESSING") // PROCESSING, SUCCEEDED, FAILED
   attempts    Int       @default(1)
+  claimToken  String?
   claimedAt   DateTime  @default(now())
   processedAt DateTime?
   lastError   String?

@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
-import { zernio } from "@/lib/zernio";
+import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
+import { severZernioForUser } from "@/lib/zernio-sever";
 
 /**
  * Permanently delete the user's account and all associated data.
@@ -92,33 +93,42 @@ export async function POST(request: Request) {
   // TEAM_ADMIN users are blocked above, so only USER role reaches here.
   // Their stripeSubscriptionId is already captured above (if any).
 
-  const stripe = getStripe();
-
   if (subscriptionId) {
+    if (!isStripeCheckoutConfigured()) {
+      // There is a subscription ID but Stripe is not configured — we cannot
+      // cancel it. Block deletion so the subscription is not orphaned (once
+      // the User row is gone, the subscription ID is lost and the subscription
+      // becomes unmanageable through the app).
+      console.error("[ACCOUNT DELETE] Stripe not configured but user has a subscription — blocking deletion");
+      return NextResponse.json(
+        { error: "Your account has an active subscription but Stripe is not configured. Please contact support to cancel your subscription before deleting your account." },
+        { status: 500 }
+      );
+    }
+
     try {
+      const stripe = getStripe();
       await stripe.subscriptions.cancel(subscriptionId);
       console.log(`[ACCOUNT DELETE] Cancelled Stripe subscription ${subscriptionId} for user ${user.id}`);
     } catch (error) {
-      // Log but don't block — the subscription may already be canceled
+      // Block deletion — the subscription may still be active. Once the User
+      // row is gone, the subscription ID is lost and the subscription becomes
+      // unmanageable through the app. The user can retry once the
+      // subscription is canceled or contact support.
       console.error("[ACCOUNT DELETE] Failed to cancel Stripe subscription:", error);
+      return NextResponse.json(
+        { error: "Failed to cancel your Stripe subscription. Your account was not deleted. Retry once the subscription is canceled, or contact support." },
+        { status: 500 }
+      );
     }
   }
 
   try {
-    // Delete Zernio accounts on Zernio's side before DB cascade removes our records
-    const zernioAccounts = await prisma.zernioAccount.findMany({
-      where: { userId: user.id },
-      select: { zernioAccountId: true, platform: true },
-    });
-
-    for (const acc of zernioAccounts) {
-      try {
-        await zernio.accounts.delete(acc.zernioAccountId);
-        console.log(`[ACCOUNT DELETE] Deleted Zernio account ${acc.zernioAccountId} (${acc.platform})`);
-      } catch (error) {
-        console.error(`[ACCOUNT DELETE] Failed to delete Zernio account ${acc.zernioAccountId}:`, error);
-      }
-    }
+    // Sever Zernio social-account connections on Zernio's side BEFORE the DB
+    // cascade removes our records. Best-effort — errors are logged but don't
+    // block (a failed Zernio delete is recoverable; an orphaned paid
+    // subscription is not).
+    await severZernioForUser(user.id);
 
     // Clean up any invite tokens associated with this user's email
     if (user.email) {

@@ -162,6 +162,70 @@ try {
   }
 }
 
+// ─── Legacy null format backward compatibility (Issue 1) ────────────────────
+
+// 11. Legacy currentVersion.format === null → interpreted as post.format (no throw).
+assertPostMatchesCurrentVersion(
+  makePost({ format: "Reel" }),
+  makeVersion({ format: null })
+);
+assert(true, "legacy null current-version format passes (interpreted as post.format)");
+
+// 12. checkPostIntegrity returns null for legacy null format.
+assert(
+  checkPostIntegrity(makePost({ format: "Carousel" }), makeVersion({ format: null })) === null,
+  "checkPostIntegrity returns null for legacy null format"
+);
+
+// 13. Non-null mismatched format → still throws CONTENT_MISMATCH.
+try {
+  assertPostMatchesCurrentVersion(makePost({ format: "Reel" }), makeVersion({ format: "Carousel" }));
+  console.error("FAIL: non-null mismatched format should throw");
+  failures++;
+} catch (e) {
+  if (e instanceof PostIntegrityError && e.reason === "CONTENT_MISMATCH") {
+    console.log("PASS: non-null mismatched format throws CONTENT_MISMATCH");
+  } else {
+    console.error(`FAIL: wrong error/reason for non-null format mismatch — ${(e as Error).name}`);
+    failures++;
+  }
+}
+
+// 14. New versions capture format (matching post.format) → no throw.
+assertPostMatchesCurrentVersion(
+  makePost({ format: "Static" }),
+  makeVersion({ format: "Static" })
+);
+assert(true, "new versions capture format (matching post.format) — no throw");
+
+// 15. Restoring a legacy null-format historical version: the restore path
+// stores format: targetVersion.format ?? post.format, so the new version
+// produced by a restore always has a non-null format. Simulate that here:
+// a restored version with the post's current format must pass integrity.
+assertPostMatchesCurrentVersion(
+  makePost({ format: "Reel" }),
+  makeVersion({ format: "Reel" }) // restored version captured post.format
+);
+assert(true, "restoring a legacy null-format version produces a non-null format (passes integrity)");
+
+// 16. Null format on a non-format field mismatch still throws (format compat
+// does not mask other field mismatches).
+try {
+  assertPostMatchesCurrentVersion(
+    makePost({ format: "Reel", title: "current title" }),
+    makeVersion({ format: null, title: "different title" })
+  );
+  console.error("FAIL: title mismatch with null format should still throw");
+  failures++;
+} catch (e) {
+  if (e instanceof PostIntegrityError && e.reason === "CONTENT_MISMATCH") {
+    console.log("PASS: title mismatch with null format still throws CONTENT_MISMATCH");
+  } else {
+    console.error(`FAIL: wrong error/reason for title mismatch with null format — ${(e as Error).name}`);
+    failures++;
+  }
+}
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed.`);

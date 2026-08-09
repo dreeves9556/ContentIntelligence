@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   sendPostPublishedNotification,
@@ -16,6 +18,90 @@ function verifySignature(payload: string, signature: string | null, secret: stri
   } catch {
     return false;
   }
+}
+
+/**
+ * Lease duration for a Zernio event claim. A PROCESSING row whose claimedAt
+ * is older than this is considered abandoned (worker crash or timeout) and
+ * may be reclaimed by another delivery.
+ */
+const ZERNIO_EVENT_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * Concurrency-safe, recoverable claim for a Zernio webhook event.
+ *
+ * Returns:
+ *   - { status: "CLAIMED", claimToken } — this worker owns the event
+ *   - { status: "SUCCEEDED" } — already processed, skip
+ *   - { status: "BUSY" } — another worker is actively processing, skip
+ *
+ * The claim is atomic:
+ *   1. Try to insert a new PROCESSING row. P2002 means a row exists.
+ *   2. If a row exists and is SUCCEEDED, return SUCCEEDED.
+ *   3. If a row exists and is FAILED or stale PROCESSING, conditionally
+ *      updateMany to PROCESSING with a new claimToken. The conditional
+ *      update ensures two concurrent workers cannot both reclaim the same row.
+ */
+async function claimZernioEvent(
+  eventId: string,
+  eventType: string
+): Promise<
+  | { status: "CLAIMED"; claimToken: string }
+  | { status: "SUCCEEDED" }
+  | { status: "BUSY" }
+> {
+  const now = new Date();
+  const claimToken = randomUUID();
+
+  try {
+    await prisma.zernioEvent.create({
+      data: {
+        eventId,
+        eventType,
+        status: "PROCESSING",
+        claimToken,
+        claimedAt: now,
+      },
+    });
+    return { status: "CLAIMED", claimToken };
+  } catch (error) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002"
+    ) {
+      throw error;
+    }
+  }
+
+  // Row exists — re-read and decide.
+  const existing = await prisma.zernioEvent.findUnique({
+    where: { eventId },
+    select: { status: true },
+  });
+  if (existing?.status === "SUCCEEDED") return { status: "SUCCEEDED" };
+
+  const staleBefore = new Date(now.getTime() - ZERNIO_EVENT_LEASE_MS);
+  const reclaimed = await prisma.zernioEvent.updateMany({
+    where: {
+      eventId,
+      OR: [
+        { status: "FAILED" },
+        { status: "PROCESSING", claimedAt: { lt: staleBefore } },
+      ],
+    },
+    data: {
+      status: "PROCESSING",
+      eventType,
+      claimToken,
+      claimedAt: now,
+      attempts: { increment: 1 },
+      lastError: null,
+    },
+  });
+
+  return reclaimed.count === 1
+    ? { status: "CLAIMED", claimToken }
+    : { status: "BUSY" };
 }
 
 export async function POST(request: Request) {
@@ -58,51 +144,28 @@ export async function POST(request: Request) {
   }
 
   // ── Idempotency: deduplicate webhook deliveries ──────────────────────
-  // Zernio may redeliver events on timeout/5xx. Without dedup, each
-  // redelivery sends a duplicate push notification. Use the provider's
-  // eventId/id if present, otherwise derive a deterministic key from the
-  // event payload so identical redeliverions map to the same row.
+  // Zernio may redeliver events on timeout/5xx. Use the provider's eventId/id
+  // if present, otherwise derive a deterministic key from the event payload
+  // so identical redeliveries map to the same row.
   const eventId = event.eventId ?? event.id ?? crypto
     .createHash("sha256")
     .update(body)
     .digest("hex")
     .slice(0, 64);
 
-  const existingEvent = await prisma.zernioEvent.findUnique({
-    where: { eventId },
-    select: { status: true },
-  });
-
-  if (existingEvent?.status === "SUCCEEDED") {
-    // Already processed — acknowledge without re-sending notifications.
+  // Concurrency-safe claim. Previously the findUnique + update/create pattern
+  // allowed two workers to both process the same event (duplicate
+  // notifications) and left crashed workers' rows stuck in PROCESSING.
+  const claim = await claimZernioEvent(eventId, eventType);
+  if (claim.status === "SUCCEEDED") {
     return NextResponse.json({ ok: true, duplicate: true });
   }
-
-  if (existingEvent?.status === "PROCESSING") {
-    // Another worker is handling this event — acknowledge to stop redelivery.
+  if (claim.status === "BUSY") {
+    // Another worker is actively processing — acknowledge to stop redelivery.
     return NextResponse.json({ ok: true, inProgress: true });
   }
 
-  // Claim the event (insert new, or re-claim a FAILED one).
-  if (existingEvent?.status === "FAILED") {
-    await prisma.zernioEvent.update({
-      where: { eventId },
-      data: { status: "PROCESSING", attempts: { increment: 1 }, claimedAt: new Date() },
-    });
-  } else {
-    try {
-      await prisma.zernioEvent.create({
-        data: { eventId, eventType, status: "PROCESSING" },
-      });
-    } catch (err) {
-      // P2002 = another worker inserted first; acknowledge to stop redelivery.
-      const prismaErr = err as { code?: string };
-      if (prismaErr.code === "P2002") {
-        return NextResponse.json({ ok: true, duplicate: true });
-      }
-      throw err;
-    }
-  }
+  const { claimToken } = claim;
 
   // Find the user by Zernio account ID or profile ID
   let userId: string | null = null;
@@ -129,10 +192,11 @@ export async function POST(request: Request) {
 
   if (!userId) {
     console.warn(`[ZERNIO WEBHOOK] No user found for event ${eventType}`, { accountId: event.accountId, profileId: event.profileId });
-    // Mark as SUCCEEDED — no user to notify, no point retrying.
-    await prisma.zernioEvent.update({
-      where: { eventId },
-      data: { status: "SUCCEEDED", processedAt: new Date() },
+    // Mark as SUCCEEDED — no user to notify, no point retrying. Guarded by
+    // claimToken so only the claim holder can finalize.
+    await prisma.zernioEvent.updateMany({
+      where: { eventId, claimToken, status: "PROCESSING" },
+      data: { status: "SUCCEEDED", processedAt: new Date(), claimToken: null },
     }).catch((err) => console.error("[ZERNIO WEBHOOK] Failed to mark event SUCCEEDED:", err));
     return NextResponse.json({ ok: true, message: "No matching user" });
   }
@@ -163,15 +227,22 @@ export async function POST(request: Request) {
         console.log(`[ZERNIO WEBHOOK] Unhandled event type: ${eventType}`);
     }
 
-    await prisma.zernioEvent.update({
-      where: { eventId },
-      data: { status: "SUCCEEDED", processedAt: new Date() },
-    }).catch((err) => console.error("[ZERNIO WEBHOOK] Failed to mark event SUCCEEDED:", err));
+    // Finalize as SUCCEEDED — guarded by claimToken so only the claim holder
+    // can mark it. If the lease was lost (stale reclaim by another worker),
+    // this update is a no-op and the other worker owns the finalization.
+    const completed = await prisma.zernioEvent.updateMany({
+      where: { eventId, claimToken, status: "PROCESSING" },
+      data: { status: "SUCCEEDED", processedAt: new Date(), claimToken: null, lastError: null },
+    });
+    if (completed.count === 0) {
+      console.warn(`[ZERNIO WEBHOOK] Lost processing lease for ${eventId}`);
+    }
   } catch (err) {
     console.error(`[ZERNIO WEBHOOK] Failed to process ${eventType}:`, err);
-    await prisma.zernioEvent.update({
-      where: { eventId },
-      data: { status: "FAILED", lastError: String(err).slice(0, 500) },
+    // Finalize as FAILED — guarded by claimToken.
+    await prisma.zernioEvent.updateMany({
+      where: { eventId, claimToken, status: "PROCESSING" },
+      data: { status: "FAILED", claimToken: null, lastError: (err instanceof Error ? err.message : String(err)).slice(0, 2000) },
     }).catch((e) => console.error("[ZERNIO WEBHOOK] Failed to mark event FAILED:", e));
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }

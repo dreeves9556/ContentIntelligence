@@ -5,6 +5,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/scheduled-pushes",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/notifications",
       "schedule": "0 9 * * *"
     },
