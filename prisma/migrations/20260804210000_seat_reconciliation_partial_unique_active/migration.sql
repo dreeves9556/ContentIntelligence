@@ -37,7 +37,7 @@ BEGIN
   SELECT COUNT(*) INTO dup_count
   FROM (
     SELECT "organizationId"
-    FROM "SeatReconciliationOperation"
+    FROM "seat_reconciliation_operations"
     WHERE "status" IN ('PENDING', 'RECOVERY_REQUIRED')
     GROUP BY "organizationId"
     HAVING COUNT(*) > 1
@@ -47,7 +47,7 @@ BEGIN
     SELECT string_agg("organizationId", ', ') INTO dup_orgs
     FROM (
       SELECT DISTINCT "organizationId"
-      FROM "SeatReconciliationOperation"
+      FROM "seat_reconciliation_operations"
       WHERE "status" IN ('PENDING', 'RECOVERY_REQUIRED')
       GROUP BY "organizationId"
       HAVING COUNT(*) > 1
@@ -65,5 +65,5 @@ BEGIN
 END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "seat_reconciliation_active_unique_org_idx"
-  ON "SeatReconciliationOperation" ("organizationId")
+  ON "seat_reconciliation_operations" ("organizationId")
   WHERE "status" IN ('PENDING', 'RECOVERY_REQUIRED');
