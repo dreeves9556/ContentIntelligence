@@ -2,6 +2,7 @@ import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { AccountAccessUser } from "@/lib/account-access";
+import { isBetaUser } from "@/lib/account-access";
 import type { UserPlan } from "@/lib/tiers";
 import { evaluateDashboardAccess } from "@/lib/access-policy";
 
@@ -80,4 +81,19 @@ export async function requireDashboardAccess(
     allowed: true,
     user: { ...user, plan: policy.effectivePlan },
   };
+}
+
+export type BetaAccessResult = DashboardAccessResult;
+
+export async function requireBetaAccess(
+  options: DashboardAccessOptions = {}
+): Promise<BetaAccessResult> {
+  const access = await requireDashboardAccess(options);
+  if (!access.allowed) return access;
+
+  if (!isBetaUser(access.user)) {
+    return { allowed: false, status: 403, error: "This feature is in beta." };
+  }
+
+  return access;
 }
