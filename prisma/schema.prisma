@@ -74,6 +74,10 @@ model User {
   loginAnnouncementDismissals LoginAnnouncementDismissal[]
   accounts                   Account[]
   sessions                   Session[]
+  listings                   Listing[]
+  listingContents            ListingContent[]
+  listingLibraryItems        ListingLibraryItem[]
+  listingGenerationRequests  ListingGenerationRequest[]
 
   @@index([internalTag])
   @@index([accountStatus])
@@ -1107,4 +1111,236 @@ model PostRefinementMessage {
   @@index([sessionId, turnId, createdAt])
   @@index([sessionId, createdAt])
   @@map("post_refinement_messages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Listings (V1A — Manual Listings Foundation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ListingSourceType {
+  MANUAL
+  URL_IMPORT
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ListingContentIntent {
+  COMING_SOON
+  JUST_LISTED
+  OPEN_HOUSE
+  PRICE_IMPROVEMENT
+  PROPERTY_SPOTLIGHT
+  UNDER_CONTRACT
+  JUST_SOLD
+  CUSTOM
+}
+
+enum ListingAssetType {
+  SOCIAL_CAPTION
+}
+
+enum ListingContentStatus {
+  GENERATED
+  REFINED
+  APPROVED
+}
+
+enum ListingContentVersionSource {
+  GENERATION
+  AI_REFINEMENT
+  MANUAL_EDIT
+  RESTORE
+}
+
+enum ListingComplianceStatus {
+  CLEAN
+  WARNING
+  BLOCKED
+}
+
+enum ListingGenerationRequestStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Listing {
+  id                  String            @id @default(cuid())
+  userId              String
+  sourceType          ListingSourceType @default(MANUAL)
+  sourceUrl           String?
+  normalizedSourceUrl String?
+  status              ListingStatus     @default(DRAFT)
+
+  addressLine1        String
+  addressLine2        String?
+  city                String
+  state               String
+  postalCode          String
+  normalizedAddress   String
+  propertyType        String
+  price               Decimal?          @db.Decimal(14, 2)
+
+  factsJson           Json
+  insightsJson        Json              @default("{}")
+  extractedFactsJson  Json?
+  extractionMeta      Json?
+  factsRevision       Int               @default(0)
+  factsConfirmedAt    DateTime?
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  archivedAt          DateTime?
+
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content             ListingContent[]
+  generationRequests  ListingGenerationRequest[]
+  libraryItems        ListingLibraryItem[]
+
+  @@unique([id, userId])
+  @@index([userId, status, updatedAt])
+  @@index([userId, normalizedAddress])
+  @@index([userId, normalizedSourceUrl])
+  @@map("listings")
+}
+
+model ListingContent {
+  id                String                 @id @default(cuid())
+  listingId         String
+  userId            String
+  intent            ListingContentIntent
+  intentDataJson    Json                   @default("{}")
+  assetType         ListingAssetType       @default(SOCIAL_CAPTION)
+  platform          String                 @default("GENERIC")
+  status            ListingContentStatus   @default(GENERATED)
+
+  title             String                 @default("")
+  hook              String
+  body              String                 @default("")
+  cta               String
+  caption           String
+  musicSuggestion   String?
+  duration          String?
+  directions        String?
+
+  currentVersionId  String?                @unique
+  approvedVersionId String?                @unique
+  approvedAt        DateTime?
+  approvalMetaJson  Json?
+
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  listing           Listing                @relation(fields: [listingId, userId], references: [id, userId], onDelete: Cascade)
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions          ListingContentVersion[] @relation("ListingContentVersions")
+  currentVersion    ListingContentVersion?  @relation("ListingCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  approvedVersion   ListingContentVersion?  @relation("ListingApprovedVersion", fields: [approvedVersionId], references: [id], onDelete: SetNull)
+  generationRequest ListingGenerationRequest? @relation("ListingGenerationResult")
+  libraryItems      ListingLibraryItem[]
+
+  @@unique([id, userId])
+  @@index([listingId, createdAt])
+  @@index([userId, status, updatedAt])
+  @@map("listing_contents")
+}
+
+model ListingContentVersion {
+  id                        String                      @id @default(cuid())
+  contentId                 String
+  versionNumber             Int
+  source                    ListingContentVersionSource @default(GENERATION)
+
+  title                     String
+  hook                      String
+  body                      String
+  cta                       String
+  caption                   String
+  musicSuggestion           String?
+  duration                  String?
+  directions                String?
+
+  changeSummary             String?
+  factsRevision             Int
+  factsSnapshotJson         Json
+  insightsSnapshotJson      Json
+  intentDataSnapshotJson    Json
+  provenanceJson            Json?
+  complianceStatus          ListingComplianceStatus
+  complianceIssuesJson      Json?
+
+  aiModel                   String?
+  promptTokens              Int?
+  completionTokens          Int?
+  estimatedCostMicrodollars Int?
+  latencyMs                 Int?
+
+  previousVersionId         String?
+  restoredFromVersionId     String?
+  createdAt                 DateTime                    @default(now())
+
+  content                   ListingContent              @relation("ListingContentVersions", fields: [contentId], references: [id], onDelete: Cascade)
+  currentVersionOf          ListingContent?             @relation("ListingCurrentVersion")
+  approvedVersionOf         ListingContent?             @relation("ListingApprovedVersion")
+  previousVersion           ListingContentVersion?      @relation("ListingVersionChain", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  nextVersions              ListingContentVersion[]     @relation("ListingVersionChain")
+  restoredFrom              ListingContentVersion?      @relation("ListingVersionRestore", fields: [restoredFromVersionId], references: [id], onDelete: SetNull)
+  restoredInVersions        ListingContentVersion[]     @relation("ListingVersionRestore")
+  libraryItems              ListingLibraryItem[]
+
+  @@unique([id, contentId])
+  @@unique([contentId, versionNumber])
+  @@index([contentId, createdAt])
+  @@map("listing_content_versions")
+}
+
+model ListingLibraryItem {
+  id          String                @id @default(cuid())
+  userId      String
+  listingId   String
+  contentId   String
+  versionId   String
+  savedAt     DateTime              @default(now())
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing     Listing               @relation(fields: [listingId, userId], references: [id, userId], onDelete: Cascade)
+  content     ListingContent        @relation(fields: [contentId, userId], references: [id, userId], onDelete: Cascade)
+  version     ListingContentVersion @relation(fields: [versionId, contentId], references: [id, contentId], onDelete: Cascade)
+
+  @@unique([contentId, versionId])
+  @@index([userId, savedAt])
+  @@index([listingId, savedAt])
+  @@map("listing_library_items")
+}
+
+model ListingGenerationRequest {
+  id                 String                         @id @default(cuid())
+  userId             String
+  listingId          String
+  requestId          String
+  intent             ListingContentIntent
+  requestParamsHash  String
+  status             ListingGenerationRequestStatus @default(PROCESSING)
+  claimToken         String
+  claimedAt          DateTime
+  completedAt        DateTime?
+  attempts           Int                            @default(1)
+  errorKind          String?
+  errorMessage       String?
+  resultingContentId String?                        @unique
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+
+  listing            Listing                        @relation(fields: [listingId, userId], references: [id, userId], onDelete: Cascade)
+  user               User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resultingContent   ListingContent?                @relation("ListingGenerationResult", fields: [resultingContentId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestId])
+  @@index([status, claimedAt])
+  @@index([listingId, createdAt])
+  @@map("listing_generation_requests")
 }
