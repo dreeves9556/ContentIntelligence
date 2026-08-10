@@ -6,8 +6,6 @@ import {
   sendPostingReminder,
   sendStreakWarning,
   sendWeeklyDigest,
-  sendBroadcastToSegment,
-  type PushSegment,
 } from "@/lib/notifications";
 
 function verifyCronAuth(request: Request): boolean {
@@ -221,73 +219,16 @@ async function runWeeklyDigest(): Promise<number> {
 }
 
 // ─── Scheduled Admin Push Notifications ─────────────────────────────
-async function runScheduledPushes(): Promise<{ processed: number; sent: number; failed: number }> {
-  // Atomically claim due pushes by updating PENDING → PROCESSING in a single
-  // updateMany. This prevents concurrent cron workers from both fetching the
-  // same PENDING pushes and double-sending. Previously findMany + update was
-  // non-atomic — two workers could fetch the same rows before either updated.
-  const now = new Date();
-  const claimResult = await prisma.scheduledPushNotification.updateMany({
-    where: {
-      status: "PENDING",
-      scheduledFor: { lte: now },
-    },
-    data: {
-      status: "PROCESSING",
-    },
-  });
-
-  if (claimResult.count === 0) {
-    return { processed: 0, sent: 0, failed: 0 };
-  }
-
-  // Fetch the rows we claimed (now in PROCESSING status)
-  const claimedPushes = await prisma.scheduledPushNotification.findMany({
-    where: {
-      status: "PROCESSING",
-      scheduledFor: { lte: now },
-    },
-    orderBy: { scheduledFor: "asc" },
-    take: 20,
-  });
-
-  let processed = 0;
-  let totalSent = 0;
-  let totalFailed = 0;
-
-  for (const push of claimedPushes) {
-    processed++;
-    try {
-      const result = await sendBroadcastToSegment(
-        push.segment as PushSegment,
-        push.title,
-        push.body,
-        push.url ?? undefined
-      );
-
-      await prisma.scheduledPushNotification.update({
-        where: { id: push.id },
-        data: {
-          status: "SENT",
-          sentCount: result.sent,
-          failedCount: result.failed,
-        },
-      });
-
-      totalSent += result.sent;
-      totalFailed += result.failed;
-    } catch (err) {
-      console.error(`[CRON NOTIFICATIONS] Scheduled push ${push.id} failed:`, err);
-      await prisma.scheduledPushNotification.update({
-        where: { id: push.id },
-        data: { status: "FAILED" },
-      });
-      totalFailed++;
-    }
-  }
-
-  return { processed, sent: totalSent, failed: totalFailed };
-}
+// Scheduled push processing has been extracted to a dedicated service
+// (src/lib/scheduled-push-service.ts) and a dedicated cron route
+// (/api/cron/scheduled-pushes) that runs every 5 minutes. The old approach
+// claimed every due PENDING row via updateMany then fetched only `take: 20`,
+// leaving the rest stuck in PROCESSING forever with no lease recovery. See
+// the service module for the bounded, recoverable claim protocol.
+//
+// This daily notifications route keeps posting reminders, streak warnings,
+// and the weekly digest — it must NOT send scheduled pushes (a once-daily
+// run would allow nearly 24-hour delivery delays).
 
 export async function GET(request: Request) {
   if (!verifyCronAuth(request)) {
@@ -295,11 +236,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [reminders, streaks, digests, scheduled, staleCleanup] = await Promise.all([
+    const [reminders, streaks, digests, staleCleanup] = await Promise.all([
       runPostingReminders(),
       runStreakWarnings(),
       runWeeklyDigest(),
-      runScheduledPushes(),
       abandonStaleSessions(),
     ]);
 
@@ -308,7 +248,6 @@ export async function GET(request: Request) {
       postingReminders: reminders,
       streakWarnings: streaks,
       weeklyDigests: digests,
-      scheduledPushes: scheduled,
       staleRefinementCleanup: staleCleanup,
     });
   } catch (err) {

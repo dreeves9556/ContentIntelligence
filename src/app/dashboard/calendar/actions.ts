@@ -62,6 +62,13 @@ import {
   isContextSurveyExpired,
 } from "@/lib/freshness";
 import { buildBudgetedPrompt, type PromptBlock, type BudgetedBlockMetadata } from "@/lib/prompt-budget";
+import {
+  decideCalendarClaim,
+  isValidCalendarRequestId,
+  CALENDAR_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL_MS,
+  type CalendarClaimExistingRow,
+} from "@/lib/calendar-claim-service";
+import { replacePromptPlaceholders, replaceStrategySystemPlaceholders, type PromptPlaceholderContext } from "@/lib/prompt-placeholders";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -261,12 +268,33 @@ ${userProfileXml}
 
 Write the strategy note now.`;
 
-  const systemPrompt = config.calendarStrategyPromptTemplate ?? CALENDAR_STRATEGY_SYSTEM_PROMPT;
-  const userPrompt = (config.calendarStrategyPromptTemplate ?? defaultUserPrompt)
-    .replace(/\{\{weekStarting\}\}/g, calendar.weekStarting)
-    .replace(/\{\{formatMix\}\}/g, Object.entries(formatCounts).map(([fmt, count]) => `- ${fmt}: ${count}`).join("\n"))
-    .replace(/\{\{bucketMix\}\}/g, Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n"))
-    .replace(/\{\{daySummary\}\}/g, daySummary);
+  // Custom template semantics (matching the calendar generation path):
+  // - The custom template replaces the SYSTEM prompt. Placeholders in the
+  //   template are replaced with the calendar data.
+  // - The USER prompt is ALWAYS the assembled calendar data
+  //   (defaultUserPrompt). Previously, when a custom template was set, the
+  //   user prompt was ALSO set to the custom template — sending the template
+  //   twice and never sending the actual calendar data. The AI received no
+  //   weekStarting/formatMix/bucketMix/daySummary and could not write a
+  //   useful strategy note.
+  const formatMixStr = Object.entries(formatCounts).map(([fmt, count]) => `- ${fmt}: ${count}`).join("\n");
+  const bucketMixStr = Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n");
+  const primaryGoal = (answers.primaryGoal ?? "").trim() || "Not specified";
+  const antiBrandWords = (answers.antiBrandWords ?? "").trim() || "None specified";
+
+  const systemPrompt = replaceStrategySystemPlaceholders(
+    config.calendarStrategyPromptTemplate ?? CALENDAR_STRATEGY_SYSTEM_PROMPT,
+    {
+      weekStarting: calendar.weekStarting,
+      formatMix: formatMixStr,
+      bucketMix: bucketMixStr,
+      daySummary,
+      primaryGoal,
+      antiBrandWords,
+    }
+  );
+
+  const userPrompt = defaultUserPrompt;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -387,13 +415,25 @@ export type GenerateWeeklyCalendarResult =
   | { success: false; error: string; inProgress?: boolean; unknownOutcome?: boolean };
 
 export async function generateWeeklyCalendar(
-  timezoneOffsetHours: number = 0,
-  daysToPostOverride?: number,
-  requestId?: string,
+  timezoneOffsetHours: number,
+  daysToPostOverride: number | undefined,
+  requestId: string,
 ): Promise<GenerateWeeklyCalendarResult> {
   const access = await requireDashboardAccess();
   if (!access.allowed) return { success: false, error: access.error };
   const userId = access.user.id;
+
+  // Validate requestId as a UUID. The legacy non-idempotent path (no
+  // requestId) is removed — every real caller (CalendarGenerationShell)
+  // generates a UUID client-side. A missing or malformed requestId would
+  // bypass idempotency and allow duplicate generations.
+  if (!isValidCalendarRequestId(requestId)) {
+    return { success: false, error: "A valid requestId is required." };
+  }
+
+  // Start duration measurement BEFORE the claim/prework so the recorded
+  // duration covers the full generation lifecycle, not just the AI call.
+  const generationStartTime = Date.now();
 
   // Load questionnaire early — needed for daysToPost computation which is
   // required by the idempotency claim. This is read-only, no side effects.
@@ -432,19 +472,43 @@ export async function generateWeeklyCalendar(
   // Previously rate limits, DB queries, RSS fetching, AI pre-calls, and
   // questionnaire mutations all occurred before this claim — wasting rate
   // limits, duplicating AI costs, and allowing race-losers to mutate data.
-  // See plan-f61b9b29c33f91cd.md for the full state machine.
-  const CLAIM_LEASE_MS = 120_000; // stale PROCESSING threshold
+  // The pure decision logic lives in `decideCalendarClaim` (calendar-claim-service.ts)
+  // and is unit-tested there; this block performs the DB writes the decision prescribes.
   let claimLogId: string | null = null;
   let claimToken: string | null = null;
 
-  if (requestId) {
-    const newClaimToken = crypto.randomUUID();
-    const now = new Date();
+  const newClaimToken = crypto.randomUUID();
+  const now = new Date();
 
-    const claimResult = await serializableTransaction(async (tx) => {
-      // Try to insert a new PROCESSING claim. P2002 on @@unique([userId, requestId])
-      // means a row already exists — we re-read it below.
-      try {
+  const claimResult = await serializableTransaction(async (tx) => {
+    // Try to insert a new PROCESSING claim. P2002 on @@unique([userId, requestId])
+    // means a row already exists — we re-read it and let decideCalendarClaim
+    // determine the correct action.
+    try {
+      const row = await tx.calendarGenerationLog.create({
+        data: {
+          userId,
+          requestId,
+          requestStatus: "PROCESSING",
+          requestClaimToken: newClaimToken,
+          requestClaimedAt: now,
+          requestAttempts: 1,
+          requestDaysToPost: daysToPost,
+          requestTimezoneOffset: timezoneOffsetHours,
+          requestUserId: userId,
+          success: false, // provisional until COMPLETED
+        },
+      });
+      return { kind: "claimed" as const, logId: row.id };
+    } catch (err) {
+      const prismaErr = err as { code?: string };
+      if (prismaErr.code !== "P2002") throw err;
+      // Row exists — re-read and delegate the decision to the pure helper.
+      const existing = await tx.calendarGenerationLog.findUnique({
+        where: { userId_requestId: { userId, requestId } },
+      });
+      if (!existing) {
+        // Row vanished between P2002 and re-read (shouldn't happen) — retry insert.
         const row = await tx.calendarGenerationLog.create({
           data: {
             userId,
@@ -456,147 +520,160 @@ export async function generateWeeklyCalendar(
             requestDaysToPost: daysToPost,
             requestTimezoneOffset: timezoneOffsetHours,
             requestUserId: userId,
-            success: false, // provisional until COMPLETED
+            success: false,
           },
         });
         return { kind: "claimed" as const, logId: row.id };
-      } catch (err) {
-        const prismaErr = err as { code?: string };
-        if (prismaErr.code !== "P2002") throw err;
-        // Row exists — re-read the winner and decide.
-        const existing = await tx.calendarGenerationLog.findUnique({
-          where: { userId_requestId: { userId, requestId } },
-        });
-        if (!existing) {
-          // Row vanished between P2002 and re-read (shouldn't happen) — retry insert.
-          const row = await tx.calendarGenerationLog.create({
-            data: {
-              userId,
-              requestId,
-              requestStatus: "PROCESSING",
-              requestClaimToken: newClaimToken,
-              requestClaimedAt: now,
-              requestAttempts: 1,
-              requestDaysToPost: daysToPost,
-              requestTimezoneOffset: timezoneOffsetHours,
-              requestUserId: userId,
-              success: false,
-            },
-          });
-          return { kind: "claimed" as const, logId: row.id };
-        }
+      }
 
-        if (existing.requestStatus === "COMPLETED") {
-          return {
-            kind: "completed" as const,
-            calendarId: existing.resultingCalendarId,
-          };
-        }
+      const decision = decideCalendarClaim(
+        existing as unknown as CalendarClaimExistingRow,
+        { requestId, userId, daysToPost, timezoneOffsetHours },
+        now
+      );
 
-        if (existing.requestStatus === "PROCESSING") {
-          const isStale =
-            existing.requestClaimedAt &&
-            now.getTime() - existing.requestClaimedAt.getTime() > CLAIM_LEASE_MS;
-          if (isStale) {
-            // Reclaim via optimistic lock on the old token.
-            const updated = await tx.calendarGenerationLog.updateMany({
-              where: {
-                id: existing.id,
-                requestClaimToken: existing.requestClaimToken,
-              },
-              data: {
-                requestClaimToken: newClaimToken,
-                requestClaimedAt: now,
-                requestAttempts: { increment: 1 },
-              },
-            });
-            if (updated.count > 0) {
-              return { kind: "claimed" as const, logId: existing.id };
-            }
-            // Lost the race — another process reclaimed first.
-            return { kind: "in_progress" as const };
-          }
+      switch (decision.kind) {
+        case "COMPLETED":
+          return { kind: "completed" as const, calendarId: decision.calendarId };
+        case "IN_PROGRESS":
           return { kind: "in_progress" as const };
-        }
-
-        if (existing.requestStatus === "FAILED") {
-          // Validate inputs match the original request.
-          if (
-            existing.requestDaysToPost !== daysToPost ||
-            existing.requestTimezoneOffset !== timezoneOffsetHours ||
-            existing.requestUserId !== userId
-          ) {
-            return { kind: "param_mismatch" as const };
-          }
-          // Reclaim via optimistic lock on FAILED status.
-          const updated = await tx.calendarGenerationLog.updateMany({
-            where: { id: existing.id, requestStatus: "FAILED" },
-            data: {
-              requestStatus: "PROCESSING",
-              requestClaimToken: newClaimToken,
-              requestClaimedAt: now,
-              requestAttempts: { increment: 1 },
-            },
-          });
+        case "PARAM_MISMATCH":
+          return { kind: "param_mismatch" as const };
+        case "CLAIM_NEW":
+          // Unreachable inside the P2002 branch, but handle defensively.
+          return { kind: "in_progress" as const };
+        case "RECLAIM": {
+          // Reclaim via optimistic lock. The conditional where-clause depends
+          // on the from-status: for stale PROCESSING, lock on the old token;
+          // for FAILED, lock on the FAILED status.
+          const where =
+            decision.fromStatus === "PROCESSING"
+              ? { id: decision.rowId, requestClaimToken: existing.requestClaimToken }
+              : { id: decision.rowId, requestStatus: "FAILED" as const };
+          const data =
+            decision.fromStatus === "PROCESSING"
+              ? {
+                  requestClaimToken: newClaimToken,
+                  requestClaimedAt: now,
+                  requestAttempts: { increment: 1 },
+                }
+              : {
+                  requestStatus: "PROCESSING" as const,
+                  requestClaimToken: newClaimToken,
+                  requestClaimedAt: now,
+                  requestAttempts: { increment: 1 },
+                };
+          const updated = await tx.calendarGenerationLog.updateMany({ where, data });
           if (updated.count > 0) {
-            return { kind: "claimed" as const, logId: existing.id };
+            return { kind: "claimed" as const, logId: decision.rowId };
           }
           // Lost the race — another process reclaimed first.
           return { kind: "in_progress" as const };
         }
-
-        // Unknown status — treat as in-progress.
-        return { kind: "in_progress" as const };
       }
-    });
+    }
+  });
 
-    switch (claimResult.kind) {
-      case "completed":
-        if (claimResult.calendarId) {
-          return { success: true, calendarId: claimResult.calendarId, duplicate: true };
-        }
-        // COMPLETED but no resultingCalendarId — data integrity issue; treat as failed.
-        return { success: false, error: "A previous generation completed but its calendar is missing. Please start a new generation." };
-      case "in_progress":
-        return { success: false, error: "Generation already in progress.", inProgress: true };
-      case "param_mismatch":
-        return { success: false, error: "Request parameters do not match the original request." };
-      case "claimed":
-        claimLogId = claimResult.logId;
-        claimToken = newClaimToken;
-        break;
+  switch (claimResult.kind) {
+    case "completed":
+      if (claimResult.calendarId) {
+        return { success: true, calendarId: claimResult.calendarId, duplicate: true };
+      }
+      // COMPLETED but no resultingCalendarId — data integrity issue; treat as failed.
+      return { success: false, error: "A previous generation completed but its calendar is missing. Please start a new generation." };
+    case "in_progress":
+      return { success: false, error: "Generation already in progress.", inProgress: true };
+    case "param_mismatch":
+      return { success: false, error: "Request parameters do not match the original request." };
+    case "claimed":
+      claimLogId = claimResult.logId;
+      claimToken = newClaimToken;
+      break;
+  }
+
+  // ── Claim finalization helpers ────────────────────────────────────
+  // Defined immediately after the claim is acquired so EVERY post-claim
+  // failure path (early returns AND thrown exceptions) can transition the
+  // owned claim to FAILED. Conditional updates use claimToken so a worker
+  // cannot finalize a lease it no longer owns (lost-lease / stale reclaim).
+
+  // Heartbeat: refresh requestClaimedAt periodically so a long generation
+  // is not reclaimed as stale while the worker is still alive. The
+  // conditional update (claimToken) stops heartbeating once the lease is lost.
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  function startHeartbeat(): void {
+    if (heartbeatTimer) return;
+    heartbeatTimer = setInterval(() => {
+      if (!claimLogId || !claimToken) return;
+      prisma.calendarGenerationLog
+        .updateMany({
+          where: { id: claimLogId, requestClaimToken: claimToken },
+          data: { requestClaimedAt: new Date() },
+        })
+        .catch((err: unknown) => console.error("Calendar generation heartbeat failed:", err));
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+  function stopHeartbeat(): void {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
     }
   }
 
-  // Rate limit — only applies to the claim holder (completed/in-progress
-  // requests already returned above). Previously this ran before the
-  // idempotency check, consuming a rate-limit token on every retry even
-  // when the cached result was returned.
-  const rateLimit = await checkActionRateLimit(
-    `calendar_gen:${userId}`,
-    5,
-    10 * 60 * 1000
-  );
-  if (!rateLimit.allowed) {
-    return {
-      success: false,
-      error: `Too many calendar generations. Please try again in ${formatRetryTime(rateLimit.retryAfterMs ?? 0)}.`,
-    };
+  async function failClaim(errorMessage: string): Promise<void> {
+    if (!claimLogId || !claimToken) return;
+    await prisma.calendarGenerationLog
+      .updateMany({
+        where: { id: claimLogId, requestClaimToken: claimToken },
+        data: {
+          requestStatus: "FAILED",
+          requestCompletedAt: new Date(),
+          requestClaimToken: null,
+          success: false,
+          errorMessage,
+          durationMs: Date.now() - generationStartTime,
+        },
+      })
+      .catch((err: unknown) => console.error("Failed to update claim to FAILED:", err));
   }
 
-  // Persist daysToPost override — only for the claim holder. Previously
-  // this ran before the idempotency claim, so race-losers could mutate the
-  // questionnaire even though they didn't hold the claim.
-  if (overrideValid && daysToPost !== questionnaireDaysToPost) {
-    try {
-      await prisma.questionnaire.update({
-        where: { id: questionnaire.id },
-        data: { content: { ...answers, daysToPost } as unknown as Prisma.InputJsonValue },
-      });
-    } catch (err) {
-      console.error("Failed to persist daysToPost override:", err);
+  startHeartbeat();
+
+  // ── All post-claim work in a single try/catch/finally ─────────────
+  // Every expected early return after claiming calls failClaim first.
+  // Every thrown exception transitions the owned claim to FAILED via catch.
+  // finally always stops the heartbeat.
+  try {
+    // Rate limit — only applies to the claim holder (completed/in-progress
+    // requests already returned above). Previously this ran before the
+    // idempotency check, consuming a rate-limit token on every retry even
+    // when the cached result was returned.
+    const rateLimit = await checkActionRateLimit(
+      `calendar_gen:${userId}`,
+      5,
+      10 * 60 * 1000
+    );
+    if (!rateLimit.allowed) {
+      await failClaim(`Rate limited: retry after ${formatRetryTime(rateLimit.retryAfterMs ?? 0)}`);
+      return {
+        success: false,
+        error: `Too many calendar generations. Please try again in ${formatRetryTime(rateLimit.retryAfterMs ?? 0)}.`,
+      };
     }
-  }
+
+    // Persist daysToPost override — only for the claim holder. Previously
+    // this ran before the idempotency claim, so race-losers could mutate the
+    // questionnaire even though they didn't hold the claim.
+    if (overrideValid && daysToPost !== questionnaireDaysToPost) {
+      try {
+        await prisma.questionnaire.update({
+          where: { id: questionnaire.id },
+          data: { content: { ...answers, daysToPost } as unknown as Prisma.InputJsonValue },
+        });
+      } catch (err) {
+        console.error("Failed to persist daysToPost override:", err);
+      }
+    }
 
   const allProfileSurveys = await prisma.profileSurvey.findMany({
     where: { userId },
@@ -650,6 +727,7 @@ export async function generateWeeklyCalendar(
   const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
   if (!apiKey) {
     console.error("Anthropic API key is not configured");
+    await failClaim("Anthropic API key not configured");
     return { success: false, error: "API key not configured" };
   }
 
@@ -922,42 +1000,42 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
 
   const budgetedPrompt = buildBudgetedPrompt(promptBlocks);
   const defaultUserPrompt = budgetedPrompt.prompt;
-  const generationStartTime = Date.now();
 
-  // Helper: record a generation failure on the claim row (or legacy log).
-  async function failClaim(errorMessage: string): Promise<void> {
-    if (claimLogId && claimToken) {
-      await prisma.calendarGenerationLog
-        .updateMany({
-          where: { id: claimLogId, requestClaimToken: claimToken },
-          data: {
-            requestStatus: "FAILED",
-            requestCompletedAt: new Date(),
-            requestClaimToken: null,
-            success: false,
-            errorMessage,
-            durationMs: Date.now() - generationStartTime,
-          },
-        })
-        .catch((err) => console.error("Failed to update claim to FAILED:", err));
-    } else {
-      logCalendarGeneration({
-        userId,
-        success: false,
-        stalenessTriggered,
-        audienceFatigueTriggered,
-        dynamicConstraintsMode,
-        dynamicConstraintsFallback,
-        blockMetadata: { included: budgetedPrompt.included, trimmed: budgetedPrompt.trimmed, omitted: budgetedPrompt.omitted },
-        errorMessage,
-        durationMs: Date.now() - generationStartTime,
-      });
-    }
-  }
+  // Shared placeholder replacement. Applied to BOTH the system prompt (custom
+  // template or default) and the user prompt (assembled context). Previously
+  // only {{weekStarting}} and {{firstDay}} were replaced in the system prompt
+  // — a custom template using {{daysToPost}}, {{targetDays}}, {{formatMix}},
+  // etc. would have those placeholders appear as literal text in the prompt
+  // sent to the AI. Block placeholders that are no longer individually built
+  // (deepDiveBlock, goalBlock, guardrailBlock, voiceBlock, offerBlock,
+  // audienceBlock, boundariesBlock, personalContextBlock, formattingBlock)
+  // are replaced with empty strings so a custom template referencing them
+  // does not leak literal {{...}} text; their content is already inlined into
+  // the budgeted user prompt.
+  const placeholderCtx: PromptPlaceholderContext = {
+    questionnaireAnswers: userProfileXml,
+    usedTitlesBlock: usedTitlesXml,
+    bestTimesBlock,
+    demographicsBlock,
+    memoryBlock,
+    performanceBlock,
+    contentPerformanceBlock,
+    followerTrendBlock,
+    cadenceBlock,
+    feedbackBlock,
+    trendingTopicsBlock,
+    daysToPost,
+    currentDay,
+    targetDays,
+    formatMix: formatMixStr,
+    bucketDistribution: bucketDistStr,
+    weekStarting,
+  };
 
-  const systemPrompt = (config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT)
-    .replace(/\{\{weekStarting\}\}/g, weekStarting)
-    .replace(/\{\{firstDay\}\}/g, targetDays[0]);
+  const systemPrompt = replacePromptPlaceholders(
+    config.calendarPromptTemplate ?? CALENDAR_SYSTEM_PROMPT,
+    placeholderCtx
+  );
 
   // Always use defaultUserPrompt as the user prompt, even when a custom
   // calendarPromptTemplate is set. Previously this was set to "" when a
@@ -965,24 +1043,7 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
   // (questionnaire, memories, performance, trends, compliance, etc.).
   // The custom template replaces the SYSTEM prompt; the user prompt always
   // carries the assembled context. Placeholders in both prompts are replaced.
-  const userPrompt = defaultUserPrompt
-    .replace(/\{\{questionnaireAnswers\}\}/g, userProfileXml)
-    .replace(/\{\{usedTitlesBlock\}\}/g, usedTitlesXml)
-    .replace(/\{\{bestTimesBlock\}\}/g, bestTimesBlock)
-    .replace(/\{\{demographicsBlock\}\}/g, demographicsBlock)
-    .replace(/\{\{memoryBlock\}\}/g, memoryBlock)
-    .replace(/\{\{performanceBlock\}\}/g, performanceBlock)
-    .replace(/\{\{contentPerformanceBlock\}\}/g, contentPerformanceBlock)
-    .replace(/\{\{followerTrendBlock\}\}/g, followerTrendBlock)
-    .replace(/\{\{cadenceBlock\}\}/g, cadenceBlock)
-    .replace(/\{\{feedbackBlock\}\}/g, feedbackBlock)
-    .replace(/\{\{daysToPost\}\}/g, String(daysToPost))
-    .replace(/\{\{currentDay\}\}/g, currentDay)
-    .replace(/\{\{targetDays\}\}/g, targetDays.join(", "))
-    .replace(/\{\{formatMix\}\}/g, formatMixStr)
-    .replace(/\{\{bucketDistribution\}\}/g, bucketDistStr)
-    .replace(/\{\{weekStarting\}\}/g, weekStarting)
-    .replace(/\{\{firstDay\}\}/g, targetDays[0]);
+  const userPrompt = replacePromptPlaceholders(defaultUserPrompt, placeholderCtx);
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1253,6 +1314,19 @@ MUSIC: Every post must include a musicSuggestion, regardless of format (Reel, Ca
       logCalendarGeneration(failCtx);
     }
     return { success: false, error: "Failed to generate calendar. Please try again." };
+  }
+  } catch (error) {
+    // Outer catch: covers exceptions thrown during prework (between the
+    // claim and the inner AI-call try block) — e.g. RSS fetch, profile
+    // survey loading, prompt assembly. The inner try/catch handles
+    // exceptions during the AI call and calendar creation. Without this
+    // outer catch, a prework exception would leave the claim PROCESSING
+    // forever (no terminal transition, no heartbeat cleanup).
+    console.error("Error during calendar generation prework:", error);
+    await failClaim(error instanceof Error ? error.message : "Unknown error during prework");
+    return { success: false, error: "Failed to generate calendar. Please try again." };
+  } finally {
+    stopHeartbeat();
   }
 }
 

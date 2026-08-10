@@ -44,6 +44,8 @@ export const EXPIRATION_ACTION_LABELS: Record<ExpirationAction, string> = {
 
 export const COMMON_TAGS = ["KWLG", "OWNER", "BETA", "STAFF", "TEAM", "OTHER"] as const;
 
+export const BETA_TAG = "BETA";
+
 export const TAG_LABELS: Record<string, string> = {
   KWLG: "KWLG",
   OWNER: "Owner",
@@ -172,4 +174,8 @@ export function normalizeTag(tag: string | null | undefined): string | null {
   const trimmed = tag.trim().toUpperCase();
   if (!trimmed) return null;
   return trimmed;
+}
+
+export function isBetaUser(user: { internalTag: string | null }): boolean {
+  return user.internalTag === BETA_TAG;
 }

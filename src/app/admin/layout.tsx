@@ -22,6 +22,7 @@ import {
   ScrollText,
   CreditCard,
   DollarSign,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -30,6 +31,7 @@ const adminNavItems = [
   { name: "Exit Admin Mode", href: "/dashboard", icon: LogOut },
   { name: "Client Roster", href: "/admin", icon: Users },
   { name: "Organizations", href: "/admin/organizations", icon: Building2 },
+  { name: "Seat Recovery", href: "/admin/seat-reconciliation", icon: Wrench },
   { name: "Pending Stripe Invites", href: "/admin/pending-invites", icon: CreditCard },
   { name: "Revenue", href: "/admin/revenue", icon: DollarSign },
   { name: "Impact Dashboard", href: "/admin/impact", icon: TrendingUp },

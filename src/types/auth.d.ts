@@ -5,6 +5,7 @@ declare module "next-auth" {
     role: "USER" | "TEAM_ADMIN" | "ADMIN";
     plan: "CALENDAR_ONLY" | "PRO";
     accountStatus: string;
+    isBeta?: boolean;
   }
 
   interface Session {
@@ -13,6 +14,7 @@ declare module "next-auth" {
       role: "USER" | "TEAM_ADMIN" | "ADMIN";
       plan: "CALENDAR_ONLY" | "PRO";
       accountStatus: string;
+      isBeta?: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -23,6 +25,7 @@ declare module "next-auth/jwt" {
     role?: "USER" | "TEAM_ADMIN" | "ADMIN";
     plan?: "CALENDAR_ONLY" | "PRO";
     accountStatus?: string;
+    internalTag?: string | null;
     sessionExpiry?: number;
     tokenVersion?: number;
   }

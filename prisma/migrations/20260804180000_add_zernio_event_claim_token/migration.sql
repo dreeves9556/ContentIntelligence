@@ -1,0 +1,24 @@
+-- Add claimToken to zernio_events for concurrency-safe, recoverable claiming.
+--
+-- Previously the Zernio webhook used a findUnique + update/create pattern that
+-- was NOT atomic:
+--   - Two concurrent workers could both see status = FAILED and both update it
+--     to PROCESSING, both processing the same event (duplicate notifications).
+--   - A P2002 on create returned { duplicate: true } even though the event was
+--     being processed by another worker (not a true duplicate).
+--   - Finalization (SUCCEEDED/FAILED) used an unconditional update — if a
+--     stale PROCESSING row was reclaimed by worker B, worker A could still
+--     mark it SUCCEEDED/FAILED after worker B already processed it.
+--   - A worker crash left rows stuck in PROCESSING forever (redeliveries were
+--     ack'd as inProgress but never reclaimed).
+--
+-- claimToken enables the same claim protocol used by the Stripe webhook:
+--   - create with P2002 fallback to conditional updateMany (FAILED or stale
+--     PROCESSING only)
+--   - finalization guarded by claimToken (a worker cannot finalize a lease it
+--     no longer owns)
+--   - stale PROCESSING rows (claimedAt older than the lease) are reclaimable
+--
+-- Safe because claimToken is nullable; existing rows are untouched.
+
+ALTER TABLE "zernio_events" ADD COLUMN "claimToken" TEXT;

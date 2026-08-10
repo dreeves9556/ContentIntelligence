@@ -641,6 +641,65 @@ model Organization {
   @@map("organizations")
 }
 
+// Durable, idempotent seat-reduction operation.
+//
+// A seat reduction touches two independent systems (Stripe + the DB) and must
+// remain retryable if either side fails. This row is the single source of
+// truth for an in-flight reduction: it records the original Stripe quantity,
+// original seat limit, target quantity, selected member actions, actor, and
+// the current state-machine status. The client generates a UUID `requestId`
+// so a retry resumes the same operation instead of creating a second one.
+//
+// Status state machine:
+//   PENDING            — claimed, validation done, Stripe call not yet applied
+//   COMPLETED          — Stripe reduced AND DB member/seatLimit changes applied
+//   FAILED             — retryable: Stripe rejected/timeout (members untouched)
+//                        OR Stripe succeeded + DB failed + Stripe compensation
+//                        succeeded (members untouched, Stripe restored)
+//   RECOVERY_REQUIRED  — Stripe succeeded + DB failed + Stripe compensation
+//                        also failed. Admin must intervene. The row preserves
+//                        the original quantity so a human can reconcile.
+//
+// The Stripe reduction uses a persisted idempotency key
+// (`seat_reconcile_main_<uuid>`) generated once at op creation and reused
+// across retries. Compensation uses a separate persisted key
+// (`seat_reconcile_comp_<op-id>`) derived from the immutable operation ID.
+model SeatReconciliationOperation {
+  id                        String   @id @default(cuid())
+  requestId                 String   @unique
+  organizationId            String
+  actorUserId               String
+  originalSeatLimit         Int
+  originalStripeQuantity    Int?
+  targetSeats               Int
+  memberActionsJson         Json
+  status                    String   @default("PENDING")
+  attempts                  Int      @default(0)
+  claimToken                String?
+  claimedAt                 DateTime?
+  completedAt               DateTime?
+  lastError                 String?
+  // Persisted Stripe idempotency keys — one per logical provider mutation.
+  // Reused across retries, stale reclaims, and unknown-outcome retries so the
+  // same logical mutation never sends two different keys to Stripe.
+  mainIdempotencyKey        String?
+  compensationIdempotencyKey String?
+  // Admin recovery fields (migration 20260804200000).
+  recoveryIdempotencyKey    String?
+  recoveryClaimToken        String?
+  recoveryClaimedAt         DateTime?
+  resolvedAt                DateTime?
+  resolvedByUserId          String?
+  resolutionType            String?
+  resolutionSummary         String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([status, claimedAt])
+  @@map("seat_reconciliation_operations")
+}
+
 model ScheduledPushNotification {
   id           String   @id @default(cuid())
   title        String
@@ -648,7 +707,7 @@ model ScheduledPushNotification {
   url          String?
   segment      String   @default("all") // all, CALENDAR_ONLY, CREATOR, PRO
   scheduledFor DateTime
-  status       String   @default("PENDING") // PENDING, SENT, CANCELLED, FAILED
+  status       String   @default("PENDING") // PENDING, PROCESSING, SENT, CANCELLED, FAILED
   sentCount    Int      @default(0)
   failedCount  Int      @default(0)
   createdBy    String?
@@ -656,7 +715,18 @@ model ScheduledPushNotification {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // ── Bounded recoverable claim state ──────────────────────────────────
+  // A worker claims a due PENDING row by atomically setting status →
+  // PROCESSING and stamping claimToken + claimedAt. Only the worker holding
+  // claimToken may finalize the row (SENT/FAILED). Stale PROCESSING rows
+  // (claimedAt older than the lease) are reclaimable by another worker.
+  claimToken   String?
+  claimedAt    DateTime?
+  attempts     Int      @default(0)
+  lastError    String?
+
   @@index([status, scheduledFor])
+  @@index([status, claimedAt])
   @@map("scheduled_push_notifications")
 }
 
@@ -735,6 +805,7 @@ model ZernioEvent {
   eventType   String
   status      String    @default("PROCESSING") // PROCESSING, SUCCEEDED, FAILED
   attempts    Int       @default(1)
+  claimToken  String?
   claimedAt   DateTime  @default(now())
   processedAt DateTime?
   lastError   String?

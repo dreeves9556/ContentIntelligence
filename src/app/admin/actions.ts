@@ -7,7 +7,9 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { getStripe } from "@/lib/stripe";
-import { zernio } from "@/lib/zernio";
+import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
+import { severZernioForUser } from "@/lib/zernio-sever";
+import { decideAfterStripeCancelFailure } from "@/lib/deletion-hardening";
 import type { UserPlan } from "@/lib/tiers";
 import type { AccountStatus, ExpirationAction } from "@/lib/account-access";
 import { sendSignupNotification, sendBulkSignupNotification } from "@/lib/signup-notification";
@@ -434,29 +436,35 @@ export async function deleteUser(
   }
 
   if (subscriptionId) {
+    if (!isStripeCheckoutConfigured()) {
+      // There is a subscription ID but Stripe is not configured — we cannot
+      // cancel it. Block deletion so the subscription is not orphaned.
+      console.error("[ADMIN DELETE USER] Stripe not configured but user has a subscription — blocking deletion");
+      return {
+        success: false,
+        error: "This user has an active subscription but Stripe is not configured. Cancel the subscription manually before deleting the account.",
+      };
+    }
+
     try {
       const stripe = getStripe();
       await stripe.subscriptions.cancel(subscriptionId);
       console.log(`[ADMIN DELETE USER] Cancelled Stripe subscription ${subscriptionId} for user ${userId}`);
     } catch (error) {
+      // Block deletion — the subscription may still be active. Once the User
+      // row is gone, the subscription ID is lost and the subscription becomes
+      // unmanageable through the app.
       console.error("[ADMIN DELETE USER] Failed to cancel Stripe subscription:", error);
+      const fail = decideAfterStripeCancelFailure("account");
+      return { success: false, error: fail.error };
     }
   }
 
-  // Delete Zernio accounts on Zernio's side before DB cascade removes our records
-  const zernioAccounts = await prisma.zernioAccount.findMany({
-    where: { userId },
-    select: { zernioAccountId: true, platform: true },
-  });
-
-  for (const acc of zernioAccounts) {
-    try {
-      await zernio.accounts.delete(acc.zernioAccountId);
-      console.log(`[ADMIN DELETE USER] Deleted Zernio account ${acc.zernioAccountId} (${acc.platform}) for user ${userId}`);
-    } catch (error) {
-      console.error(`[ADMIN DELETE USER] Failed to delete Zernio account ${acc.zernioAccountId}:`, error);
-    }
-  }
+  // Sever Zernio social-account connections on Zernio's side BEFORE the DB
+  // cascade removes our records. Best-effort — errors are logged but don't
+  // block (a failed Zernio delete is recoverable; an orphaned paid
+  // subscription is not).
+  await severZernioForUser(userId);
 
   try {
     // Clean up invite tokens associated with this user's email

@@ -15,8 +15,7 @@ import {
 } from "lucide-react";
 import {
   getOrgMembersForReconciliation,
-  lockMembers,
-  removeMembers,
+  reduceSeatsWithReconciliation,
   type ReconcileMember,
 } from "./seat-actions";
 
@@ -245,6 +244,10 @@ function SeatReconciliationModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"select" | "confirm">("select");
+  // Stable per-attempt requestId. Generated once when the modal mounts; a
+  // retry with the same requestId resumes the existing durable operation on
+  // the server instead of creating a second reduction.
+  const [requestId] = useState(() => crypto.randomUUID());
 
   const mustSelect = memberCount - targetSeats;
   const selectedCount = Object.keys(selections).length;
@@ -282,53 +285,15 @@ function SeatReconciliationModal({
     setSubmitting(true);
     setError(null);
 
-    const lockIds = Object.entries(selections)
-      .filter(([, action]) => action === "lock")
-      .map(([id]) => id);
-    const removeIds = Object.entries(selections)
-      .filter(([, action]) => action === "remove")
-      .map(([id]) => id);
-
     try {
-      // First, apply lock/remove actions to reduce the active member count.
-      // This must happen BEFORE the Stripe API call because the API rejects
-      // seat reductions when newQuantity < activeMemberCount. Locking or
-      // removing members sets their accountStatus to ARCHIVED, which excludes
-      // them from the active count, allowing the Stripe update to succeed.
-      if (lockIds.length > 0) {
-        const lockRes = await lockMembers(lockIds);
-        if (!lockRes.success) {
-          setError(lockRes.error || "Failed to lock some members.");
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      if (removeIds.length > 0) {
-        const removeRes = await removeMembers(removeIds);
-        if (!removeRes.success) {
-          setError(removeRes.error || "Failed to remove some members.");
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // Then, update Stripe subscription — active member count is now
-      // reduced so the API validation will pass.
-      const stripeRes = await fetch("/api/stripe/update-seats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "remove", newQuantity: targetSeats }),
-      });
-      const stripeData = await stripeRes.json();
-      if (!stripeRes.ok) {
-        // Members were already locked/removed but the Stripe seat count was
-        // not reduced. The admin can retry the seat reduction separately —
-        // members remain archived in the meantime.
-        setError(
-          (stripeData.error || "Failed to update seat count with Stripe.") +
-          " Selected members were already archived. Retry the seat reduction, or contact support."
-        );
+      // Single durable server-owned operation: the server calls Stripe FIRST,
+      // then archives/detaches members and updates seatLimit in one
+      // serializable transaction. If Stripe fails, no members are touched and
+      // the operation is retryable with the same requestId. If the DB fails
+      // after Stripe succeeds, Stripe is compensated to the original quantity.
+      const res = await reduceSeatsWithReconciliation(requestId, targetSeats, selections);
+      if (!res.success) {
+        setError(res.error || "Failed to reduce seats.");
         setSubmitting(false);
         return;
       }

@@ -83,6 +83,23 @@ export function assertPostMatchesCurrentVersion(
   for (const field of CONTENT_FIELDS) {
     const postValue = post[field];
     const versionValue = currentVersion[field];
+
+    // Backward compatibility for the legacy `format` column.
+    //
+    // Migration 20260804130000 added `PostVersion.format` as a nullable column
+    // and left all existing versions with format = NULL (the historical format
+    // was never recorded, so backfilling with the post's CURRENT format would
+    // be misleading). For versions that are the post's *current* version
+    // (the only ones this function checks), a NULL format must be interpreted
+    // as the post's current format — otherwise every pre-migration post throws
+    // CONTENT_MISMATCH before refinement acceptance or restoration.
+    //
+    // A non-NULL version format that differs from the post's format is still a
+    // real mismatch and must throw.
+    if (field === "format" && versionValue === null) {
+      continue;
+    }
+
     if (postValue !== versionValue) {
       throw new PostIntegrityError(
         post.id,

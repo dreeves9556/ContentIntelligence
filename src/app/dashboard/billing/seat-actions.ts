@@ -2,6 +2,17 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireTeamAdminOrganization } from "@/lib/organizations";
+import { getStripe } from "@/lib/stripe";
+import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
+import {
+  executeSeatReconciliation,
+  getReconcileRoster,
+  type SeatReconciliationContext,
+  type SeatReconciliationDeps,
+  type SeatReconciliationPrisma,
+  type SeatReconciliationResult,
+  type SeatStripeClient,
+} from "@/lib/seat-reconciliation-service";
 
 /**
  * Seat reconciliation server actions.
@@ -31,117 +42,22 @@ export async function getOrgMembersForReconciliation(): Promise<{
   const ctx = await requireTeamAdminOrganization();
   if (!ctx) return { error: "Unauthorized" };
 
-  const members = await prisma.user.findMany({
-    where: {
-      organizationId: ctx.user.organizationId,
-      id: { not: ctx.user.id },
-      role: { not: "ADMIN" },
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      accountStatus: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const roster = await getReconcileRoster(
+    prisma as unknown as { user: Parameters<typeof getReconcileRoster>[0]["user"] },
+    ctx.user.organizationId!,
+    ctx.user.id
+  );
 
   return {
-    members: members.map((m) => ({
+    members: roster.map((m) => ({
       id: m.id,
-      name: m.name,
-      email: m.email,
+      name: null,
+      email: null,
       role: m.role,
       accountStatus: m.accountStatus,
-      createdAt: m.createdAt,
+      createdAt: new Date(0),
     })),
   };
-}
-
-/**
- * Lock selected members — set accountStatus to ARCHIVED. They remain in the org
- * but lose dashboard access. Can be unlocked later if seats are added back.
- */
-export async function lockMembers(
-  memberIds: string[]
-): Promise<{ success: boolean; error?: string }> {
-  const ctx = await requireTeamAdminOrganization();
-  if (!ctx) return { success: false, error: "Unauthorized" };
-
-  if (!memberIds.length) {
-    return { success: false, error: "No members selected." };
-  }
-
-  // Verify all selected members belong to the caller's org and aren't admins
-  const targets = await prisma.user.findMany({
-    where: { id: { in: memberIds } },
-    select: { id: true, organizationId: true, role: true },
-  });
-
-  for (const t of targets) {
-    if (t.organizationId !== ctx.user.organizationId) {
-      return { success: false, error: "You can only manage members of your own organization." };
-    }
-    if (t.role === "ADMIN" || t.role === "TEAM_ADMIN") {
-      return { success: false, error: "You cannot lock admin accounts." };
-    }
-  }
-
-  try {
-    await prisma.user.updateMany({
-      where: { id: { in: memberIds } },
-      data: { accountStatus: "ARCHIVED" },
-    });
-    return { success: true };
-  } catch {
-    return { success: false, error: "Failed to lock members." };
-  }
-}
-
-/**
- * Remove selected members from the org — set accountStatus to ARCHIVED and
- * clear organizationId. They become archived independent users, prompted to
- * subscribe to their own membership.
- */
-export async function removeMembers(
-  memberIds: string[]
-): Promise<{ success: boolean; error?: string }> {
-  const ctx = await requireTeamAdminOrganization();
-  if (!ctx) return { success: false, error: "Unauthorized" };
-
-  if (!memberIds.length) {
-    return { success: false, error: "No members selected." };
-  }
-
-  // Verify all selected members belong to the caller's org and aren't admins
-  const targets = await prisma.user.findMany({
-    where: { id: { in: memberIds } },
-    select: { id: true, organizationId: true, role: true },
-  });
-
-  for (const t of targets) {
-    if (t.organizationId !== ctx.user.organizationId) {
-      return { success: false, error: "You can only manage members of your own organization." };
-    }
-    if (t.role === "ADMIN" || t.role === "TEAM_ADMIN") {
-      return { success: false, error: "You cannot remove admin accounts." };
-    }
-  }
-
-  try {
-    await prisma.user.updateMany({
-      where: { id: { in: memberIds } },
-      data: {
-        organizationId: null,
-        accountStatus: "ARCHIVED",
-      },
-    });
-    return { success: true };
-  } catch {
-    return { success: false, error: "Failed to remove members." };
-  }
 }
 
 /**
@@ -221,4 +137,54 @@ export async function unlockMember(
     }
     return { success: false, error: "Failed to unlock member." };
   }
+}
+
+/**
+ * Durable, idempotent seat reduction with reconciliation.
+ *
+ * The client generates a UUID `requestId` for each reconciliation attempt; a
+ * retry with the same `requestId` resumes the existing operation rather than
+ * creating a second reduction. The orchestration (Stripe-first, DB-second,
+ * compensation on DB failure, durable RECOVERY_REQUIRED state) lives in
+ * `src/lib/seat-reconciliation-service.ts` and is unit-tested there with
+ * injected Prisma/Stripe fakes.
+ *
+ * Failure model (see the service module for the full state machine):
+ *   - Stripe failure → no member changes, seatLimit unchanged, FAILED (retryable)
+ *   - DB failure after Stripe success → Stripe compensated to original, FAILED
+ *   - Compensation failure → RECOVERY_REQUIRED (admin intervenes)
+ *   - Duplicate requestId → resumes existing op (COMPLETED → returns success)
+ *
+ * `action` per member: "lock" (archive, keep in org) or "remove" (archive +
+ * detach from org).
+ */
+export async function reduceSeatsWithReconciliation(
+  requestId: string,
+  targetSeats: number,
+  memberActions: Record<string, "lock" | "remove">
+): Promise<SeatReconciliationResult> {
+  const ctx = await requireTeamAdminOrganization();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const stripe = isStripeCheckoutConfigured() ? getStripe() : null;
+
+  const serviceCtx: SeatReconciliationContext = {
+    userId: ctx.user.id,
+    organizationId: ctx.user.organizationId as string,
+    organization: {
+      id: ctx.organization.id,
+      name: ctx.organization.name,
+      seatLimit: ctx.organization.seatLimit,
+      stripeSubscriptionId: ctx.organization.stripeSubscriptionId,
+    },
+  };
+
+  // The real Prisma + Stripe clients are structural supersets of the DI
+  // interfaces; cast to satisfy the orchestrator's minimal contract.
+  const deps: SeatReconciliationDeps = {
+    prisma: prisma as unknown as SeatReconciliationPrisma,
+    stripe: stripe as unknown as SeatStripeClient | null,
+  };
+
+  return executeSeatReconciliation(deps, serviceCtx, requestId, targetSeats, memberActions);
 }

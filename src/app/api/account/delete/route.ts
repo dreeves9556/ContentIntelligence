@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
-import { zernio } from "@/lib/zernio";
+import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
+import { severZernioForUser } from "@/lib/zernio-sever";
+import { decideAccountDelete, decideAfterStripeCancelFailure } from "@/lib/deletion-hardening";
 
 /**
  * Permanently delete the user's account and all associated data.
@@ -59,27 +61,18 @@ export async function POST(request: Request) {
   }
 
   const passwordValid = await bcrypt.compare(body.password, user.password);
-  if (!passwordValid) {
-    return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
-  }
 
-  // TEAM_ADMIN must transfer admin role before deleting their account
-  if (user.role === "TEAM_ADMIN") {
-    return NextResponse.json(
-      {
-        error:
-          "You are the team admin for your organization. Please transfer your admin role to another member before deleting your account.",
-      },
-      { status: 400 }
-    );
-  }
-
-  // Global admins cannot self-delete
-  if (user.role === "ADMIN") {
-    return NextResponse.json(
-      { error: "Admin accounts cannot be self-deleted." },
-      { status: 400 }
-    );
+  // Delegate the hardening decision to the pure helper (unit-tested).
+  const decision = decideAccountDelete({
+    userId: user.id,
+    role: user.role,
+    hasPassword: !!user.password,
+    passwordValid,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    stripeConfigured: isStripeCheckoutConfigured(),
+  });
+  if (decision.kind === "BLOCK") {
+    return NextResponse.json({ error: decision.error }, { status: decision.status });
   }
 
   // Cancel Stripe subscription immediately if the user has one.
@@ -92,33 +85,24 @@ export async function POST(request: Request) {
   // TEAM_ADMIN users are blocked above, so only USER role reaches here.
   // Their stripeSubscriptionId is already captured above (if any).
 
-  const stripe = getStripe();
-
   if (subscriptionId) {
     try {
+      const stripe = getStripe();
       await stripe.subscriptions.cancel(subscriptionId);
       console.log(`[ACCOUNT DELETE] Cancelled Stripe subscription ${subscriptionId} for user ${user.id}`);
     } catch (error) {
-      // Log but don't block — the subscription may already be canceled
       console.error("[ACCOUNT DELETE] Failed to cancel Stripe subscription:", error);
+      const fail = decideAfterStripeCancelFailure("account");
+      return NextResponse.json({ error: fail.error }, { status: fail.status });
     }
   }
 
   try {
-    // Delete Zernio accounts on Zernio's side before DB cascade removes our records
-    const zernioAccounts = await prisma.zernioAccount.findMany({
-      where: { userId: user.id },
-      select: { zernioAccountId: true, platform: true },
-    });
-
-    for (const acc of zernioAccounts) {
-      try {
-        await zernio.accounts.delete(acc.zernioAccountId);
-        console.log(`[ACCOUNT DELETE] Deleted Zernio account ${acc.zernioAccountId} (${acc.platform})`);
-      } catch (error) {
-        console.error(`[ACCOUNT DELETE] Failed to delete Zernio account ${acc.zernioAccountId}:`, error);
-      }
-    }
+    // Sever Zernio social-account connections on Zernio's side BEFORE the DB
+    // cascade removes our records. Best-effort — errors are logged but don't
+    // block (a failed Zernio delete is recoverable; an orphaned paid
+    // subscription is not).
+    await severZernioForUser(user.id);
 
     // Clean up any invite tokens associated with this user's email
     if (user.email) {

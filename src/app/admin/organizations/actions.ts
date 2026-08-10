@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import { generateUniqueSlug } from "@/lib/organizations";
 import { sendTeamInviteEmail } from "@/lib/invite-email";
 import { getStripe } from "@/lib/stripe";
+import { isStripeCheckoutConfigured } from "@/lib/stripe-config";
+import { decideOrgDelete, decideAfterStripeCancelFailure } from "@/lib/deletion-hardening";
 import type { UserPlan } from "@/lib/tiers";
 
 const INVITE_EXPIRY_DAYS = 7;
@@ -371,7 +373,8 @@ export async function assignTeamAdmin(
 }
 
 export async function deleteOrganization(
-  id: string
+  id: string,
+  confirmName: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return { success: false, error: "Unauthorized" };
@@ -381,9 +384,22 @@ export async function deleteOrganization(
   // ID is lost and the subscription becomes unmanageable through the app.
   const org = await prisma.organization.findUnique({
     where: { id },
-    select: { id: true, stripeSubscriptionId: true, stripeCustomerId: true },
+    select: { id: true, name: true, stripeSubscriptionId: true, stripeCustomerId: true },
   });
   if (!org) return { success: false, error: "Organization not found." };
+
+  // Delegate the hardening decision (auth + typed confirmation + Stripe
+  // configuration check) to the pure helper (unit-tested).
+  const decision = decideOrgDelete({
+    callerRole: session.user.role,
+    confirmName,
+    orgName: org.name,
+    hasStripeSubscription: !!org.stripeSubscriptionId,
+    stripeConfigured: isStripeCheckoutConfigured(),
+  });
+  if (decision.kind === "BLOCK") {
+    return { success: false, error: decision.error };
+  }
 
   // Cancel the active Stripe subscription BEFORE deleting the org record.
   // If cancellation fails, block deletion so the admin can retry — deleting
@@ -396,10 +412,8 @@ export async function deleteOrganization(
       console.log(`[DELETE ORG] Cancelled Stripe subscription ${org.stripeSubscriptionId} for org ${id}`);
     } catch (err) {
       console.error("[DELETE ORG] Failed to cancel Stripe subscription:", err);
-      return {
-        success: false,
-        error: "Failed to cancel the organization's Stripe subscription. The organization was not deleted. Retry once the subscription is canceled or contact support.",
-      };
+      const fail = decideAfterStripeCancelFailure("org");
+      return { success: false, error: fail.error };
     }
   }
 

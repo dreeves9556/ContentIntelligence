@@ -60,6 +60,16 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
     currentAdminName: string | null;
   } | null>(null);
 
+  // Delete confirmation modal state — requires typing the org name to confirm.
+  const [pendingDelete, setPendingDelete] = useState<{
+    orgId: string;
+    orgName: string;
+    memberCount: number;
+    hasSubscription: boolean;
+  } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
+
   // Create form state
   const [createForm, setCreateForm] = useState({
     name: "",
@@ -135,14 +145,24 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
     });
   }
 
-  function handleDelete(orgId: string, orgName: string) {
-    if (!confirm(`Delete "${orgName}"? All members will be detached from the organization. This cannot be undone.`)) return;
+  function handleDelete(orgId: string, orgName: string, memberCount: number, hasSubscription: boolean) {
+    setPendingDelete({ orgId, orgName, memberCount, hasSubscription });
+    setDeleteConfirmText("");
+  }
+
+  function confirmDeleteOrg() {
+    if (!pendingDelete) return;
+    const { orgId, orgName } = pendingDelete;
     setError(null);
     setSuccess(null);
+    setDeletingOrgId(orgId);
     startTransition(async () => {
-      const res = await deleteOrganization(orgId);
+      const res = await deleteOrganization(orgId, deleteConfirmText);
+      setDeletingOrgId(null);
       if (res.success) {
-        setSuccess("Organization deleted.");
+        setSuccess(`Organization "${orgName}" deleted.`);
+        setPendingDelete(null);
+        setDeleteConfirmText("");
         refreshData();
       } else {
         setError(res.error ?? "Failed to delete organization.");
@@ -396,7 +416,7 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(org.id, org.name)}
+                      onClick={() => handleDelete(org.id, org.name, org.members.length, !!org.stripeStatus)}
                       disabled={isPending}
                       className="p-2 text-text-muted hover:text-red-400 transition-colors rounded-md hover:bg-background-secondary"
                       title="Delete"
@@ -625,6 +645,68 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCog className="h-4 w-4" />}
                 Confirm Transfer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete organization confirmation modal — typed confirmation */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background-card rounded-lg border border-border-primary max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-red-500/10 rounded-lg">
+                <Trash2 className="h-5 w-5 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+                Delete Organization
+              </h3>
+            </div>
+            <p className="text-sm text-text-muted">
+              You are about to permanently delete{" "}
+              <span className="font-medium text-text-primary">{pendingDelete.orgName}</span>. This cannot be undone.
+            </p>
+            <ul className="text-sm text-text-muted space-y-1 list-disc list-inside">
+              {pendingDelete.hasSubscription && (
+                <li>The Stripe subscription will be canceled immediately.</li>
+              )}
+              <li>
+                {pendingDelete.memberCount} member{pendingDelete.memberCount !== 1 ? "s" : ""} will be downgraded to CALENDAR_ONLY, archived, and detached from the organization.
+              </li>
+              <li>All pending invites will be deleted.</li>
+            </ul>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text-primary">
+                Type the organization name <span className="text-red-400">{pendingDelete.orgName}</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoFocus
+                placeholder={pendingDelete.orgName}
+                className="w-full bg-background-secondary border border-border-primary rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-red-400 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setPendingDelete(null);
+                  setDeleteConfirmText("");
+                }}
+                disabled={deletingOrgId !== null}
+                className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteOrg}
+                disabled={deletingOrgId !== null || deleteConfirmText.trim() !== pendingDelete.orgName}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg transition-colors"
+              >
+                {deletingOrgId !== null ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete Permanently
               </button>
             </div>
           </div>

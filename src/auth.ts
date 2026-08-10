@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { authConfig, isSessionExpired } from "./auth.config";
 import { prisma } from "./lib/prisma";
+import { isBetaUser } from "./lib/account-access";
 import { checkRateLimit, recordFailedAttempt, clearRateLimit, formatRetryTime } from "./lib/rate-limiter";
 
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -72,6 +73,7 @@ export const {
           role: user.role,
           plan: user.plan,
           accountStatus: user.accountStatus,
+          internalTag: user.internalTag,
           sessionExpiry,
           tokenVersion: user.tokenVersion,
         };
@@ -86,6 +88,7 @@ export const {
         token.role = (user as { role?: string }).role;
         token.plan = (user as { plan?: string }).plan as "CALENDAR_ONLY" | "PRO" | undefined;
         token.accountStatus = (user as { accountStatus?: string }).accountStatus as string | undefined;
+        token.internalTag = (user as { internalTag?: string | null }).internalTag ?? null;
         token.sessionExpiry = (user as { sessionExpiry?: number }).sessionExpiry;
         token.tokenVersion = (user as { tokenVersion?: number }).tokenVersion;
       }
@@ -99,7 +102,7 @@ export const {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, plan: true, tokenVersion: true, accountStatus: true },
+            select: { role: true, plan: true, tokenVersion: true, accountStatus: true, internalTag: true },
           });
           if (dbUser) {
             // Invalidate token if tokenVersion has changed (e.g. password reset)
@@ -110,6 +113,7 @@ export const {
             token.plan = dbUser.plan;
             token.tokenVersion = dbUser.tokenVersion;
             token.accountStatus = dbUser.accountStatus;
+            token.internalTag = dbUser.internalTag;
           }
         } catch {
           // silently fail — keep existing token values
@@ -134,6 +138,9 @@ export const {
         session.user.role = token.role as "USER" | "TEAM_ADMIN" | "ADMIN";
         session.user.plan = (token.plan ?? "CALENDAR_ONLY") as "CALENDAR_ONLY" | "PRO";
         session.user.accountStatus = token.accountStatus as string;
+        session.user.isBeta = isBetaUser({
+          internalTag: (token.internalTag as string | null | undefined) ?? null,
+        });
         (session.user as { sessionExpiry?: number }).sessionExpiry = sessionExpiry;
       }
       return session;
