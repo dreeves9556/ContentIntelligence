@@ -27,6 +27,7 @@ import {
   updateOrganization,
   deleteOrganization,
   assignTeamAdmin,
+  promoteCoAdmin,
   getOrganizations,
   type AdminOrgData,
 } from "./actions";
@@ -52,6 +53,15 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
   const [isPending, startTransition] = useTransition();
   const [transferOrgId, setTransferOrgId] = useState<string | null>(null);
   const [transferTargetId, setTransferTargetId] = useState<string | null>(null);
+  const [coAdminOrgId, setCoAdminOrgId] = useState<string | null>(null);
+  const [coAdminTargetId, setCoAdminTargetId] = useState<string | null>(null);
+  const [pendingCoAdmin, setPendingCoAdmin] = useState<{
+    orgId: string;
+    orgName: string;
+    userId: string;
+    userName: string;
+    existingAdminCount: number;
+  } | null>(null);
   const [pendingTransfer, setPendingTransfer] = useState<{
     orgId: string;
     orgName: string;
@@ -199,6 +209,39 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
         setError(res.error ?? "Failed to transfer admin.");
         setTransferOrgId(null);
         setTransferTargetId(null);
+      }
+    });
+  }
+
+  function confirmPromoteCoAdmin(
+    orgId: string,
+    orgName: string,
+    targetUserId: string,
+    targetName: string,
+    existingAdminCount: number
+  ) {
+    setPendingCoAdmin({ orgId, orgName, userId: targetUserId, userName: targetName, existingAdminCount });
+  }
+
+  function handlePromoteCoAdmin() {
+    if (!pendingCoAdmin) return;
+    const { orgId, userId, userName } = pendingCoAdmin;
+    setPendingCoAdmin(null);
+    setCoAdminOrgId(orgId);
+    setCoAdminTargetId(userId);
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const res = await promoteCoAdmin(orgId, userId);
+      if (res.success) {
+        setSuccess(`${userName} promoted to co-admin.`);
+        setCoAdminOrgId(null);
+        setCoAdminTargetId(null);
+        refreshData();
+      } else {
+        setError(res.error ?? "Failed to promote co-admin.");
+        setCoAdminOrgId(null);
+        setCoAdminTargetId(null);
       }
     });
   }
@@ -395,12 +438,14 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
                         <span className={org.isOverLimit ? "text-red-400" : ""}>
                           {org.usedSeats} used
                         </span>
-                        {org.teamAdmin && (
+                        {org.teamAdmins.length > 0 && (
                           <>
                             <span>·</span>
                             <span className="flex items-center gap-1">
                               <UserCog className="h-3 w-3" />
-                              {org.teamAdmin.name || org.teamAdmin.email}
+                              {org.teamAdmins.length === 1
+                                ? (org.teamAdmins[0].name || org.teamAdmins[0].email)
+                                : `${org.teamAdmins.length} admins`}
                             </span>
                           </>
                         )}
@@ -534,6 +579,7 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
                         {org.members.map((member) => {
                           const isAdmin = member.role === "TEAM_ADMIN";
                           const isTransferring = transferOrgId === org.id && transferTargetId === member.id;
+                          const isCoAdmining = coAdminOrgId === org.id && coAdminTargetId === member.id;
 
                           return (
                             <div key={member.id} className="px-5 py-3 flex items-center justify-between gap-3">
@@ -568,26 +614,48 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
                                 </div>
                               </div>
                               {!isAdmin && member.role !== "ADMIN" && member.accountStatus !== "ARCHIVED" && (
-                                <button
-                                  onClick={() =>
-                                    confirmTransferAdmin(
-                                      org.id,
-                                      org.name,
-                                      member.id,
-                                      member.name || member.email || "this user",
-                                      org.teamAdmin?.name || org.teamAdmin?.email || null
-                                    )
-                                  }
-                                  disabled={isPending}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20 disabled:opacity-60 rounded-lg transition-colors shrink-0"
-                                >
-                                  {isTransferring ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <UserCog className="h-3.5 w-3.5" />
-                                  )}
-                                  Make Admin
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() =>
+                                      confirmPromoteCoAdmin(
+                                        org.id,
+                                        org.name,
+                                        member.id,
+                                        member.name || member.email || "this user",
+                                        org.teamAdmins.length
+                                      )
+                                    }
+                                    disabled={isPending}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-muted bg-background-secondary hover:bg-background-secondary/70 disabled:opacity-60 rounded-lg transition-colors shrink-0"
+                                  >
+                                    {isCoAdmining ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Shield className="h-3.5 w-3.5" />
+                                    )}
+                                    Make Co-Admin
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      confirmTransferAdmin(
+                                        org.id,
+                                        org.name,
+                                        member.id,
+                                        member.name || member.email || "this user",
+                                        org.teamAdmins[0]?.name || org.teamAdmins[0]?.email || null
+                                      )
+                                    }
+                                    disabled={isPending}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20 disabled:opacity-60 rounded-lg transition-colors shrink-0"
+                                  >
+                                    {isTransferring ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <UserCog className="h-3.5 w-3.5" />
+                                    )}
+                                    Make Admin
+                                  </button>
+                                </div>
                               )}
                             </div>
                           );
@@ -645,6 +713,48 @@ export default function OrganizationsAdminClient({ initialOrgs }: OrganizationsA
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCog className="h-4 w-4" />}
                 Confirm Transfer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Co-admin promotion confirmation modal */}
+      {pendingCoAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background-card rounded-lg border border-border-primary max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-accent-primary/10 rounded-lg">
+                <Shield className="h-5 w-5 text-accent-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary" style={{ fontFamily: "var(--font-serif)" }}>
+                Promote Co-Admin
+              </h3>
+            </div>
+            <p className="text-sm text-text-muted">
+              You are about to promote <span className="font-medium text-text-primary">{pendingCoAdmin.userName}</span> to co-admin of{" "}
+              <span className="font-medium text-text-primary">{pendingCoAdmin.orgName}</span>.
+              {pendingCoAdmin.existingAdminCount > 0 && (
+                <>
+                  {" "}This organization already has {pendingCoAdmin.existingAdminCount} admin{pendingCoAdmin.existingAdminCount !== 1 ? "s" : ""}. The existing admin{pendingCoAdmin.existingAdminCount !== 1 ? "s" : ""} will not be demoted.
+                </>
+              )}
+              {" "}Co-admins have the same roster management and billing access as the primary admin.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setPendingCoAdmin(null)}
+                className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePromoteCoAdmin}
+                disabled={isPending}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-60 rounded-lg transition-colors"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                Promote to Co-Admin
               </button>
             </div>
           </div>

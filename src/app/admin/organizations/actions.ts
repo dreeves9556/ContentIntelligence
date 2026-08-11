@@ -36,7 +36,7 @@ export interface AdminOrgData {
   pendingInvites: number;
   usedSeats: number;
   isOverLimit: boolean;
-  teamAdmin: AdminOrgMember | null;
+  teamAdmins: AdminOrgMember[];
   members: AdminOrgMember[];
 }
 
@@ -74,7 +74,7 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
     const activeUsers = org.members.length;
     const pendingInvites = org.teamInvites.length;
     const usedSeats = activeUsers + pendingInvites;
-    const teamAdmin = org.members.find((m) => m.role === "TEAM_ADMIN") ?? null;
+    const teamAdmins = org.members.filter((m) => m.role === "TEAM_ADMIN");
 
     return {
       id: org.id,
@@ -88,19 +88,17 @@ export async function getOrganizations(): Promise<{ data?: AdminOrgData[]; error
       pendingInvites,
       usedSeats,
       isOverLimit: usedSeats > org.seatLimit,
-      teamAdmin: teamAdmin
-        ? {
-            id: teamAdmin.id,
-            email: teamAdmin.email,
-            name: teamAdmin.name,
-            role: teamAdmin.role,
-            plan: (teamAdmin.plan ?? "PRO") as UserPlan,
-            createdAt: teamAdmin.createdAt,
-            accountStatus: teamAdmin.accountStatus,
-            internalTag: teamAdmin.internalTag,
-            isComped: teamAdmin.isComped,
-          }
-        : null,
+      teamAdmins: teamAdmins.map((m) => ({
+        id: m.id,
+        email: m.email,
+        name: m.name,
+        role: m.role,
+        plan: (m.plan ?? "PRO") as UserPlan,
+        createdAt: m.createdAt,
+        accountStatus: m.accountStatus,
+        internalTag: m.internalTag,
+        isComped: m.isComped,
+      })),
       members: org.members.map((m) => ({
         id: m.id,
         email: m.email,
@@ -372,6 +370,49 @@ export async function assignTeamAdmin(
   }
 }
 
+export async function promoteCoAdmin(
+  orgId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) return { success: false, error: "Organization not found." };
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { success: false, error: "User not found." };
+
+  if (user.role === "ADMIN") {
+    return { success: false, error: "Cannot promote a global admin to team admin." };
+  }
+
+  if (user.role === "TEAM_ADMIN" && user.organizationId === orgId) {
+    return { success: false, error: "This user is already a team admin for this organization." };
+  }
+
+  if (user.role === "TEAM_ADMIN" && user.organizationId && user.organizationId !== orgId) {
+    return { success: false, error: "This user is already a team admin for another organization." };
+  }
+
+  if (user.organizationId !== orgId) {
+    return { success: false, error: "The target user is not a member of this organization." };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: "TEAM_ADMIN",
+        plan: org.seatPlan,
+      },
+    });
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to promote co-admin." };
+  }
+}
+
 export async function deleteOrganization(
   id: string,
   confirmName: string
@@ -451,5 +492,124 @@ export async function deleteOrganization(
   } catch (err) {
     console.error("[DELETE ORG] Error:", err);
     return { success: false, error: "Failed to delete organization." };
+  }
+}
+
+export interface AssignableOrg {
+  id: string;
+  name: string;
+  slug: string | null;
+  seatLimit: number;
+  usedSeats: number;
+  freeSeats: number;
+}
+
+/**
+ * Returns organizations with at least one free seat, for the "assign user to
+ * organization" picker. Counts active members + pending (unexpired) invites as
+ * used seats, matching the seat accounting in `getOrganizations`.
+ */
+export async function getAssignableOrganizations(): Promise<{
+  data?: AssignableOrg[];
+  error?: string;
+}> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+
+  const orgs = await prisma.organization.findMany({
+    orderBy: { name: "asc" },
+    include: {
+      _count: { select: { members: true } },
+      teamInvites: {
+        where: { expiresAt: { gt: new Date() } },
+        select: { id: true },
+      },
+    },
+  });
+
+  const data: AssignableOrg[] = orgs
+    .map((org) => {
+      const usedSeats = org._count.members + org.teamInvites.length;
+      const freeSeats = Math.max(0, org.seatLimit - usedSeats);
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        seatLimit: org.seatLimit,
+        usedSeats,
+        freeSeats,
+      };
+    })
+    .filter((o) => o.freeSeats > 0);
+
+  return { data };
+}
+
+/**
+ * Assigns a standalone USER to an existing organization as a regular member.
+ * Does NOT promote them to TEAM_ADMIN — call `promoteCoAdmin` afterwards to
+ * make them a secondary admin. Enforces seat availability and the invariants
+ * documented in AGENTS.md (no global admins, no re-assignment, org must exist
+ * with a free seat). Community subscription ownership stays on the
+ * Organization; user-level Stripe fields are cleared defensively.
+ */
+export async function assignUserToOrganization(
+  userId: string,
+  orgId: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { success: false, error: "Unauthorized" };
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, organizationId: true, email: true },
+  });
+  if (!user) return { success: false, error: "User not found." };
+
+  if (user.role === "ADMIN") {
+    return { success: false, error: "Cannot assign a global admin to an organization." };
+  }
+  if (user.organizationId) {
+    return { success: false, error: "This user is already a member of an organization." };
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    include: {
+      _count: { select: { members: true } },
+      teamInvites: {
+        where: { expiresAt: { gt: new Date() } },
+        select: { id: true },
+      },
+    },
+  });
+  if (!org) return { success: false, error: "Organization not found." };
+
+  const usedSeats = org._count.members + org.teamInvites.length;
+  if (usedSeats >= org.seatLimit) {
+    return {
+      success: false,
+      error: `Organization is at its seat limit (${org.seatLimit}). Raise the limit or remove a member first.`,
+    };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        organizationId: org.id,
+        plan: org.seatPlan,
+        // Defensive: community subs live on the Organization, never the User.
+        // Clear any stale solo-subscription fields so billing routes don't
+        // mistake a community member for a solo subscriber.
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripeStatus: null,
+      },
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("[ASSIGN USER TO ORG] Error:", err);
+    return { success: false, error: "Failed to assign user to organization." };
   }
 }

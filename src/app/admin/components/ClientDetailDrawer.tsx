@@ -30,6 +30,7 @@ import ResetPasswordButton from "./ResetPasswordButton";
 import DeleteUserButton from "./DeleteUserButton";
 import AccountManagerModal, { type AccountModalUser } from "./AccountManagerModal";
 import BillingModal from "./BillingModal";
+import AssignOrgButton from "./AssignOrgButton";
 
 export interface DrawerUser {
   id: string;
@@ -185,6 +186,13 @@ export default function ClientDetailDrawer({ user, currentUserId, onClose, onSav
                 <Settings2 className="w-3 h-3" />
                 Edit account
               </button>
+              {user.role === "USER" && !user.organizationId && (
+                <AssignOrgButton
+                  userId={user.id}
+                  userName={user.name}
+                  onAssigned={onSaved}
+                />
+              )}
             </div>
           </section>
 
