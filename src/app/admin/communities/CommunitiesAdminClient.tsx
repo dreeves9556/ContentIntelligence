@@ -192,11 +192,13 @@ export default function CommunitiesAdminClient({ initialOrgs }: CommunitiesAdmin
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Current admin badge */}
-                    {org.teamAdmin ? (
+                    {org.teamAdmins.length > 0 ? (
                       <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-accent-primary/10 rounded-lg">
                         <Crown className="h-3.5 w-3.5 text-accent-primary" />
                         <span className="text-xs font-medium text-accent-primary">
-                          {org.teamAdmin.name || org.teamAdmin.email}
+                          {org.teamAdmins.length === 1
+                            ? (org.teamAdmins[0].name || org.teamAdmins[0].email)
+                            : `${org.teamAdmins.length} admins`}
                         </span>
                       </div>
                     ) : (
@@ -215,12 +217,14 @@ export default function CommunitiesAdminClient({ initialOrgs }: CommunitiesAdmin
                 </div>
 
                 {/* Mobile admin badge */}
-                {org.teamAdmin && (
+                {org.teamAdmins.length > 0 && (
                   <div className="sm:hidden px-5 pb-3">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent-primary/10 rounded-lg">
                       <Crown className="h-3.5 w-3.5 text-accent-primary" />
                       <span className="text-xs font-medium text-accent-primary">
-                        {org.teamAdmin.name || org.teamAdmin.email}
+                        {org.teamAdmins.length === 1
+                          ? (org.teamAdmins[0].name || org.teamAdmins[0].email)
+                          : `${org.teamAdmins.length} admins`}
                       </span>
                     </div>
                   </div>
@@ -302,7 +306,7 @@ export default function CommunitiesAdminClient({ initialOrgs }: CommunitiesAdmin
                                       org.name,
                                       member.id,
                                       member.name || member.email || "this user",
-                                      org.teamAdmin?.name || org.teamAdmin?.email || null
+                                      org.teamAdmins[0]?.name || org.teamAdmins[0]?.email || null
                                     )
                                   }
                                   disabled={isPending}
