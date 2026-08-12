@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
+import { closeConnectionPeriodsForUser } from "@/lib/impact-connection-periods";
 
 /**
  * Sever all Zernio social-account connections for a user.
@@ -33,6 +34,7 @@ export async function severZernioForUser(userId: string): Promise<void> {
     );
   }
 
+  await closeConnectionPeriodsForUser(userId);
   await prisma.zernioAccount.deleteMany({ where: { userId } });
   console.log(`[ZERNIO SEVER] Removed ${accounts.length} ZernioAccount rows for user ${userId}`);
 }

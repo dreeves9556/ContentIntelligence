@@ -136,6 +136,26 @@ function postsForAccount<T extends { userId: string; platform: string | null }>(
   );
 }
 
+function connectionStartByAccount(
+  accounts: Array<{ userId: string; platform: string; connectedAt: Date }>
+): Map<string, Date> {
+  return new Map(
+    accounts.map((account) => [
+      accountKey(account.userId, account.platform),
+      utcStartOfDay(account.connectedAt),
+    ])
+  );
+}
+
+function isInConnectionPeriod(
+  date: Date,
+  userId: string,
+  platform: string | null,
+  starts: Map<string, Date>
+): boolean {
+  return platform != null && date >= (starts.get(accountKey(userId, platform)) ?? new Date(8640000000000000));
+}
+
 export async function getImpactOverview(): Promise<ImpactOverview> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - ACTIVE_DAYS);
@@ -145,6 +165,7 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
   const connectedAccountKeys = new Set(
     accounts.map((account) => accountKey(account.userId, account.platform))
   );
+  const connectionStarts = connectionStartByAccount(accounts);
 
   const [allBaselines, allFollowerStats, allPosts, activeCalendarUsers] =
     await Promise.all([
@@ -183,14 +204,17 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
 
   const connectedMembers = connectedUserIds.length;
   const connectedAccounts = accounts.length;
-  const followerStats = allFollowerStats.filter((stat) =>
-    connectedAccountKeys.has(accountKey(stat.userId, stat.platform))
+  const followerStats = allFollowerStats.filter(
+    (stat) =>
+      connectedAccountKeys.has(accountKey(stat.userId, stat.platform)) &&
+      isInConnectionPeriod(stat.date, stat.userId, stat.platform, connectionStarts)
   );
   const suspiciousFollowerAccounts = findDuplicatedFollowerSeries(followerStats);
   const posts = allPosts.filter(
     (post) =>
       post.platform != null &&
-      connectedAccountKeys.has(accountKey(post.userId, post.platform))
+      connectedAccountKeys.has(accountKey(post.userId, post.platform)) &&
+      isInConnectionPeriod(post.publishedAt, post.userId, post.platform, connectionStarts)
   );
 
   const latestByAccount = new Map<string, number>();
@@ -217,6 +241,7 @@ export async function getImpactOverview(): Promise<ImpactOverview> {
       !baseline ||
       baseline.baselineFollowerCount == null ||
       !baselineStartsAfterConnection(baseline.baselineDate, account.connectedAt) ||
+      baseline.connectionPeriodId !== account.connectionPeriodId ||
       suspiciousFollowerAccounts.has(key)
     ) {
       accountsMissingBaseline++;
@@ -321,13 +346,16 @@ export async function getImpactTimeSeries(): Promise<ImpactTimeSeriesPoint[]> {
   const accountKeys = new Set(
     accounts.map((account) => accountKey(account.userId, account.platform))
   );
+  const connectionStarts = connectionStartByAccount(accounts);
   const allFollowerStats = await prisma.followerStats.findMany({
     where: { userId: { in: [...new Set(accounts.map((a) => a.userId))] } },
     orderBy: { date: "asc" },
     select: { date: true, followerCount: true, userId: true, platform: true },
   });
-  const followerStats = allFollowerStats.filter((stat) =>
-    accountKeys.has(accountKey(stat.userId, stat.platform))
+  const followerStats = allFollowerStats.filter(
+    (stat) =>
+      accountKeys.has(accountKey(stat.userId, stat.platform)) &&
+      isInConnectionPeriod(stat.date, stat.userId, stat.platform, connectionStarts)
   );
   const suspicious = findDuplicatedFollowerSeries(followerStats);
 
@@ -365,6 +393,7 @@ export async function getEngagementTimeSeries(): Promise<EngagementTimeSeriesPoi
   const accountKeys = new Set(
     accounts.map((account) => accountKey(account.userId, account.platform))
   );
+  const connectionStarts = connectionStartByAccount(accounts);
   const allPosts = await prisma.postAnalytics.findMany({
     where: {
       userId: { in: [...new Set(accounts.map((account) => account.userId))] },
@@ -384,7 +413,8 @@ export async function getEngagementTimeSeries(): Promise<EngagementTimeSeriesPoi
   const posts = allPosts.filter(
     (post) =>
       post.platform != null &&
-      accountKeys.has(accountKey(post.userId, post.platform))
+      accountKeys.has(accountKey(post.userId, post.platform)) &&
+      isInConnectionPeriod(post.publishedAt, post.userId, post.platform, connectionStarts)
   );
 
   const weekMap = new Map<string, { views: number; interactions: number }>();
@@ -418,6 +448,7 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
   const connectedAccountKeys = new Set(
     accounts.map((account) => accountKey(account.userId, account.platform))
   );
+  const connectionStarts = connectionStartByAccount(accounts);
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - ACTIVE_DAYS);
@@ -456,14 +487,17 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
         distinct: ["userId"],
       }),
     ]);
-  const followerStats = allFollowerStats.filter((stat) =>
-    connectedAccountKeys.has(accountKey(stat.userId, stat.platform))
+  const followerStats = allFollowerStats.filter(
+    (stat) =>
+      connectedAccountKeys.has(accountKey(stat.userId, stat.platform)) &&
+      isInConnectionPeriod(stat.date, stat.userId, stat.platform, connectionStarts)
   );
   const suspiciousFollowerAccounts = findDuplicatedFollowerSeries(followerStats);
   const posts = allPosts.filter(
     (post) =>
       post.platform != null &&
-      connectedAccountKeys.has(accountKey(post.userId, post.platform))
+      connectedAccountKeys.has(accountKey(post.userId, post.platform)) &&
+      isInConnectionPeriod(post.publishedAt, post.userId, post.platform, connectionStarts)
   );
 
   const latestFollowerMap = new Map<string, number>();
@@ -494,6 +528,7 @@ export async function getMemberGrowthRows(): Promise<MemberGrowthRow[]> {
     const followerDataValid = !suspiciousFollowerAccounts.has(key);
     const baselineIsValid =
       baseline != null &&
+      baseline.connectionPeriodId === account.connectionPeriodId &&
       baselineStartsAfterConnection(baseline.baselineDate, account.connectedAt);
     const currentFollowers = followerDataValid
       ? latestFollowerMap.get(key)
@@ -697,6 +732,9 @@ export async function getUsageCorrelationStats(
   const accountKeys = new Set(
     rows.map((row) => accountKey(row.userId, row.platform))
   );
+  const connectionStarts = new Map(
+    rows.map((row) => [accountKey(row.userId, row.platform), new Date(row.connectedAt ?? 0)])
+  );
   const posts = await prisma.postAnalytics.findMany({
     where: {
       userId: { in: [...new Set(rows.map((row) => row.userId))] },
@@ -704,12 +742,13 @@ export async function getUsageCorrelationStats(
       isDemo: false,
       platform: { not: null },
     },
-    select: { userId: true, platform: true },
+    select: { userId: true, platform: true, publishedAt: true },
   });
   const validPosts = posts.filter(
     (post) =>
       post.platform != null &&
-      accountKeys.has(accountKey(post.userId, post.platform))
+      accountKeys.has(accountKey(post.userId, post.platform)) &&
+      isInConnectionPeriod(post.publishedAt, post.userId, post.platform, connectionStarts)
   );
   const activePostCount = validPosts.filter((post) =>
     activeUserIds.has(post.userId)
@@ -739,6 +778,7 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
   const accountKeys = new Set(
     allAccounts.map((account) => accountKey(account.userId, account.platform))
   );
+  const connectionStarts = connectionStartByAccount(allAccounts);
   const [totalUsers, baselines, posts, followerStats] = await Promise.all([
     prisma.user.count({
       where: {
@@ -751,7 +791,9 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
       select: {
         userId: true,
         platform: true,
+        connectionPeriodId: true,
         baselineDate: true,
+        baselineFollowerCount: true,
       },
     }),
     prisma.postAnalytics.findMany({
@@ -760,7 +802,7 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
         isDemo: false,
         platform: { not: null },
       },
-      select: { userId: true, platform: true },
+      select: { userId: true, platform: true, publishedAt: true },
     }),
     prisma.followerStats.findMany({
       where: { userId: { in: userIds } },
@@ -787,6 +829,8 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
         );
         return (
           account != null &&
+          baseline.connectionPeriodId === account.connectionPeriodId &&
+          baseline.baselineFollowerCount != null &&
           baselineStartsAfterConnection(
             baseline.baselineDate,
             account.connectedAt
@@ -809,7 +853,8 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
       .filter(
         (post) =>
           post.platform != null &&
-          accountKeys.has(accountKey(post.userId, post.platform))
+          accountKeys.has(accountKey(post.userId, post.platform)) &&
+          isInConnectionPeriod(post.publishedAt, post.userId, post.platform, connectionStarts)
       )
       .map((post) => accountKey(post.userId, post.platform!))
   );
@@ -822,8 +867,10 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
     (a) => !a.lastSyncAt || a.lastSyncAt < staleThreshold
   ).length;
   const suspiciousFollowerAccounts = findDuplicatedFollowerSeries(
-    followerStats.filter((stat) =>
-      accountKeys.has(accountKey(stat.userId, stat.platform))
+    followerStats.filter(
+      (stat) =>
+        accountKeys.has(accountKey(stat.userId, stat.platform)) &&
+        isInConnectionPeriod(stat.date, stat.userId, stat.platform, connectionStarts)
     )
   ).size;
 

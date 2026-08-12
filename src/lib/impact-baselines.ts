@@ -22,7 +22,6 @@ export async function ensureBaselineForUserPlatform(
   platform: string
 ): Promise<"created" | "skipped" | "missing_data"> {
   const existing = await getBaselineForUserPlatform(userId, platform);
-  if (existing) return "skipped";
 
   const account = await prisma.zernioAccount.findUnique({
     where: { userId_platform: { userId, platform } },
@@ -31,6 +30,14 @@ export async function ensureBaselineForUserPlatform(
 
   // A growth baseline cannot predate the account's connection to The Local Post.
   const connectionDay = utcStartOfDay(account.connectedAt);
+  if (
+    existing &&
+    existing.connectionPeriodId === account.connectionPeriodId &&
+    existing.baselineFollowerCount != null &&
+    existing.baselineDate >= connectionDay
+  ) {
+    return "skipped";
+  }
   const earliestFollower = await prisma.followerStats.findFirst({
     where: { userId, platform, date: { gte: connectionDay } },
     orderBy: { date: "asc" },
@@ -75,17 +82,25 @@ export async function ensureBaselineForUserPlatform(
     baselineAvgInteractions = totalInteractions / earlyPosts.length;
   }
 
-  await prisma.memberGrowthBaseline.create({
-    data: {
-      userId,
-      platform,
-      baselineDate,
-      baselineFollowerCount: earliestFollower.followerCount,
-      baselineEngagementRate,
-      baselineAvgViews,
-      baselineAvgInteractions,
-    },
-  });
+  const data = {
+    userId,
+    platform,
+    connectionPeriodId: account.connectionPeriodId,
+    baselineDate,
+    baselineFollowerCount: earliestFollower.followerCount,
+    baselineEngagementRate,
+    baselineAvgViews,
+    baselineAvgInteractions,
+  };
+
+  if (existing) {
+    await prisma.memberGrowthBaseline.update({
+      where: { id: existing.id },
+      data,
+    });
+  } else {
+    await prisma.memberGrowthBaseline.create({ data });
+  }
 
   return "created";
 }
@@ -129,7 +144,13 @@ export async function recalculateEngagementBaselines(): Promise<{
   const result = { updated: 0, skipped: 0, errors: [] as string[] };
 
   const baselines = await prisma.memberGrowthBaseline.findMany({
-    select: { id: true, userId: true, platform: true, baselineDate: true },
+    select: {
+      id: true,
+      userId: true,
+      platform: true,
+      connectionPeriodId: true,
+      baselineDate: true,
+    },
   });
 
   for (const baseline of baselines) {
@@ -141,7 +162,7 @@ export async function recalculateEngagementBaselines(): Promise<{
             platform: baseline.platform,
           },
         },
-        select: { connectedAt: true },
+        select: { connectedAt: true, connectionPeriodId: true },
       });
       if (!account) {
         result.skipped++;
@@ -189,6 +210,7 @@ export async function recalculateEngagementBaselines(): Promise<{
       await prisma.memberGrowthBaseline.update({
         where: { id: baseline.id },
         data: {
+          connectionPeriodId: account.connectionPeriodId,
           baselineDate,
           baselineFollowerCount: earliestFollower.followerCount,
           baselineEngagementRate: engagementRate,
