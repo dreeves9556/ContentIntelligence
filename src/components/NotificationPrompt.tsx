@@ -51,7 +51,7 @@ export function NotificationPrompt() {
       });
 
       const { subscribeUser } = await import("@/app/dashboard/actions");
-      await subscribeUser({
+      const result = await subscribeUser({
         endpoint: sub.endpoint,
         expirationTime: sub.expirationTime,
         keys: {
@@ -59,6 +59,7 @@ export function NotificationPrompt() {
           auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth") as ArrayBuffer))),
         },
       });
+      if (!result.success) throw new Error(result.error);
 
       localStorage.setItem(STORAGE_KEY, "subscribed");
       setVisible(false);

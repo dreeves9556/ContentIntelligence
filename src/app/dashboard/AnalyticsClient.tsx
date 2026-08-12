@@ -38,6 +38,7 @@ import {
 } from "recharts";
 import { seedPostAnalytics, getCachedInsight, type AIInsightResult } from "./actions";
 import SyncButton from "./integrations/SyncButton";
+import { AnalyticsSyncShell } from "./integrations/AnalyticsSyncShell";
 import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 import {
   DAY_LABELS_SHORT,
@@ -1199,8 +1200,9 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
   };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <AnalyticsSyncShell onInsightRefresh={handleInsightRefresh}>
+      <div className="space-y-8">
+        {/* Header */}
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>
@@ -1211,7 +1213,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           </p>
         </div>
         <div className="sm:hidden absolute top-0 right-0">
-          <SyncButton onInsightRefresh={handleInsightRefresh} />
+          <SyncButton />
         </div>
         {posts.length === 0 && (
           <button
@@ -1303,7 +1305,7 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
           })}
         </div>
         <div className="ml-auto hidden sm:block">
-          <SyncButton onInsightRefresh={handleInsightRefresh} />
+          <SyncButton />
         </div>
       </div>
 
@@ -1677,8 +1679,9 @@ export default function AnalyticsClient({ posts, bestTimes, followerStats, deepA
         )}
       </div>
         </>
-      )}
-    </div>
+        )}
+      </div>
+    </AnalyticsSyncShell>
   );
 }
 

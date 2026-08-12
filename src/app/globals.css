@@ -265,6 +265,17 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Mobile: prevent iOS auto-zoom on input focus.
+   iOS Safari zooms when a focused form control has font-size < 16px.
+   Force 16px on touch viewports so the native-app feel is preserved. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Tiptap placeholder */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

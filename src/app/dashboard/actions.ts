@@ -358,62 +358,83 @@ Respond with ONLY the insight text — no headers, no bullet points, no markdown
   }
 }
 
+export type PushActionResult =
+  | { success: true }
+  | { success: false; error: string };
+
 export async function subscribeUser(sub: {
   endpoint: string;
   expirationTime: number | null;
   keys: { p256dh: string; auth: string };
-}) {
+}): Promise<PushActionResult> {
   const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
   if (typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || sub.endpoint.length > 2048) {
-    throw new Error("Invalid push endpoint");
+    return { success: false, error: "Invalid push endpoint" };
   }
 
-  // Re-pointing an existing endpoint at the caller would let one account claim
-  // another account's registered device. Only the current owner may update it.
-  const existing = await prisma.pushSubscription.findUnique({
-    where: { endpoint: sub.endpoint },
-    select: { userId: true },
-  });
+  try {
+    // A browser can reuse its subscription after the user changes accounts. Only
+    // accept a transfer when the browser presents the same subscription keys.
+    const existing = await prisma.pushSubscription.findUnique({
+      where: { endpoint: sub.endpoint },
+      select: { userId: true, p256dh: true, auth: true },
+    });
 
-  if (existing && existing.userId !== session.user.id) {
-    throw new Error("Push endpoint is already registered to another account");
+    if (
+      existing &&
+      existing.userId !== session.user.id &&
+      (existing.p256dh !== sub.keys.p256dh || existing.auth !== sub.keys.auth)
+    ) {
+      return {
+        success: false,
+        error: "This browser's notification subscription belongs to another account. Disable push notifications on that account first, then try again.",
+      };
+    }
+
+    await prisma.pushSubscription.upsert({
+      where: { endpoint: sub.endpoint },
+      update: {
+        userId: session.user.id,
+        p256dh: sub.keys.p256dh,
+        auth: sub.keys.auth,
+      },
+      create: {
+        userId: session.user.id,
+        endpoint: sub.endpoint,
+        p256dh: sub.keys.p256dh,
+        auth: sub.keys.auth,
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("[PUSH] Failed to save subscription:", error);
+    return { success: false, error: "Push notifications are temporarily unavailable. Please try again later." };
   }
-
-  await prisma.pushSubscription.upsert({
-    where: { endpoint: sub.endpoint },
-    update: {
-      userId: session.user.id,
-      p256dh: sub.keys.p256dh,
-      auth: sub.keys.auth,
-    },
-    create: {
-      userId: session.user.id,
-      endpoint: sub.endpoint,
-      p256dh: sub.keys.p256dh,
-      auth: sub.keys.auth,
-    },
-  });
-
-  return { success: true };
 }
 
-export async function unsubscribeUser(endpoint?: string) {
+export async function unsubscribeUser(endpoint?: string): Promise<PushActionResult> {
   const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
-  if (endpoint) {
-    await prisma.pushSubscription.deleteMany({
-      where: { userId: session.user.id, endpoint },
-    });
-  } else {
-    await prisma.pushSubscription.deleteMany({
-      where: { userId: session.user.id },
-    });
+  try {
+    if (endpoint) {
+      await prisma.pushSubscription.deleteMany({
+        where: { userId: session.user.id, endpoint },
+      });
+    } else {
+      await prisma.pushSubscription.deleteMany({
+        where: { userId: session.user.id },
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[PUSH] Failed to remove subscription:", error);
+    return { success: false, error: "Push notifications are temporarily unavailable. Please try again later." };
   }
-
-  return { success: true };
 }
 
 export async function getPushSubscriptionStatus() {
