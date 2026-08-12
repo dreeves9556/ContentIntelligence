@@ -6,6 +6,7 @@ import { after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { zernio } from "@/lib/zernio";
 import { generateAIInsight, type AIInsightResult } from "../actions";
+import { generateImpactInsight } from "@/app/admin/impact/actions";
 import { normalizeBestTimeResponse } from "@/lib/best-time";
 import { normalizeFollowerStatsResponse } from "@/lib/follower-stats";
 import { PLATFORM_DEEP_ANALYTICS, normalizeContentDecay, normalizeDailyMetrics, normalizePostingFrequency } from "@/lib/deep-analytics";
@@ -13,6 +14,7 @@ import { runLearningPipeline } from "@/lib/memory/memory-builder";
 import { checkActionRateLimit, formatRetryTime } from "@/lib/rate-limiter";
 import { checkAndSendAnalyticsMilestone } from "@/lib/notifications";
 import { ensureBaselineForUserPlatform } from "@/lib/impact-baselines";
+import { closeConnectionPeriodForAccount, ensureConnectionPeriodForAccount } from "@/lib/impact-connection-periods";
 import { requireDashboardAccess } from "@/lib/server-access";
 
 export async function disconnectZernioAccount(platform: string) {
@@ -30,6 +32,7 @@ export async function disconnectZernioAccount(platform: string) {
     } catch {
       // Continue even if Zernio-side deletion fails
     }
+    await closeConnectionPeriodForAccount(account);
     await prisma.zernioAccount.delete({
       where: { userId_platform: { userId, platform } },
     });
@@ -40,15 +43,13 @@ export async function disconnectZernioAccount(platform: string) {
   return { success: true };
 }
 
-const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 hours
-
 interface AccountSyncResult {
   syncedPosts: number;
   analyticsSucceeded: boolean;
   followerStatsSucceeded: boolean;
 }
 
-async function syncSingleAccount(
+export async function syncSingleAccount(
   userId: string,
   account: { zernioAccountId: string; platform: string; zernioProfileId: string },
   startStr: string,
@@ -266,6 +267,7 @@ export async function syncAnalytics() {
   const endStr = now.toISOString().split("T")[0];
 
   const accountResults = await Promise.all(zernioAccounts.map(async (account) => {
+    await ensureConnectionPeriodForAccount(account);
     const result = await syncSingleAccount(userId, account, startStr, endStr);
     if (result.analyticsSucceeded && result.followerStatsSucceeded) {
       await prisma.zernioAccount.update({
@@ -312,6 +314,16 @@ export async function syncAnalytics() {
   // Regenerate the insight before responding, so the returned UI always matches this sync.
   const insightResult: AIInsightResult = await generateAIInsight(userId);
 
+  if (accountResults.some((result) => result.analyticsSucceeded && result.followerStatsSucceeded)) {
+    after(async () => {
+      try {
+        await generateImpactInsight({ systemToken: process.env.CRON_SECRET });
+      } catch (err) {
+        console.error("Automatic impact insight generation failed:", err);
+      }
+    });
+  }
+
   if (synced > 0) {
     // Run memory learning pipeline — may create new PERFORMANCE/AUDIENCE memories from fresh analytics.
     // Wrapped in after() so the work is guaranteed to complete even after
@@ -351,56 +363,4 @@ export async function syncAnalytics() {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/analytics");
   return { success: true, synced, insightResult };
-}
-
-export async function autoSyncAnalyticsIfNeeded() {
-  const access = await requireDashboardAccess({ requiredPlan: "PRO" });
-  if (!access.allowed) return;
-  const userId = access.user.id;
-
-  const zernioAccounts = await prisma.zernioAccount.findMany({
-    where: { userId },
-  });
-
-  if (zernioAccounts.length === 0) return;
-
-  const now = new Date();
-  const staleThreshold = new Date(now.getTime() - AUTO_SYNC_INTERVAL_MS);
-
-  // Only sync accounts that haven't been synced in 24h (or never synced)
-  const staleAccounts = zernioAccounts.filter(
-    (a) => !a.lastSyncAt || a.lastSyncAt < staleThreshold
-  );
-
-  if (staleAccounts.length === 0) return;
-
-  const startDate = new Date(now);
-  startDate.setDate(now.getDate() - 90);
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = now.toISOString().split("T")[0];
-
-  let synced = 0;
-
-  for (const account of staleAccounts) {
-    const result = await syncSingleAccount(userId, account, startStr, endStr);
-    synced += result.syncedPosts;
-    if (result.analyticsSucceeded && result.followerStatsSucceeded) {
-      await prisma.zernioAccount.update({
-        where: { userId_platform: { userId, platform: account.platform } },
-        data: { lastSyncAt: now },
-      });
-    }
-  }
-
-  if (synced > 0) {
-    after(async () => {
-      try {
-        await generateAIInsight(userId);
-      } catch (err) {
-        console.error("Background AI insight generation failed:", err);
-      }
-    });
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/analytics");
-  }
 }

@@ -265,3 +265,16 @@ the actual DB/Stripe calls based on the returned decision.
 
 - `turbopack.root` in `next.config.ts` is resolved dynamically via `import.meta.url` — do NOT hard-code a path (breaks CI/other machines).
 - `scripts/` is excluded from both `tsconfig.json` and `eslint.config.mjs` — debug scripts only, not app code.
+
+### Vercel CLI access
+
+The `vercel` binary is not installed globally. From `my-app/`, use the pinned CLI version below so commands target the correct project:
+
+```bash
+npx --yes vercel@58.7.1 link --yes --scope content-intelligence --project my-app
+npx --yes vercel@58.7.1 env ls production --scope content-intelligence --project my-app
+npx --yes vercel@58.7.1 list my-app --environment production --json --limit 1 --scope content-intelligence
+npx --yes vercel@58.7.1 redeploy <deployment-url> --target production --scope content-intelligence
+```
+
+Always use `--scope content-intelligence --project my-app`. Without the link/project flags, the CLI can inspect the separate `content-intelligence` project instead. Do not print or pull secret values. `vercel link` may update the ignored `.env.local` with a Vercel OIDC token.

@@ -71,6 +71,8 @@ model User {
   notificationPreference     NotificationPreference?
   scheduledPushNotifications ScheduledPushNotification[] @relation("ScheduledPushCreator")
   memberGrowthBaselines      MemberGrowthBaseline[]
+  impactConnectionPeriods    ImpactConnectionPeriod[]
+  analyticsSyncJobs          AnalyticsSyncJob[]
   loginAnnouncementDismissals LoginAnnouncementDismissal[]
   accounts                   Account[]
   sessions                   Session[]
@@ -387,25 +389,114 @@ model ProfileSurvey {
 }
 
 model ZernioAccount {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  zernioProfileId String
-  zernioAccountId String
-  platform        String // e.g. "instagram", "tiktok", "linkedin"
-  handle          String?
-  connectedAt     DateTime  @default(now())
-  lastSyncAt      DateTime?
+  id                  String                  @id @default(cuid())
+  userId              String
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zernioProfileId     String
+  zernioAccountId     String
+  platform            String // e.g. "instagram", "tiktok", "linkedin"
+  handle              String?
+  connectedAt         DateTime                @default(now())
+  lastSyncAt          DateTime?
+  connectionPeriodId  String?                  @unique
+  connectionPeriod    ImpactConnectionPeriod? @relation(fields: [connectionPeriodId], references: [id], onDelete: SetNull)
 
   @@unique([userId, platform])
+  @@index([connectionPeriodId])
   @@map("zernio_accounts")
+}
+
+model ImpactConnectionPeriod {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform          String
+  connectedAt       DateTime
+  disconnectedAt    DateTime?
+  providerAccountId String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  account           ZernioAccount?
+  baselines         MemberGrowthBaseline[]
+  syncJobs          AnalyticsSyncJob[]
+
+  @@index([userId, platform, connectedAt])
+  @@index([platform, disconnectedAt])
+  @@map("impact_connection_periods")
+}
+
+model AnalyticsSyncJob {
+  id                 String                 @id @default(cuid())
+  userId             String
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform           String
+  connectionPeriodId String?
+  connectionPeriod   ImpactConnectionPeriod? @relation(fields: [connectionPeriodId], references: [id], onDelete: SetNull)
+  source             String                 @default("SCHEDULED")
+  status             String                 @default("PENDING")
+  scheduledFor       DateTime               @default(now())
+  claimToken         String?
+  claimedAt          DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  attempts           Int                    @default(0)
+  postsSynced        Int                    @default(0)
+  followerPointsSynced Int                  @default(0)
+  analyticsSucceeded Boolean                @default(false)
+  followerStatsSucceeded Boolean            @default(false)
+  lastError          String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([status, claimedAt])
+  @@index([userId, platform, status])
+  @@map("analytics_sync_jobs")
+}
+
+model ImpactBaselineRebuildRun {
+  id                String                      @id @default(cuid())
+  requestedByUserId String
+  status            String                      @default("PREVIEW")
+  definitionVersion String
+  sourceFingerprint String
+  appliedAt         DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  items             ImpactBaselineRebuildItem[]
+
+  @@index([status, createdAt])
+  @@map("impact_baseline_rebuild_runs")
+}
+
+model ImpactBaselineRebuildItem {
+  id                 String                   @id @default(cuid())
+  runId              String
+  run                ImpactBaselineRebuildRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  userId             String
+  platform           String
+  connectionPeriodId String?
+  oldBaselineDate    DateTime?
+  oldFollowerCount   Int?
+  proposedDate       DateTime?
+  proposedFollowerCount Int?
+  proposedEngagementRate Float?
+  status             String                   @default("PENDING")
+  reason             String?
+  appliedAt          DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@unique([runId, userId, platform])
+  @@index([userId, platform, status])
+  @@map("impact_baseline_rebuild_items")
 }
 
 model PlatformConfig {
   id                             String   @id @default("default")
   zernioApiKey                   String?
   zernioEnabledPlatforms         String[] @default(["instagram", "tiktok", "facebook", "youtube"])
-  analyticsSyncFrequencyMinutes  Int      @default(60)
+  analyticsSyncFrequencyMinutes  Int      @default(180)
   anthropicModel                 String   @default("claude-opus-4-8")
   anthropicApiKey                String?
   insightPromptTemplate          String?
@@ -871,21 +962,24 @@ model ChangelogEntry {
 }
 
 model MemberGrowthBaseline {
-  id                      String   @id @default(cuid())
+  id                      String                  @id @default(cuid())
   userId                  String
-  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform                String
+  connectionPeriodId      String?
+  connectionPeriod        ImpactConnectionPeriod? @relation(fields: [connectionPeriodId], references: [id], onDelete: SetNull)
   baselineDate            DateTime
   baselineFollowerCount   Int?
   baselineEngagementRate  Float?
   baselineAvgViews        Float?
   baselineAvgInteractions Float?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
   @@unique([userId, platform])
   @@index([platform])
   @@index([baselineDate])
+  @@index([connectionPeriodId])
   @@map("member_growth_baselines")
 }
 

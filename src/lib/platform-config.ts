@@ -19,7 +19,7 @@ export type PlatformConfigData = Pick<
 const DEFAULT_CONFIG: PlatformConfigData = {
   zernioApiKey: null,
   zernioEnabledPlatforms: ["instagram", "tiktok", "facebook", "youtube"],
-  analyticsSyncFrequencyMinutes: 60,
+  analyticsSyncFrequencyMinutes: 180,
   anthropicModel: "claude-opus-4-8",
   anthropicApiKey: null,
   insightPromptTemplate: null,

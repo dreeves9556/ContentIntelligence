@@ -86,3 +86,19 @@ The dashboard reports:
 All growth figures are observed changes for connected accounts. They do not prove
 that The Local Post caused the result. Sales and AI copy must use terms such as
 "tracked net change," "observed growth," and "correlation."
+
+## Connection-period scope
+
+Impact charts and totals are scoped to the current `ImpactConnectionPeriod` for
+that user/platform. Rows retained from an earlier connection remain available
+for audit but are excluded from current impact totals. Reconnecting a platform
+starts a new period and requires a new valid baseline.
+
+Every dashboard payload includes a definition version, generated timestamp,
+data-through timestamp, source fingerprint, eligible sample sizes, and data
+quality exclusions. An AI insight is stale when its source fingerprint differs
+from the current dashboard payload or its six-hour cache expiry has passed.
+
+Scheduled analytics sync runs through the durable `AnalyticsSyncJob` queue. The
+cron pass is bounded and lease-recoverable; the per-account cadence defaults to
+three hours and is controlled by `PlatformConfig.analyticsSyncFrequencyMinutes`.

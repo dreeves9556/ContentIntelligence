@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   TrendingUp, Users, UserPlus, Eye, Heart, FileText, Activity,
   AlertTriangle, Copy, Check, Loader2, RefreshCw, Database,
@@ -11,7 +12,8 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import type { ImpactData } from "./actions";
-import { backfillBaselines, recalculateEngagementBaselinesAction, getCachedImpactInsight, generateImpactInsight } from "./actions";
+import { backfillBaselines, recalculateEngagementBaselinesAction, getCachedImpactInsight, generateImpactInsight, previewBaselineRebuild, applyBaselineRebuild } from "./actions";
+import ImpactMetricDrawer from "./ImpactMetricDrawer";
 
 const PLATFORM_LABELS: Record<string, string> = {
   INSTAGRAM: "Instagram", TIKTOK: "TikTok", LINKEDIN: "LinkedIn",
@@ -49,15 +51,22 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
   const [recalcLoading, setRecalcLoading] = useState(false);
   const [recalcResult, setRecalcResult] = useState<string | null>(null);
   const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewRunId, setPreviewRunId] = useState<string | null>(null);
+  const [previewSummary, setPreviewSummary] = useState<string | null>(null);
   const [copiedStat, setCopiedStat] = useState<string | null>(null);
   const [aiInsight, setAiInsight] = useState<string>("");
+  const [aiGeneratedAt, setAiGeneratedAt] = useState<string | null>(null);
+  const [aiDataThroughAt, setAiDataThroughAt] = useState<string | null>(null);
+  const [aiStale, setAiStale] = useState(false);
   const [aiLoading, setAiLoading] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [insightExpanded, setInsightExpanded] = useState(false);
 
-  const { overview, timeSeries, engagementTimeSeries, memberRows,
+  const { metadata, overview, timeSeries, engagementTimeSeries, memberRows,
     platformBreakdown, cohortBreakdown, usageCorrelation, dataQuality } = data;
+  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +75,9 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
       if (cancelled) return;
       if (result.success && result.insight) {
         setAiInsight(result.insight);
+        setAiGeneratedAt(result.generatedAt ?? null);
+        setAiDataThroughAt(result.dataThroughAt ?? null);
+        setAiStale(result.stale ?? false);
       } else if (result.error) {
         setAiError(result.error);
       }
@@ -87,6 +99,9 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
       const result = await generateImpactInsight();
       if (result.success && result.insight) {
         setAiInsight(result.insight);
+        setAiGeneratedAt(result.generatedAt ?? new Date().toISOString());
+        setAiDataThroughAt(result.dataThroughAt ?? metadata.dataThroughAt);
+        setAiStale(false);
       } else {
         setAiError(result.error || "Failed to generate insight");
       }
@@ -95,7 +110,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
     } finally {
       setAiGenerating(false);
     }
-  }, []);
+  }, [metadata.dataThroughAt]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -136,18 +151,57 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
     try {
       const r = await backfillBaselines();
       setBackfillResult(r.success ? `Created ${r.created}, skipped ${r.skipped}, ${r.missingFollowerStats} missing data.` : `Error: ${r.error}`);
+      if (r.success) router.refresh();
     } catch (e) { setBackfillResult(`Error: ${e instanceof Error ? e.message : "Unknown"}`); }
     finally { setBackfillLoading(false); }
-  }, []);
+  }, [router]);
 
   const handleRecalculate = useCallback(async () => {
     setRecalcLoading(true); setRecalcResult(null); setShowRecalcConfirm(false);
     try {
       const r = await recalculateEngagementBaselinesAction();
       setRecalcResult(r.success ? `Updated ${r.updated}, skipped ${r.skipped}.` : `Error: ${r.error}`);
+      if (r.success) router.refresh();
     } catch (e) { setRecalcResult(`Error: ${e instanceof Error ? e.message : "Unknown"}`); }
     finally { setRecalcLoading(false); }
+  }, [router]);
+
+  const handlePreview = useCallback(async () => {
+    setPreviewLoading(true);
+    setPreviewSummary(null);
+    try {
+      const result = await previewBaselineRebuild();
+      if (result.success) {
+        const ready = result.items?.filter((item) => item.status === "READY").length ?? 0;
+        const noData = result.items?.filter((item) => item.status === "NO_DATA").length ?? 0;
+        setPreviewRunId(result.runId ?? null);
+        setPreviewSummary(`Preview ${result.runId}: ${ready} ready to apply, ${noData} missing follower data.`);
+      } else {
+        setPreviewSummary(`Error: ${result.error}`);
+      }
+    } catch (e) {
+      setPreviewSummary(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setPreviewLoading(false);
+    }
   }, []);
+
+  const handleApplyPreview = useCallback(async () => {
+    if (!previewRunId) return;
+    setPreviewLoading(true);
+    try {
+      const result = await applyBaselineRebuild(previewRunId);
+      setPreviewSummary(result.success ? `Applied ${result.applied}, skipped ${result.skipped}.` : `Error: ${result.error}`);
+      if (result.success) {
+        setPreviewRunId(null);
+        router.refresh();
+      }
+    } catch (e) {
+      setPreviewSummary(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [previewRunId, router]);
 
   const copyToClipboard = useCallback(async (text: string, id: string) => {
     try { await navigator.clipboard.writeText(text); setCopiedStat(id); setTimeout(() => setCopiedStat(null), 2000); } catch {}
@@ -170,6 +224,39 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
     { name: "Active Users (30d)", value: String(overview.activeUsers), icon: Activity },
   ];
 
+  const metricDetails: Record<string, { description: string; formula: string; sample: string; exclusions: string }> = {
+    "Total Followers Gained": {
+      description: "Observed net follower change across eligible accounts during their current connection period.",
+      formula: "Latest valid follower count minus the connection-period baseline follower count.",
+      sample: `${overview.accountsWithValidBaseline} accounts with valid baselines and current observations.`,
+      exclusions: "Pre-connection observations, zero/null baselines, and quarantined duplicate histories are excluded.",
+    },
+    "Avg Follower Growth": {
+      description: "Average member-level follower growth, so members with multiple platforms do not receive extra weight.",
+      formula: "Average of ((current followers - baseline followers) / baseline followers) × 100 per member.",
+      sample: `${overview.accountsWithValidBaseline} valid account comparisons across ${overview.connectedMembers} eligible members.`,
+      exclusions: "Members with zero baselines or no valid current comparison are excluded from the percentage average.",
+    },
+    "Avg Engagement Lift": {
+      description: "Measured difference between current trailing-30-day engagement and the first 30-day baseline window.",
+      formula: "Current weighted engagement rate minus baseline weighted engagement rate.",
+      sample: `${overview.accountsWithValidEngagement} accounts with both baseline and current engagement data.`,
+      exclusions: "Zero-view posts, missing platform attribution, and accounts without both comparison windows are excluded.",
+    },
+    "Total Views Tracked": {
+      description: "Provider-reported non-demo views for platform-attributed posts since the current connection began.",
+      formula: "Sum of eligible post views.",
+      sample: `${overview.totalPostsTracked} eligible platform-attributed posts.`,
+      exclusions: "Demo rows, legacy unattributed rows, and posts before the current connection are excluded.",
+    },
+    "Total Posts Tracked": {
+      description: "Count of eligible platform-attributed non-demo posts since the current connection began.",
+      formula: "Count of eligible post analytics rows.",
+      sample: `${overview.connectedAccounts} eligible connected accounts.`,
+      exclusions: "Demo rows, legacy unattributed rows, and posts before the current connection are excluded.",
+    },
+  };
+
   const tooltipStyle = {
     backgroundColor: "var(--color-background-card)", border: "1px solid var(--color-border-primary)",
     borderRadius: "8px", color: "var(--color-text-primary)",
@@ -179,8 +266,21 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>Local Post Impact</h1>
-        <p className="text-text-muted mt-1">Track member growth, engagement lift, and platform-wide results since joining The Local Post.</p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-serif)" }}>Local Post Impact</h1>
+            <p className="text-text-muted mt-1">Tracked growth and engagement for eligible connected accounts since their current connection began.</p>
+            <p className="text-xs text-text-muted mt-2">
+              Data through {metadata.dataThroughAt ? new Date(metadata.dataThroughAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "not available"} · Calculated {new Date(metadata.generatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </p>
+          </div>
+          <button
+            onClick={() => router.refresh()}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-primary/20 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/30 transition-all shrink-0"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </button>
+        </div>
         <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
           <ShieldAlert className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
           <p className="text-xs text-text-muted leading-relaxed">These stats show tracked growth and engagement trends for connected accounts. They should be used as directional evidence, not guaranteed attribution. Individual results may vary.</p>
@@ -199,9 +299,18 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <h3 className="text-lg font-semibold text-accent-primary">
-                AI Marketing Insight
-              </h3>
+              <div>
+                <h3 className="text-lg font-semibold text-accent-primary">
+                  AI Marketing Insight
+                </h3>
+                {aiInsight && (aiGeneratedAt || aiStale) && (
+                  <p className={`text-xs mt-1 ${aiStale ? "text-yellow-500" : "text-text-muted"}`}>
+                    {aiStale ? "Stale insight, regenerate recommended" : "Grounded in the current metric snapshot"}
+                    {aiGeneratedAt ? ` · generated ${new Date(aiGeneratedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
+                    {aiDataThroughAt ? ` · data through ${new Date(aiDataThroughAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={handleGenerateInsight}
                 disabled={aiGenerating || aiLoading}
@@ -271,7 +380,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
         {cards.map((s) => { const Icon = s.icon; return (
           <div key={s.name} className="bg-background-card rounded-xl p-4 sm:p-6 border border-border-primary hover:border-accent-primary/30 transition-colors">
             <div className="flex items-center justify-between">
-              <div><p className="text-xs sm:text-sm text-text-muted">{s.name}</p><p className="text-xl sm:text-2xl font-bold text-text-primary mt-1">{s.value}</p></div>
+              <div><p className="text-xs sm:text-sm text-text-muted">{s.name}</p>{metricDetails[s.name] ? <div className="mt-1"><ImpactMetricDrawer title={s.name} value={s.value} {...metricDetails[s.name]} /></div> : <p className="text-xl sm:text-2xl font-bold text-text-primary mt-1">{s.value}</p>}</div>
               <div className="p-2 sm:p-3 bg-accent-primary/10 rounded-xl"><Icon className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" /></div>
             </div>
           </div>
@@ -459,7 +568,12 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
                     <td className="px-4 py-3 text-xs text-text-muted text-right whitespace-nowrap">{row.currentEngagement != null ? row.currentEngagement.toFixed(2) + "%" : "—"}</td>
                     <td className="px-4 py-3 text-sm text-right whitespace-nowrap"><span className={row.engagementLift != null && row.engagementLift >= 0 ? "text-green-400 font-medium" : "text-red-400 font-medium"}>{row.engagementLift != null ? formatPercent(row.engagementLift, 2) : "—"}</span></td>
                     <td className="px-4 py-3 text-xs text-text-muted whitespace-nowrap">{row.lastSyncAt ? formatDateShort(row.lastSyncAt) : "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap"><span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.isActive ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-background-secondary text-text-muted border-border-primary"}`}>{row.isActive ? "Active" : "Inactive"}</span></td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="space-y-1">
+                        <span className={`block w-fit text-xs font-medium px-2 py-0.5 rounded-full border ${row.accountStatus === "STALE" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-green-500/20 text-green-400 border-green-500/30"}`}>{row.accountStatus}</span>
+                        <span className={`block w-fit text-[11px] px-2 py-0.5 rounded-full border ${row.isActive ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-background-secondary text-text-muted border-border-primary"}`}>Usage {row.isActive ? "active" : "inactive"}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-xs text-text-muted whitespace-nowrap">{row.plan}</td>
                   </tr>
                 ))}
@@ -497,7 +611,17 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
         <div className="flex items-center gap-2 mb-1"><RefreshCw className="h-5 w-5 text-accent-primary shrink-0" /><h3 className="text-base sm:text-lg font-semibold" style={{ fontFamily: "var(--font-serif)" }}>Baseline Management</h3></div>
         <p className="text-xs sm:text-sm text-text-muted mb-4">Backfill missing baselines or rebuild follower and engagement baselines from post-connection, platform-specific data.</p>
         <div className="flex flex-wrap gap-3">
-          <button onClick={handleBackfill} disabled={backfillLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-primary text-white transition-all hover:bg-accent-primary/90 disabled:opacity-50">
+          <button onClick={handlePreview} disabled={previewLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-primary text-white transition-all hover:bg-accent-primary/90 disabled:opacity-50">
+            {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+            Preview Baseline Rebuild
+          </button>
+          {previewRunId && (
+            <button onClick={handleApplyPreview} disabled={previewLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50">
+              {previewLoading ? <Loader2 className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+              Apply Preview
+            </button>
+          )}
+          <button onClick={handleBackfill} disabled={backfillLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-background-secondary border border-border-primary text-text-primary transition-all hover:bg-background-secondary/80 disabled:opacity-50">
             {backfillLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
             Backfill Missing Baselines
           </button>
@@ -518,6 +642,7 @@ export default function ImpactDashboardClient({ data }: { data: ImpactData }) {
             </div>
           )}
         </div>
+        {previewSummary && <p className="mt-3 text-sm text-text-muted">{previewSummary}</p>}
         {backfillResult && <p className="mt-3 text-sm text-text-muted">{backfillResult}</p>}
         {recalcResult && <p className="mt-3 text-sm text-text-muted">{recalcResult}</p>}
       </div>

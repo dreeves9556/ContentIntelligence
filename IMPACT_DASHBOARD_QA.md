@@ -84,3 +84,31 @@
 - [ ] Light mode renders correctly
 - [ ] Dark mode renders correctly
 - [ ] All colors use CSS variables, no hardcoded hex values (except chart colors where appropriate)
+
+## Connection-period scope
+- [ ] Current metrics exclude follower and post rows before the active connection period
+- [ ] Reconnecting the same platform creates a new connection period
+- [ ] Existing baselines from an older connection are not treated as current
+- [ ] Data quality counts use the same validity rules as overview metrics
+- [ ] Header shows scope, data-through time, and calculation time
+
+## Preview and apply
+- [ ] Baseline preview is read-only and creates a run ID
+- [ ] Preview shows ready versus missing-data items
+- [ ] Apply requires a specific preview run
+- [ ] Changed source data causes an item to be skipped as a conflict
+- [ ] Historical analytics rows are preserved
+
+## Durable sync
+- [ ] Analytics cron requires `CRON_SECRET`
+- [ ] Cron claims bounded `AnalyticsSyncJob` rows
+- [ ] Stale PROCESSING jobs are reclaimed after the lease
+- [ ] Concurrent cron/manual work cannot process one account twice
+- [ ] `lastSyncAt` updates only after both provider endpoints succeed
+
+## Grounded impact insight
+- [ ] Cached insight stores source fingerprint and data-through time
+- [ ] Changed metrics mark the old insight stale
+- [ ] Automatic generation is skipped when the source fingerprint is unchanged
+- [ ] Manual regeneration remains available to admins
+- [ ] Insight metadata is visible in the UI

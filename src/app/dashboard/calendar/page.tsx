@@ -6,9 +6,7 @@ import { MobileCalendarHeader } from "./MobileCalendarHeader";
 import { CalendarGenerationShell } from "./CalendarGenerationShell";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { autoSyncAnalyticsIfNeeded } from "../integrations/actions";
 import { parseLocalDate } from "@/lib/best-time";
 import {
   Sparkles,
@@ -24,16 +22,6 @@ export default async function CalendarPage() {
   if (!session?.user?.id) {
     redirect("/login");
   }
-
-  // Auto-sync analytics once per day per account. Runs after the response is
-  // sent so it never competes with page rendering for the DB connection pool.
-  after(async () => {
-    try {
-      await autoSyncAnalyticsIfNeeded();
-    } catch (err) {
-      console.error("Auto analytics sync failed:", err);
-    }
-  });
 
   // Independent reads — issue them concurrently rather than waiting on each in turn.
   const [calendar, zernioAccounts, bestTimeRows] = await Promise.all([

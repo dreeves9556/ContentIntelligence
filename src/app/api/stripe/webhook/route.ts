@@ -206,6 +206,23 @@ function getSubscriptionId(obj: { subscription: string | Stripe.Subscription | n
   return typeof obj.subscription === "string" ? obj.subscription : obj.subscription?.id ?? null;
 }
 
+/**
+ * Determine the effective seat limit for a community subscription.
+ *
+ * Flat-rate subscriptions (e.g. negotiated custom pricing) use quantity=1
+ * but carry the seat count in subscription.metadata.seats. Per-seat
+ * subscriptions use quantity = number of seats. This helper checks
+ * metadata.seats first, then falls back to quantity, then to the
+ * provided fallback (e.g. existing org.seatLimit).
+ */
+function getEffectiveSeatLimit(subscription: Stripe.Subscription, fallback: number): number {
+  const metadataSeats = parseInt(subscription.metadata?.seats ?? "", 10);
+  if (Number.isInteger(metadataSeats) && metadataSeats >= 1) return metadataSeats;
+  const quantity = subscription.items.data[0]?.quantity;
+  if (Number.isInteger(quantity) && quantity! >= 1) return quantity!;
+  return fallback;
+}
+
 /** Check if a user should be protected from webhook modifications.
  *  ADMIN users and comped users are never overwritten by webhook events. */
 async function isProtectedUser(userId: string): Promise<boolean> {
@@ -389,7 +406,7 @@ async function fulfillCommunityCheckout(
 
   const stripe = getStripe();
   let subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const quantity = subscription.items.data[0]?.quantity ?? 1;
+  const quantity = getEffectiveSeatLimit(subscription, 1);
   const organizationName = session.metadata?.organizationName || "Community";
 
   // Trial abuse guard: if the user already used a trial but Stripe returned
@@ -531,7 +548,7 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     let organizationId: string;
     const orgName = organizationName || "Community";
-    const quantity = subscription.items.data[0]?.quantity ?? seats ?? 1;
+    const quantity = getEffectiveSeatLimit(subscription, seats ?? 1);
 
     if (existingOrg) {
       await prisma.organization.update({
@@ -812,7 +829,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     });
 
     if (org) {
-      const quantity = subscription.items.data[0]?.quantity ?? org.seatLimit;
+      const quantity = getEffectiveSeatLimit(subscription, org.seatLimit);
       const effectiveStatus = subscription.cancel_at_period_end
         ? "cancel_at_period_end"
         : subscription.status;

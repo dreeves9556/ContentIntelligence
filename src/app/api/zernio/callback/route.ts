@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { zernio } from "@/lib/zernio";
 import { revalidatePath } from "next/cache";
 import { ensureBaselineForUserPlatform } from "@/lib/impact-baselines";
+import { ensureConnectionPeriodForAccount } from "@/lib/impact-connection-periods";
 import { requireDashboardAccess } from "@/lib/server-access";
 import { consumeIntegrationConnectionState } from "@/lib/integration-state";
 
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Upsert: one row per user per platform
-    await prisma.zernioAccount.upsert({
+    const account = await prisma.zernioAccount.upsert({
       where: { userId_platform: { userId, platform } },
       update: {
         zernioProfileId: profileId,
@@ -71,6 +72,15 @@ export async function GET(req: NextRequest) {
         platform,
         handle: connected.handle ?? null,
       },
+    });
+
+    await ensureConnectionPeriodForAccount({
+      id: account.id,
+      userId: account.userId,
+      platform: account.platform,
+      connectedAt: account.connectedAt,
+      zernioAccountId: account.zernioAccountId,
+      connectionPeriodId: account.connectionPeriodId,
     });
 
     revalidatePath("/dashboard/calendar");
