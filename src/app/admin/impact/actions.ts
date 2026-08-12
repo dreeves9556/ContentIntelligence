@@ -202,7 +202,6 @@ async function getBaselinePreviewItems(): Promise<BaselinePreviewItem[]> {
   const accounts = await prisma.zernioAccount.findMany({
     where: {
       user: {
-        role: { not: "ADMIN" },
         accountStatus: { in: [...IMPACT_ELIGIBLE_STATUSES] },
       },
     },

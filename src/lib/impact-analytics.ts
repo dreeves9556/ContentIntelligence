@@ -99,7 +99,6 @@ async function getImpactAccounts() {
   return prisma.zernioAccount.findMany({
     where: {
       user: {
-        role: { not: "ADMIN" },
         accountStatus: { in: [...IMPACT_ACCOUNT_STATUSES] },
       },
     },
@@ -782,7 +781,6 @@ export async function getDataQualityStats(): Promise<DataQualityStats> {
   const [totalUsers, baselines, posts, followerStats] = await Promise.all([
     prisma.user.count({
       where: {
-        role: { not: "ADMIN" },
         accountStatus: { in: [...IMPACT_ACCOUNT_STATUSES] },
       },
     }),
