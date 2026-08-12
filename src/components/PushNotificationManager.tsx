@@ -89,8 +89,7 @@ export function PushNotificationManager() {
           process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
         ),
       });
-      setSubscription(sub);
-      await subscribeUser({
+      const result = await subscribeUser({
         endpoint: sub.endpoint,
         expirationTime: sub.expirationTime,
         keys: {
@@ -98,6 +97,8 @@ export function PushNotificationManager() {
           auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth") as ArrayBuffer))),
         },
       });
+      if (!result.success) throw new Error(result.error);
+      setSubscription(sub);
       setDbSubscribed(true);
       setMessage("Push notifications enabled");
     } catch (error) {
@@ -127,12 +128,13 @@ export function PushNotificationManager() {
     try {
       const endpoint = subscription?.endpoint;
       await subscription?.unsubscribe();
+      const result = await unsubscribeUser(endpoint);
+      if (!result.success) throw new Error(result.error);
       setSubscription(null);
-      await unsubscribeUser(endpoint);
-      await checkDbStatus();
+      setDbSubscribed(false);
       setMessage("Push notifications disabled on this device");
     } catch (error) {
-      setMessage("Failed to disable push notifications");
+      setMessage(error instanceof Error ? error.message : "Failed to disable push notifications");
       console.error(error);
     } finally {
       setLoading(false);
