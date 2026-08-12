@@ -248,7 +248,7 @@ export function parseCarouselSlides(body: string): { label: string; text: string
   return [{ label: "Slide 1", text: body.trim() }];
 }
 
-function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPending, connectedPlatforms, bestTimes, feedback, onFeedback, onTweak, canTweak }: { day: CalendarDay; dayIndex: number; weekStarting: string; isPosted: boolean; onTogglePosted: () => void; isPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; feedback: "up" | "down" | null; onFeedback: (value: "up" | "down") => void; onTweak?: () => void; canTweak?: boolean; }) {
+function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPostedPending, isFeedbackPending, connectedPlatforms, bestTimes, feedback, onFeedback, onTweak, canTweak }: { day: CalendarDay; dayIndex: number; weekStarting: string; isPosted: boolean; onTogglePosted: () => void; isPostedPending: boolean; isFeedbackPending: boolean; connectedPlatforms: string[]; bestTimes: CalendarBestTimeEntry[]; feedback: "up" | "down" | null; onFeedback: (value: "up" | "down") => void; onTweak?: () => void; canTweak?: boolean; }) {
   const fullScript = [day.hook, day.body, day.cta].filter(Boolean).join("\n\n");
   const hasDirections = !!day.directions;
 
@@ -517,11 +517,11 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
         <div className="flex gap-3">
           <button
             onClick={() => onFeedback("up")}
-            disabled={isPending}
+            disabled={isFeedbackPending}
             className={`
               flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
               text-sm font-bold transition-all duration-200
-              ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${isFeedbackPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
               ${feedback === "up"
                 ? "bg-green-500/20 text-green-400 border border-green-500/40"
                 : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-green-400 hover:border-green-500/20"
@@ -533,11 +533,11 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
           </button>
           <button
             onClick={() => onFeedback("down")}
-            disabled={isPending}
+            disabled={isFeedbackPending}
             className={`
               flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
               text-sm font-bold transition-all duration-200
-              ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${isFeedbackPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
               ${feedback === "down"
                 ? "bg-red-500/20 text-red-400 border border-red-500/40"
                 : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-red-400 hover:border-red-500/20"
@@ -554,11 +554,11 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
       <div className="p-5 sm:p-6">
         <button
           onClick={onTogglePosted}
-          disabled={isPending}
+          disabled={isPostedPending}
           className={`
             w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-lg
             text-sm font-bold tracking-wide transition-all duration-200
-            ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+            ${isPostedPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
             ${isPosted
               ? "bg-accent-primary/15 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20"
               : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-text-primary hover:border-accent-primary/20 hover:bg-background-secondary/80"
@@ -571,7 +571,7 @@ function DayCard({ day, dayIndex, weekStarting, isPosted, onTogglePosted, isPend
             <Circle className="h-4 w-4 shrink-0" />
           )}
           <span>
-            {isPending ? "Saving..." : isPosted ? "Marked as posted" : "Mark as posted"}
+            {isPostedPending ? "Saving..." : isPosted ? "Marked as posted" : "Mark as posted"}
           </span>
         </button>
       </div>
@@ -584,7 +584,9 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
   const [posted, setPosted] = useState<boolean[]>(Array(days.length).fill(false));
   const [feedbackState, setFeedbackState] = useState<("up" | "down" | null)[]>(Array(days.length).fill(null));
   const [storageLoaded, setStorageLoaded] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [isPostedPending, startPostedTransition] = useTransition();
+  const [isFeedbackPending, startFeedbackTransition] = useTransition();
+  const [, startRefreshTransition] = useTransition();
   const didInitPosition = useRef(false);
   const [showRegenModal, setShowRegenModal] = useState(false);
   const [refinePostId, setRefinePostId] = useState<string | null>(null);
@@ -686,7 +688,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
     setPosted(next);
     const willBePosted = next[index];
     const postId = isPostBacked ? posts[index]?.id : undefined;
-    startTransition(async () => {
+    startPostedTransition(async () => {
       if (willBePosted) {
         await addToArchive(weekStarting, index, days[index], postId);
       } else {
@@ -702,7 +704,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
     setFeedbackState(next);
     const newFeedback = next[index];
     if (newFeedback) {
-      startTransition(async () => {
+      startFeedbackTransition(async () => {
         await addFeedback(weekStarting, index, days[index], newFeedback);
       });
     }
@@ -828,12 +830,12 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
 
       {/* Focused Day Card — desktop/tablet */}
       <div className="hidden sm:block transition-all duration-300 ease-in-out">
-        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={activePostRefinable} onTweak={() => activePost && setRefinePostId(activePost.id)} />
+        <DayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPostedPending={isPostedPending} isFeedbackPending={isFeedbackPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={activePostRefinable} onTweak={() => activePost && setRefinePostId(activePost.id)} />
       </div>
 
       {/* Focused Day Card — phone (tabs) */}
       <div className="sm:hidden">
-        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPending={isPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={activePostRefinable} onTweak={() => activePost && setRefinePostId(activePost.id)} />
+        <MobileDayCard day={activeDay} dayIndex={activeIndex} weekStarting={weekStarting} isPosted={posted[activeIndex]} onTogglePosted={() => togglePosted(activeIndex)} isPostedPending={isPostedPending} isFeedbackPending={isFeedbackPending} connectedPlatforms={connectedPlatforms} bestTimes={bestTimes} feedback={feedbackState[activeIndex]} onFeedback={(value) => handleFeedback(activeIndex, value)} canTweak={activePostRefinable} onTweak={() => activePost && setRefinePostId(activePost.id)} />
       </div>
 
       {/* Post Refinement panel — full-screen sheet on phone, slide-over on tablet+ */}
@@ -846,7 +848,7 @@ export default function CalendarClient({ days, weekStarting, connectedPlatforms,
             // revalidatePath in the action marks the cache stale; router.refresh
             // pulls the fresh server data so the day card re-renders with the
             // accepted/ restored content without a full page reload.
-            startTransition(() => {
+            startRefreshTransition(() => {
               router.refresh();
             });
           }}

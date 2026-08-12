@@ -263,7 +263,8 @@ export function MobileDayCard({
   weekStarting,
   isPosted,
   onTogglePosted,
-  isPending,
+  isPostedPending,
+  isFeedbackPending,
   connectedPlatforms,
   bestTimes,
   feedback,
@@ -276,7 +277,8 @@ export function MobileDayCard({
   weekStarting: string;
   isPosted: boolean;
   onTogglePosted: () => void;
-  isPending: boolean;
+  isPostedPending: boolean;
+  isFeedbackPending: boolean;
   connectedPlatforms: string[];
   bestTimes: CalendarBestTimeEntry[];
   feedback: "up" | "down" | null;
@@ -516,12 +518,12 @@ export function MobileDayCard({
         <div className="flex gap-3">
           <button
             onClick={() => onFeedback("up")}
-            disabled={isPending}
+            disabled={isFeedbackPending}
             aria-pressed={feedback === "up"}
             className={`
               flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
               text-sm font-bold transition-all duration-200 min-h-[44px]
-              ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${isFeedbackPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
               ${feedback === "up"
                 ? "bg-green-500/20 text-green-400 border border-green-500/40"
                 : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-green-400 hover:border-green-500/20"
@@ -533,12 +535,12 @@ export function MobileDayCard({
           </button>
           <button
             onClick={() => onFeedback("down")}
-            disabled={isPending}
+            disabled={isFeedbackPending}
             aria-pressed={feedback === "down"}
             className={`
               flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
               text-sm font-bold transition-all duration-200 min-h-[44px]
-              ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${isFeedbackPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
               ${feedback === "down"
                 ? "bg-red-500/20 text-red-400 border border-red-500/40"
                 : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-red-400 hover:border-red-500/20"
@@ -555,11 +557,11 @@ export function MobileDayCard({
       <div className="pt-4 border-t border-border-primary/60">
         <button
           onClick={onTogglePosted}
-          disabled={isPending}
+          disabled={isPostedPending}
           className={`
             w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-lg
             text-sm font-bold tracking-wide transition-all duration-200 min-h-[44px]
-            ${isPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+            ${isPostedPending ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
             ${isPosted
               ? "bg-accent-primary/15 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20"
               : "bg-background-secondary/50 text-text-muted border border-border-primary hover:text-text-primary hover:border-accent-primary/20 hover:bg-background-secondary/80"
@@ -572,7 +574,7 @@ export function MobileDayCard({
             <Circle className="h-4 w-4 shrink-0" />
           )}
           <span>
-            {isPending ? "Saving..." : isPosted ? "Marked as posted" : "Mark as posted"}
+            {isPostedPending ? "Saving..." : isPosted ? "Marked as posted" : "Mark as posted"}
           </span>
         </button>
       </div>
