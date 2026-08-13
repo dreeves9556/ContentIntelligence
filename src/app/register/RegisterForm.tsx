@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { registerWithToken } from "./actions";
@@ -25,9 +26,35 @@ export function RegisterForm({ email, token }: RegisterFormProps) {
       return;
     }
     startTransition(async () => {
-      const result = await registerWithToken(token, password);
-      if (result && "error" in result) {
+      let result: Awaited<ReturnType<typeof registerWithToken>>;
+      try {
+        result = await registerWithToken(token, password);
+      } catch {
+        setError("We couldn't create your account. Please try again.");
+        return;
+      }
+
+      if ("error" in result) {
         setError(result.error);
+        return;
+      }
+
+      try {
+        const signInResult = await signIn("credentials", {
+          email,
+          password,
+          redirect: false,
+          callbackUrl: "/onboarding",
+        });
+
+        if (!signInResult?.ok) {
+          setError("Account created, but automatic sign-in failed. Please log in.");
+          return;
+        }
+
+        window.location.assign("/onboarding");
+      } catch {
+        setError("Account created, but automatic sign-in failed. Please log in.");
       }
     });
   }

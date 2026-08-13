@@ -362,6 +362,10 @@ export type PushActionResult =
   | { success: true }
   | { success: false; error: string };
 
+export type PushStatusResult =
+  | { success: true; subscribed: boolean; count: number }
+  | { success: false; error: string };
+
 export async function subscribeUser(sub: {
   endpoint: string;
   expirationTime: number | null;
@@ -437,15 +441,15 @@ export async function unsubscribeUser(endpoint?: string): Promise<PushActionResu
   }
 }
 
-export async function getPushSubscriptionStatus() {
+export async function getPushSubscriptionStatus(): Promise<PushStatusResult> {
   const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
   const count = await prisma.pushSubscription.count({
     where: { userId: session.user.id },
   });
 
-  return { subscribed: count > 0, count };
+  return { success: true, subscribed: count > 0, count };
 }
 
 export async function sendNotification(message: string) {

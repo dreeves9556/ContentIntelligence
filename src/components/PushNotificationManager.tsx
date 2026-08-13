@@ -30,6 +30,7 @@ export function PushNotificationManager() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorDetail, setErrorDetail] = useState("");
+  const [authRequired, setAuthRequired] = useState(false);
 
   const isIOS = typeof window !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isStandalone =
@@ -49,6 +50,12 @@ export function PushNotificationManager() {
   const checkDbStatus = useCallback(async () => {
     try {
       const status = await getPushSubscriptionStatus();
+      if (!status.success) {
+        setAuthRequired(status.error === "Not authenticated");
+        setDbSubscribed(false);
+        return;
+      }
+      setAuthRequired(false);
       setDbSubscribed(status.subscribed);
     } catch {
       setDbSubscribed(false);
@@ -64,6 +71,7 @@ export function PushNotificationManager() {
 
   const subscribeToPush = useCallback(async () => {
     setLoading(true);
+    setAuthRequired(false);
     setErrorDetail("");
     try {
       if (isIOS && !isStandalone) {
@@ -97,7 +105,14 @@ export function PushNotificationManager() {
           auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth") as ArrayBuffer))),
         },
       });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) {
+        if (result.error === "Not authenticated") {
+          setAuthRequired(true);
+          setMessage("Your session has expired. Sign in again to enable push notifications.");
+          return;
+        }
+        throw new Error(result.error);
+      }
       setSubscription(sub);
       setDbSubscribed(true);
       setMessage("Push notifications enabled");
@@ -106,7 +121,11 @@ export function PushNotificationManager() {
       const errStr = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       console.error("[PUSH] Subscribe failed:", error);
 
-      if (!isSecureContext) {
+      if (errStr.includes("Not authenticated")) {
+        setAuthRequired(true);
+        setMessage("Your session has expired. Sign in again to enable push notifications.");
+        setErrorDetail("");
+      } else if (!isSecureContext) {
         setMessage("Push notifications require HTTPS on mobile. They work on localhost on your computer, but your phone needs a secure connection.");
       } else if (errStr.includes("aborted") || errStr.includes("AbortError")) {
         setMessage("Notification permission was denied. Go to Settings → The Local Post → Notifications to allow notifications, then try again.");
@@ -125,6 +144,7 @@ export function PushNotificationManager() {
 
   const unsubscribeFromPush = useCallback(async () => {
     setLoading(true);
+    setAuthRequired(false);
     try {
       const endpoint = subscription?.endpoint;
       await subscription?.unsubscribe();
@@ -134,7 +154,12 @@ export function PushNotificationManager() {
       setDbSubscribed(false);
       setMessage("Push notifications disabled on this device");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to disable push notifications");
+      if (error instanceof Error && error.message === "Not authenticated") {
+        setAuthRequired(true);
+        setMessage("Your session has expired. Sign in again to manage push notifications.");
+      } else {
+        setMessage(error instanceof Error ? error.message : "Failed to disable push notifications");
+      }
       console.error(error);
     } finally {
       setLoading(false);
@@ -155,6 +180,9 @@ export function PushNotificationManager() {
   }
 
   const isSubscribed = !!subscription || dbSubscribed;
+  const loginUrl = `/login?callbackUrl=${encodeURIComponent(
+    typeof window !== "undefined" ? window.location.pathname : "/onboarding"
+  )}`;
 
   return (
     <div className="bg-background-card rounded-xl p-6 border border-border-primary">
@@ -170,8 +198,13 @@ export function PushNotificationManager() {
       </div>
 
       {message && (
-        <div className={`mb-4 p-3 rounded-md text-sm ${message.includes("Failed") || message.includes("denied") || message.includes("not configured") || message.includes("Home Screen") || message.includes("failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"}`}>
-          {message}
+        <div className={`mb-4 p-3 rounded-md text-sm ${authRequired || message.includes("Failed") || message.includes("denied") || message.includes("not configured") || message.includes("Home Screen") || message.includes("failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"}`}>
+          <p>{message}</p>
+          {authRequired && (
+            <a href={loginUrl} className="mt-2 inline-block font-medium underline">
+              Sign in again
+            </a>
+          )}
           {errorDetail && (
             <details className="mt-2 text-xs opacity-70">
               <summary>Technical details</summary>
