@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ export function PushNotificationManager() {
     return "serviceWorker" in navigator && "PushManager" in window;
   });
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
-  const [dbSubscribed, setDbSubscribed] = useState(false);
+  const [deviceSubscribed, setDeviceSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorDetail, setErrorDetail] = useState("");
@@ -38,6 +39,8 @@ export function PushNotificationManager() {
     (window.matchMedia?.("(display-mode: standalone)").matches ||
       (window.navigator as unknown as { standalone?: boolean }).standalone === true);
 
+  const pathname = usePathname();
+
   const registerServiceWorker = useCallback(async () => {
     const registration = await navigator.serviceWorker.register("/sw.js", {
       scope: "/",
@@ -45,28 +48,48 @@ export function PushNotificationManager() {
     });
     const sub = await registration.pushManager.getSubscription();
     setSubscription(sub);
+    return sub;
   }, []);
 
-  const checkDbStatus = useCallback(async () => {
+  const checkDbStatus = useCallback(async (endpoint?: string) => {
     try {
-      const status = await getPushSubscriptionStatus();
+      const status = await getPushSubscriptionStatus(endpoint);
       if (!status.success) {
-        setAuthRequired(status.error === "Not authenticated");
-        setDbSubscribed(false);
+        const isAuthError = status.error === "Not authenticated";
+        setAuthRequired(isAuthError);
+        setDeviceSubscribed(false);
+        if (isAuthError) {
+          setMessage("Your session has expired. Sign in again to manage push notifications.");
+        }
         return;
       }
       setAuthRequired(false);
-      setDbSubscribed(status.subscribed);
+      setDeviceSubscribed(status.subscribed);
     } catch {
-      setDbSubscribed(false);
+      setDeviceSubscribed(false);
     }
   }, []);
 
   useEffect(() => {
     if (!isSupported) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    registerServiceWorker();
-    checkDbStatus();
+    let cancelled = false;
+
+    void (async () => {
+      let sub: PushSubscription | null = null;
+      try {
+        sub = await registerServiceWorker();
+      } catch (error) {
+        console.error("[PUSH] Service worker setup failed:", error);
+      }
+
+      if (!cancelled) {
+        await checkDbStatus(sub?.endpoint);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isSupported, registerServiceWorker, checkDbStatus]);
 
   const subscribeToPush = useCallback(async () => {
@@ -74,6 +97,17 @@ export function PushNotificationManager() {
     setAuthRequired(false);
     setErrorDetail("");
     try {
+      const authStatus = await getPushSubscriptionStatus();
+      if (!authStatus.success) {
+        if (authStatus.error === "Not authenticated") {
+          setAuthRequired(true);
+          setMessage("Your session has expired. Sign in again to enable push notifications.");
+        } else {
+          setMessage(authStatus.error);
+        }
+        return;
+      }
+
       if (isIOS && !isStandalone) {
         setMessage("On iPhone, you need to add this app to your Home Screen first. Tap the Share button at the bottom of Safari, then 'Add to Home Screen', then open The Local Post from your home screen icon.");
         return;
@@ -107,6 +141,9 @@ export function PushNotificationManager() {
       });
       if (!result.success) {
         if (result.error === "Not authenticated") {
+          await sub.unsubscribe().catch(() => undefined);
+          setSubscription(null);
+          setDeviceSubscribed(false);
           setAuthRequired(true);
           setMessage("Your session has expired. Sign in again to enable push notifications.");
           return;
@@ -114,7 +151,7 @@ export function PushNotificationManager() {
         throw new Error(result.error);
       }
       setSubscription(sub);
-      setDbSubscribed(true);
+      setDeviceSubscribed(true);
       setMessage("Push notifications enabled");
     } catch (error) {
       const isSecureContext = window.isSecureContext;
@@ -125,6 +162,7 @@ export function PushNotificationManager() {
         setAuthRequired(true);
         setMessage("Your session has expired. Sign in again to enable push notifications.");
         setErrorDetail("");
+        return;
       } else if (!isSecureContext) {
         setMessage("Push notifications require HTTPS on mobile. They work on localhost on your computer, but your phone needs a secure connection.");
       } else if (errStr.includes("aborted") || errStr.includes("AbortError")) {
@@ -147,11 +185,15 @@ export function PushNotificationManager() {
     setAuthRequired(false);
     try {
       const endpoint = subscription?.endpoint;
-      await subscription?.unsubscribe();
+      if (!endpoint || !subscription) {
+        setMessage("This device is not subscribed to push notifications.");
+        return;
+      }
+      await subscription.unsubscribe();
       const result = await unsubscribeUser(endpoint);
       if (!result.success) throw new Error(result.error);
       setSubscription(null);
-      setDbSubscribed(false);
+      setDeviceSubscribed(false);
       setMessage("Push notifications disabled on this device");
     } catch (error) {
       if (error instanceof Error && error.message === "Not authenticated") {
@@ -179,10 +221,8 @@ export function PushNotificationManager() {
     );
   }
 
-  const isSubscribed = !!subscription || dbSubscribed;
-  const loginUrl = `/login?callbackUrl=${encodeURIComponent(
-    typeof window !== "undefined" ? window.location.pathname : "/onboarding"
-  )}`;
+  const isSubscribed = deviceSubscribed;
+  const loginUrl = `/login?callbackUrl=${encodeURIComponent(pathname || "/onboarding")}`;
 
   return (
     <div className="bg-background-card rounded-xl p-6 border border-border-primary">
