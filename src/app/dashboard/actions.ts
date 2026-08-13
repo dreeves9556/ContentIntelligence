@@ -362,6 +362,10 @@ export type PushActionResult =
   | { success: true }
   | { success: false; error: string };
 
+export type PushStatusResult =
+  | { success: true; subscribed: boolean; count: number }
+  | { success: false; error: string };
+
 export async function subscribeUser(sub: {
   endpoint: string;
   expirationTime: number | null;
@@ -415,20 +419,16 @@ export async function subscribeUser(sub: {
   }
 }
 
-export async function unsubscribeUser(endpoint?: string): Promise<PushActionResult> {
+export async function unsubscribeUser(endpoint: string): Promise<PushActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
+  if (!endpoint) return { success: false, error: "Push subscription not found" };
+
   try {
-    if (endpoint) {
-      await prisma.pushSubscription.deleteMany({
-        where: { userId: session.user.id, endpoint },
-      });
-    } else {
-      await prisma.pushSubscription.deleteMany({
-        where: { userId: session.user.id },
-      });
-    }
+    await prisma.pushSubscription.deleteMany({
+      where: { userId: session.user.id, endpoint },
+    });
 
     return { success: true };
   } catch (error) {
@@ -437,15 +437,16 @@ export async function unsubscribeUser(endpoint?: string): Promise<PushActionResu
   }
 }
 
-export async function getPushSubscriptionStatus() {
+export async function getPushSubscriptionStatus(endpoint?: string): Promise<PushStatusResult> {
   const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+  if (!endpoint) return { success: true, subscribed: false, count: 0 };
 
   const count = await prisma.pushSubscription.count({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, endpoint },
   });
 
-  return { subscribed: count > 0, count };
+  return { success: true, subscribed: count > 0, count };
 }
 
 export async function sendNotification(message: string) {

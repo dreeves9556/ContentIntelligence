@@ -8,6 +8,19 @@ import { RotatingTagline } from "@/components/RotatingTagline";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 
+function getSafeCallbackUrl() {
+  const value = new URLSearchParams(window.location.search).get("callbackUrl");
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
+
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin) return "/dashboard";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/dashboard";
+  }
+}
+
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -53,26 +66,33 @@ export default function LoginPage() {
 
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+    const nextUrl = getSafeCallbackUrl();
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      rememberMe: rememberMe ? "true" : "false",
-      redirect: false,
-      callbackUrl: "/dashboard",
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        rememberMe: rememberMe ? "true" : "false",
+        redirect: false,
+        callbackUrl: nextUrl,
+      });
 
-    if (result?.error) {
-      setError("Invalid email or password");
-      setIsPending(false);
-    } else if (result?.ok) {
+      if (!result?.ok) {
+        setError("Invalid email or password");
+        setIsPending(false);
+        return;
+      }
+
       try {
         const statusRes = await fetch("/api/user/onboarding-status");
         const { onboardingComplete } = await statusRes.json();
-        window.location.href = onboardingComplete ? "/dashboard" : "/onboarding";
+        window.location.href = onboardingComplete ? nextUrl : "/onboarding";
       } catch {
-        window.location.href = "/dashboard";
+        window.location.href = nextUrl;
       }
+    } catch {
+      setError("Unable to sign in. Please try again.");
+      setIsPending(false);
     }
   }
 

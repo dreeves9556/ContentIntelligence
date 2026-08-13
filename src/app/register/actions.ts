@@ -1,10 +1,7 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { after } from "next/server";
 import bcrypt from "bcryptjs";
-import { AuthError } from "next-auth";
-import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { sendSignupNotification } from "@/lib/signup-notification";
 import { stripeStatusToAccountStatus } from "@/lib/stripe";
@@ -18,7 +15,7 @@ const ALLOWED_INVITE_ROLES = ["USER", "TEAM_ADMIN"] as const;
 export async function registerWithToken(
   token: string,
   password: string
-): Promise<{ error: string } | never> {
+): Promise<{ success: true } | { error: string }> {
   if (!token || !password) {
     return { error: "Missing required fields." };
   }
@@ -98,8 +95,8 @@ export async function registerWithToken(
     ]);
 
     // Wrap in after() so the notification email is guaranteed to send even
-    // after the redirect response is sent. Previously fire-and-forget could
-    // be dropped when the serverless function terminated after signIn redirect.
+    // after the response is sent. Previously fire-and-forget could be dropped
+    // when the serverless function terminated.
     after(async () => {
       try {
         await sendSignupNotification(pendingInvite.email, "self-registration");
@@ -108,22 +105,9 @@ export async function registerWithToken(
       }
     });
 
-    // Sign in the newly created user so the session cookie is set before
-    // redirecting to onboarding. Without this, /api/questionnaire rejects
-    // the submission with "Not authenticated" because no session exists.
-    try {
-      await signIn("credentials", {
-        email: pendingInvite.email,
-        password,
-        redirectTo: "/onboarding",
-      });
-    } catch (error) {
-      if (error instanceof AuthError) {
-        return { error: "Account created, but automatic sign-in failed. Please log in." };
-      }
-      throw error; // NEXT_REDIRECT propagates here
-    }
-    redirect("/onboarding"); // fallback — signIn with redirectTo throws first
+    // The client completes sign-in after this action returns so the browser
+    // receives and stores the Auth.js session cookie before onboarding loads.
+    return { success: true };
   }
 
   // ─── InviteToken flow (admin/team invite) ───
@@ -189,17 +173,7 @@ export async function registerWithToken(
     }
   });
 
-  try {
-    await signIn("credentials", {
-      email: invite.email,
-      password,
-      redirectTo: "/onboarding",
-    });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return { error: "Account created, but automatic sign-in failed. Please log in." };
-    }
-    throw error; // NEXT_REDIRECT propagates here
-  }
-  redirect("/onboarding"); // fallback — signIn with redirectTo throws first
+  // The client completes sign-in after this action returns so the browser
+  // receives and stores the Auth.js session cookie before onboarding loads.
+  return { success: true };
 }

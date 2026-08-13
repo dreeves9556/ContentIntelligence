@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { Bell, X, Loader2 } from "lucide-react";
 
 const STORAGE_KEY = "tlp_notification_prompt_dismissed";
@@ -20,6 +21,8 @@ export function NotificationPrompt() {
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [authRequired, setAuthRequired] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const dismissed = localStorage.getItem(STORAGE_KEY);
@@ -41,7 +44,25 @@ export function NotificationPrompt() {
   const handleEnable = useCallback(async () => {
     setLoading(true);
     setError("");
+    setAuthRequired(false);
     try {
+      const { subscribeUser, getPushSubscriptionStatus } = await import("@/app/dashboard/actions");
+      const authStatus = await getPushSubscriptionStatus();
+      if (!authStatus.success) {
+        if (authStatus.error === "Not authenticated") {
+          setAuthRequired(true);
+          setError("Your session has expired. Sign in again to enable notifications.");
+        } else {
+          setError(authStatus.error);
+        }
+        return;
+      }
+
+      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+        setError("Push notifications are not configured on this server. Contact support.");
+        return;
+      }
+
       const registration = await navigator.serviceWorker.ready;
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -50,7 +71,6 @@ export function NotificationPrompt() {
         ),
       });
 
-      const { subscribeUser } = await import("@/app/dashboard/actions");
       const result = await subscribeUser({
         endpoint: sub.endpoint,
         expirationTime: sub.expirationTime,
@@ -59,13 +79,26 @@ export function NotificationPrompt() {
           auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth") as ArrayBuffer))),
         },
       });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) {
+        await sub.unsubscribe().catch(() => undefined);
+        if (result.error === "Not authenticated") {
+          setAuthRequired(true);
+          setError("Your session has expired. Sign in again to enable notifications.");
+          return;
+        }
+        throw new Error(result.error);
+      }
 
       localStorage.setItem(STORAGE_KEY, "subscribed");
       setVisible(false);
     } catch (err) {
-      console.error("[NOTIFY PROMPT] Subscribe failed:", err);
-      setError("Couldn't enable notifications. You can try again later from your Profile page.");
+      if (err instanceof Error && err.message === "Not authenticated") {
+        setAuthRequired(true);
+        setError("Your session has expired. Sign in again to enable notifications.");
+      } else {
+        console.error("[NOTIFY PROMPT] Subscribe failed:", err);
+        setError("Couldn't enable notifications. You can try again later from your Profile page.");
+      }
     } finally {
       setLoading(false);
     }
@@ -75,6 +108,8 @@ export function NotificationPrompt() {
     localStorage.setItem(STORAGE_KEY, "dismissed");
     setVisible(false);
   }, []);
+
+  const loginUrl = `/login?callbackUrl=${encodeURIComponent(pathname || "/dashboard")}`;
 
   if (!visible) return null;
 
@@ -90,12 +125,21 @@ export function NotificationPrompt() {
         )}
       </p>
       {error ? (
-        <button
-          onClick={handleDismiss}
-          className="text-text-muted hover:text-text-primary text-xs shrink-0"
-        >
-          Dismiss
-        </button>
+        authRequired ? (
+          <a
+            href={loginUrl}
+            className="text-text-muted hover:text-text-primary text-xs shrink-0 underline"
+          >
+            Sign in again
+          </a>
+        ) : (
+          <button
+            onClick={handleDismiss}
+            className="text-text-muted hover:text-text-primary text-xs shrink-0"
+          >
+            Dismiss
+          </button>
+        )
       ) : (
         <>
           <button

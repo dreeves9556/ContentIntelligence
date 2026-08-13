@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,16 +27,19 @@ export function PushNotificationManager() {
     return "serviceWorker" in navigator && "PushManager" in window;
   });
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
-  const [dbSubscribed, setDbSubscribed] = useState(false);
+  const [deviceSubscribed, setDeviceSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorDetail, setErrorDetail] = useState("");
+  const [authRequired, setAuthRequired] = useState(false);
 
   const isIOS = typeof window !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isStandalone =
     typeof window !== "undefined" &&
     (window.matchMedia?.("(display-mode: standalone)").matches ||
       (window.navigator as unknown as { standalone?: boolean }).standalone === true);
+
+  const pathname = usePathname();
 
   const registerServiceWorker = useCallback(async () => {
     const registration = await navigator.serviceWorker.register("/sw.js", {
@@ -44,28 +48,66 @@ export function PushNotificationManager() {
     });
     const sub = await registration.pushManager.getSubscription();
     setSubscription(sub);
+    return sub;
   }, []);
 
-  const checkDbStatus = useCallback(async () => {
+  const checkDbStatus = useCallback(async (endpoint?: string) => {
     try {
-      const status = await getPushSubscriptionStatus();
-      setDbSubscribed(status.subscribed);
+      const status = await getPushSubscriptionStatus(endpoint);
+      if (!status.success) {
+        const isAuthError = status.error === "Not authenticated";
+        setAuthRequired(isAuthError);
+        setDeviceSubscribed(false);
+        if (isAuthError) {
+          setMessage("Your session has expired. Sign in again to manage push notifications.");
+        }
+        return;
+      }
+      setAuthRequired(false);
+      setDeviceSubscribed(status.subscribed);
     } catch {
-      setDbSubscribed(false);
+      setDeviceSubscribed(false);
     }
   }, []);
 
   useEffect(() => {
     if (!isSupported) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    registerServiceWorker();
-    checkDbStatus();
+    let cancelled = false;
+
+    void (async () => {
+      let sub: PushSubscription | null = null;
+      try {
+        sub = await registerServiceWorker();
+      } catch (error) {
+        console.error("[PUSH] Service worker setup failed:", error);
+      }
+
+      if (!cancelled) {
+        await checkDbStatus(sub?.endpoint);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isSupported, registerServiceWorker, checkDbStatus]);
 
   const subscribeToPush = useCallback(async () => {
     setLoading(true);
+    setAuthRequired(false);
     setErrorDetail("");
     try {
+      const authStatus = await getPushSubscriptionStatus();
+      if (!authStatus.success) {
+        if (authStatus.error === "Not authenticated") {
+          setAuthRequired(true);
+          setMessage("Your session has expired. Sign in again to enable push notifications.");
+        } else {
+          setMessage(authStatus.error);
+        }
+        return;
+      }
+
       if (isIOS && !isStandalone) {
         setMessage("On iPhone, you need to add this app to your Home Screen first. Tap the Share button at the bottom of Safari, then 'Add to Home Screen', then open The Local Post from your home screen icon.");
         return;
@@ -97,16 +139,31 @@ export function PushNotificationManager() {
           auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth") as ArrayBuffer))),
         },
       });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) {
+        if (result.error === "Not authenticated") {
+          await sub.unsubscribe().catch(() => undefined);
+          setSubscription(null);
+          setDeviceSubscribed(false);
+          setAuthRequired(true);
+          setMessage("Your session has expired. Sign in again to enable push notifications.");
+          return;
+        }
+        throw new Error(result.error);
+      }
       setSubscription(sub);
-      setDbSubscribed(true);
+      setDeviceSubscribed(true);
       setMessage("Push notifications enabled");
     } catch (error) {
       const isSecureContext = window.isSecureContext;
       const errStr = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       console.error("[PUSH] Subscribe failed:", error);
 
-      if (!isSecureContext) {
+      if (errStr.includes("Not authenticated")) {
+        setAuthRequired(true);
+        setMessage("Your session has expired. Sign in again to enable push notifications.");
+        setErrorDetail("");
+        return;
+      } else if (!isSecureContext) {
         setMessage("Push notifications require HTTPS on mobile. They work on localhost on your computer, but your phone needs a secure connection.");
       } else if (errStr.includes("aborted") || errStr.includes("AbortError")) {
         setMessage("Notification permission was denied. Go to Settings → The Local Post → Notifications to allow notifications, then try again.");
@@ -125,16 +182,26 @@ export function PushNotificationManager() {
 
   const unsubscribeFromPush = useCallback(async () => {
     setLoading(true);
+    setAuthRequired(false);
     try {
       const endpoint = subscription?.endpoint;
-      await subscription?.unsubscribe();
+      if (!endpoint || !subscription) {
+        setMessage("This device is not subscribed to push notifications.");
+        return;
+      }
+      await subscription.unsubscribe();
       const result = await unsubscribeUser(endpoint);
       if (!result.success) throw new Error(result.error);
       setSubscription(null);
-      setDbSubscribed(false);
+      setDeviceSubscribed(false);
       setMessage("Push notifications disabled on this device");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to disable push notifications");
+      if (error instanceof Error && error.message === "Not authenticated") {
+        setAuthRequired(true);
+        setMessage("Your session has expired. Sign in again to manage push notifications.");
+      } else {
+        setMessage(error instanceof Error ? error.message : "Failed to disable push notifications");
+      }
       console.error(error);
     } finally {
       setLoading(false);
@@ -154,7 +221,8 @@ export function PushNotificationManager() {
     );
   }
 
-  const isSubscribed = !!subscription || dbSubscribed;
+  const isSubscribed = deviceSubscribed;
+  const loginUrl = `/login?callbackUrl=${encodeURIComponent(pathname || "/onboarding")}`;
 
   return (
     <div className="bg-background-card rounded-xl p-6 border border-border-primary">
@@ -170,8 +238,13 @@ export function PushNotificationManager() {
       </div>
 
       {message && (
-        <div className={`mb-4 p-3 rounded-md text-sm ${message.includes("Failed") || message.includes("denied") || message.includes("not configured") || message.includes("Home Screen") || message.includes("failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"}`}>
-          {message}
+        <div className={`mb-4 p-3 rounded-md text-sm ${authRequired || message.includes("Failed") || message.includes("denied") || message.includes("not configured") || message.includes("Home Screen") || message.includes("failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"}`}>
+          <p>{message}</p>
+          {authRequired && (
+            <a href={loginUrl} className="mt-2 inline-block font-medium underline">
+              Sign in again
+            </a>
+          )}
           {errorDetail && (
             <details className="mt-2 text-xs opacity-70">
               <summary>Technical details</summary>
