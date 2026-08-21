@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "stripe:setup-catalog": "tsx scripts/setup-stripe-catalog.ts",
     "stripe:verify-pricing": "tsx scripts/verify-stripe-pricing.ts",
+    "stripe:migrate-solo-pricing": "tsx scripts/migrate-solo-pricing.ts",
     "stripe:check-env": "tsx scripts/check-stripe-env.ts",
     "postinstall": "prisma generate"
   },

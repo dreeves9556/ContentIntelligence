@@ -12,8 +12,8 @@
  *
  * Creates:
  *   Product: "The Local Post — Solo"
- *     - Price tlp_solo_monthly  ($200/month, flat)
- *     - Price tlp_solo_annual   ($1,999/year, flat)
+ *     - Price tlp_solo_monthly_100  ($100/month, flat)
+ *     - Price tlp_solo_annual_1000   ($1,000/year, flat)
  *   Product: "The Local Post — Communities"
  *     - Price tlp_community_monthly (graduated seat pricing, monthly)
  *     - Price tlp_community_annual  (graduated seat pricing, yearly)
@@ -69,8 +69,10 @@ const stripe = new Stripe(secretKey, {
 
 // ─── Pricing constants ─────────────────────────────────────────────────────
 
-const SOLO_MONTHLY_CENTS = 20000; // $200.00
-const SOLO_ANNUAL_CENTS = 199900; // $1,999.00
+const SOLO_MONTHLY_CENTS = 10000; // $100.00
+const SOLO_ANNUAL_CENTS = 100000; // $1,000.00
+const SOLO_MONTHLY_LOOKUP_KEY = "tlp_solo_monthly_100";
+const SOLO_ANNUAL_LOOKUP_KEY = "tlp_solo_annual_1000";
 
 const COMMUNITY_TIERS_MONTHLY = [
   { up_to: 1, unit_amount: 20000 }, // Seat 1: $200
@@ -117,35 +119,35 @@ async function main() {
   }
 
   // ── Price: Solo Monthly ──────────────────────────────────────────────────
-  let soloMonthly = await findPriceByLookupKey("tlp_solo_monthly");
+  let soloMonthly = await findPriceByLookupKey(SOLO_MONTHLY_LOOKUP_KEY);
   if (soloMonthly) {
-    console.log(`✅ Price tlp_solo_monthly already exists: ${soloMonthly.id}`);
+    console.log(`✅ Price ${SOLO_MONTHLY_LOOKUP_KEY} already exists: ${soloMonthly.id}`);
   } else {
     soloMonthly = await stripe.prices.create({
       product: soloProduct.id,
       currency: "usd",
       unit_amount: SOLO_MONTHLY_CENTS,
       recurring: { interval: "month", usage_type: "licensed" },
-      lookup_key: "tlp_solo_monthly",
+      lookup_key: SOLO_MONTHLY_LOOKUP_KEY,
       metadata: { app: "the_local_post", plan: "solo", billing: "monthly" },
     });
-    console.log(`🆕 Created price tlp_solo_monthly ($200/month): ${soloMonthly.id}`);
+    console.log(`🆕 Created price ${SOLO_MONTHLY_LOOKUP_KEY} ($100/month): ${soloMonthly.id}`);
   }
 
   // ── Price: Solo Annual ───────────────────────────────────────────────────
-  let soloAnnual = await findPriceByLookupKey("tlp_solo_annual");
+  let soloAnnual = await findPriceByLookupKey(SOLO_ANNUAL_LOOKUP_KEY);
   if (soloAnnual) {
-    console.log(`✅ Price tlp_solo_annual already exists: ${soloAnnual.id}`);
+    console.log(`✅ Price ${SOLO_ANNUAL_LOOKUP_KEY} already exists: ${soloAnnual.id}`);
   } else {
     soloAnnual = await stripe.prices.create({
       product: soloProduct.id,
       currency: "usd",
       unit_amount: SOLO_ANNUAL_CENTS,
       recurring: { interval: "year", usage_type: "licensed" },
-      lookup_key: "tlp_solo_annual",
+      lookup_key: SOLO_ANNUAL_LOOKUP_KEY,
       metadata: { app: "the_local_post", plan: "solo", billing: "annual" },
     });
-    console.log(`🆕 Created price tlp_solo_annual ($1,999/year): ${soloAnnual.id}`);
+    console.log(`🆕 Created price ${SOLO_ANNUAL_LOOKUP_KEY} ($1,000/year): ${soloAnnual.id}`);
   }
 
   // ── Product 2: Communities ───────────────────────────────────────────────

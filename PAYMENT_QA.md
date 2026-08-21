@@ -16,6 +16,15 @@
 - [ ] `NEXT_PUBLIC_APP_URL` set to correct app URL
 - [ ] `npm run stripe:check-env` passes without errors
 - [ ] `npm run stripe:verify-pricing` passes — all 4 prices match expected amounts
+- [ ] New Solo price IDs point to $100/month and $1,000/year; Community price IDs are unchanged
+
+### Existing Solo Price Migration
+- [ ] Migration defaults to dry-run and performs no Stripe updates without `--apply`
+- [ ] Dry-run selects only subscriptions using the old Solo monthly/annual price IDs
+- [ ] Community subscriptions, canceled subscriptions, and subscriptions already canceling at period end are skipped
+- [ ] Applied migration uses no proration and preserves the current billing period
+- [ ] Applied migration preserves `trial_end` for active trial subscriptions
+- [ ] Rerunning the migration skips subscriptions already using the new Solo prices
 
 ---
 
@@ -24,7 +33,7 @@
 ### Solo Membership
 - [ ] POST with `{ purchaseType: "solo", billingInterval: "monthly" }` returns `{ url }` — Stripe checkout URL
 - [ ] POST with `{ purchaseType: "solo", billingInterval: "annual" }` returns `{ url }`
-- [ ] Checkout page shows Solo product at $200/mo or $1,999/yr
+- [ ] Checkout page shows Solo product at $100/mo or $1,000/yr
 - [ ] Unauthenticated request returns 401
 - [ ] Missing `purchaseType` returns 400
 - [ ] Missing `billingInterval` returns 400
@@ -97,8 +106,8 @@
 
 ### Solo Membership Card
 - [ ] Shows "Solo Membership" with User icon
-- [ ] Monthly: $200/month
-- [ ] Annual: $1,999/year with "Two months free" note
+- [ ] Monthly: $100/month
+- [ ] Annual: $1,000/year with "Two months free" note
 - [ ] Feature list displays correctly
 - [ ] "Start Solo Membership" button triggers checkout
 - [ ] If user already has PRO and not comped: shows "Your current membership"

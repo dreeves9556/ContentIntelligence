@@ -61,13 +61,13 @@ const stripe = new Stripe(secretKey, {
 
 const EXPECTED = {
   solo_monthly: {
-    unit_amount: 20000,
+    unit_amount: 10000,
     interval: "month",
     billing_scheme: "per_unit",
     tiers_mode: null,
   },
   solo_annual: {
-    unit_amount: 199900,
+    unit_amount: 100000,
     interval: "year",
     billing_scheme: "per_unit",
     tiers_mode: null,

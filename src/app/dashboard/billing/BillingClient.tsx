@@ -6,7 +6,12 @@ import { Check, Loader2, CreditCard, User, Users, Minus, Plus, AlertTriangle, Tr
 import type { UserPlan } from "@/lib/tiers";
 import { PUBLIC_PLAN_LABELS } from "@/lib/tiers";
 import type { BillingInterval } from "@/lib/pricing";
-import { calculateCommunityTotal, formatCurrency } from "@/lib/pricing";
+import {
+  calculateCommunityTotal,
+  formatCurrency,
+  SOLO_MONTHLY_CENTS,
+  SOLO_ANNUAL_CENTS,
+} from "@/lib/pricing";
 import { trialDaysRemaining } from "@/lib/trial";
 import SeatManager from "./SeatManager";
 
@@ -364,7 +369,9 @@ export default function BillingClient({
 
           <div className="mb-4">
             <span className="text-3xl font-bold text-text-primary">
-              {billingInterval === "monthly" ? "$200" : "$1,999"}
+              {formatCurrency(
+                billingInterval === "monthly" ? SOLO_MONTHLY_CENTS : SOLO_ANNUAL_CENTS
+              )}
             </span>
             <span className="text-sm text-text-muted">
               /{billingInterval === "monthly" ? "month" : "year"}

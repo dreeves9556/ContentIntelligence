@@ -13,8 +13,8 @@ export const COMMUNITY_MONTHLY_TIERS = [
   { upTo: Infinity, perSeatCents: 11000 }, // Seats 10+: $110 each
 ] as const;
 
-export const SOLO_MONTHLY_CENTS = 20000; // $200/mo
-export const SOLO_ANNUAL_CENTS = 199900; // $1,999/yr
+export const SOLO_MONTHLY_CENTS = 10000; // $100/mo
+export const SOLO_ANNUAL_CENTS = 100000; // $1,000/yr
 export const COMMUNITY_MIN_SEATS = 2;
 export const COMMUNITY_MAX_SEATS = 25;
 

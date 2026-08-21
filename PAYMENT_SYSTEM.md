@@ -9,7 +9,7 @@
 
 The Local Post uses Stripe for subscription billing. Two public membership products:
 
-- **Solo Membership** — flat monthly ($200/mo) or annual ($1,999/yr) pricing for individual creators
+- **Solo Membership** — flat monthly ($100/mo) or annual ($1,000/yr) pricing for individual creators
 - **Communities Membership** — seat-based graduated pricing for teams/organizations, billed monthly or annually (min 2 seats)
 
 Both memberships map to the internal `PRO` plan. The internal `UserPlan` enum (`CALENDAR_ONLY`, `PRO`) is used for admin and feature-gating purposes but is never shown to users. `CALENDAR_ONLY` is an internal-only access level (admin-assigned, comped, or KW Legacy). `PRO` is the only purchasable plan.
@@ -29,8 +29,8 @@ Both memberships map to the internal `PRO` plan. The internal `UserPlan` enum (`
 
 | Lookup Key | Price | Billing | Stripe Type |
 |---|---|---|---|
-| `tlp_solo_monthly` | $200.00/mo | monthly | `per_unit`, `licensed` |
-| `tlp_solo_annual` | $1,999.00/yr | yearly | `per_unit`, `licensed` |
+| `tlp_solo_monthly_100` | $100.00/mo | monthly | `per_unit`, `licensed` |
+| `tlp_solo_annual_1000` | $1,000.00/yr | yearly | `per_unit`, `licensed` |
 
 ### Product: The Local Post — Communities
 
@@ -92,7 +92,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 **File:** `scripts/setup-stripe-catalog.ts`
 
-Creates the two products and four prices in Stripe. Idempotent — skips existing products/prices by lookup key. Prints price IDs and writes them to `.env.stripe.generated`.
+Creates or reuses the two products and four current prices in Stripe. The new Solo prices use versioned lookup keys; previous Solo prices remain available for the existing-subscription migration. Idempotent — skips existing products/prices by lookup key. Prints price IDs and writes them to `.env.stripe.generated`.
 
 **Safe to run in test mode.** Detects `sk_test_` vs `sk_live_` and warns on live keys.
 
@@ -101,14 +101,33 @@ Creates the two products and four prices in Stripe. Idempotent — skips existin
 **File:** `scripts/verify-stripe-pricing.ts`
 
 Retrieves all four prices from Stripe and verifies:
-- Solo monthly = 20000 cents/month
-- Solo annual = 199900 cents/year
+- Solo monthly = 10000 cents/month
+- Solo annual = 100000 cents/year
 - Communities monthly tiers = 20000/15000/13000/11000 cents
 - Communities annual tiers = 200000/150000/130000/110000 cents
 - Communities tier mode = `graduated`
 - Communities usage type = `licensed`
 
 Exits with code 1 if any check fails.
+
+### `npm run stripe:migrate-solo-pricing`
+
+**File:** `scripts/migrate-solo-pricing.ts`
+
+Migrates existing Solo subscriptions from the old monthly/annual price IDs to the new $100/$1,000 price IDs. Dry-run is the default; `--apply` is required to mutate subscriptions. The migration uses `proration_behavior: "none"`, preserves `trial_end`, and verifies the billing period after each update. Communities prices are never selected.
+
+Example:
+
+```bash
+npm run stripe:migrate-solo-pricing -- \\
+  --mode test \\
+  --old-monthly price_old_monthly \\
+  --old-annual price_old_annual \\
+  --new-monthly price_new_monthly \\
+  --new-annual price_new_annual
+```
+
+Use `--confirm-live` in addition to `--apply` for a live migration, after reviewing the dry-run output and receiving operator approval.
 
 ---
 
