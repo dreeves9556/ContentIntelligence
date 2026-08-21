@@ -70,7 +70,3 @@ export function canAccessIntegrations(plan: UserPlan): boolean {
 export function hasUnlimitedAccounts(plan: UserPlan): boolean {
   return plan === "PRO";
 }
-
-export function canAccessValueCall(plan: UserPlan): boolean {
-  return plan === "PRO";
-}
