@@ -22,8 +22,20 @@ import {
   type ExpirationAction,
   type UserRole,
 } from "@/lib/account-access";
-import { humanizeStripeStatus } from "@/lib/stripe-status";
-import { StatusBadge, TagBadge, CompedBadge, PlanBadge } from "./AccountBadges";
+import {
+  deriveRosterBillingSource,
+  deriveRosterLifecycle,
+  getRosterNextChange,
+  type RosterBillingInput,
+} from "@/lib/roster-billing";
+import {
+  BillingSourceBadge,
+  RosterLifecycleBadge,
+  StatusBadge,
+  TagBadge,
+  CompedBadge,
+  PlanBadge,
+} from "./AccountBadges";
 import PlanSwitcher from "./PlanSwitcher";
 import RoleSwitcher from "./RoleSwitcher";
 import ResetPasswordButton from "./ResetPasswordButton";
@@ -51,6 +63,10 @@ export interface DrawerUser {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripeStatus: string | null;
+  billingSubscriptionId: string | null;
+  billingStatus: string | null;
+  billingCancelAt: Date | null;
+  billingCurrentPeriodEnd: Date | null;
   trialEndsAt: Date | null;
   hasUsedTrial: boolean;
   _count?: {
@@ -82,9 +98,19 @@ export default function ClientDetailDrawer({ user, currentUserId, onClose, onSav
   }, [onClose]);
 
   const effective = getEffectiveAccountStatus(user);
-  const stripe = user.stripeSubscriptionId
-    ? humanizeStripeStatus(user.stripeStatus)
-    : null;
+  const billingInput: RosterBillingInput = {
+    accountStatus: user.accountStatus,
+    isComped: user.isComped,
+    organizationId: user.organizationId,
+    stripeSubscriptionId: user.billingSubscriptionId,
+    stripeStatus: user.billingStatus,
+    stripeCancelAt: user.billingCancelAt,
+    stripeCurrentPeriodEnd: user.billingCurrentPeriodEnd,
+    trialEndsAt: user.trialEndsAt,
+  };
+  const lifecycle = deriveRosterLifecycle(billingInput);
+  const billingSource = deriveRosterBillingSource(billingInput);
+  const nextChange = getRosterNextChange(billingInput, lifecycle);
 
   const q = user._count?.questionnaires ?? 0;
   const ps = user._count?.profileSurveys ?? 0;
@@ -138,6 +164,8 @@ export default function ClientDetailDrawer({ user, currentUserId, onClose, onSav
           <section>
             <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Status</h3>
             <div className="flex flex-wrap items-center gap-1.5">
+              <RosterLifecycleBadge lifecycle={lifecycle} />
+              <BillingSourceBadge source={billingSource} />
               <StatusBadge status={effective} />
               <PlanBadge plan={user.plan} />
               {user.internalTag && <TagBadge tag={user.internalTag} />}
@@ -199,26 +227,26 @@ export default function ClientDetailDrawer({ user, currentUserId, onClose, onSav
           {/* Billing */}
           <section>
             <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Billing</h3>
-            {stripe ? (
+            {billingSource !== "NONE" ? (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${stripe.badgeClass}`}>
-                    <CreditCard className="h-3 w-3" />
-                    {stripe.label}
+                  <RosterLifecycleBadge lifecycle={lifecycle} />
+                  <BillingSourceBadge source={billingSource} />
+                  <span className="text-xs text-text-muted">
+                    {nextChange.date
+                      ? `${nextChange.label} ${format(nextChange.date, "MMM d, yyyy")}`
+                      : nextChange.label}
                   </span>
-                  {user.stripeStatus === "trialing" && user.trialEndsAt && (
-                    <span className="text-xs text-text-muted">
-                      Trial ends {format(user.trialEndsAt, "MMM d, yyyy")}
-                    </span>
-                  )}
                 </div>
-                <button
-                  onClick={() => setShowBillingModal(true)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border-primary bg-background-secondary text-text-muted hover:text-text-primary hover:border-accent-primary/40 transition-colors"
-                >
-                  <CreditCard className="w-3 h-3" />
-                  Open billing details
-                </button>
+                {user.stripeSubscriptionId && (
+                  <button
+                    onClick={() => setShowBillingModal(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border-primary bg-background-secondary text-text-muted hover:text-text-primary hover:border-accent-primary/40 transition-colors"
+                  >
+                    <CreditCard className="w-3 h-3" />
+                    Open billing details
+                  </button>
+                )}
               </div>
             ) : (
               <p className="text-xs text-text-muted">No Stripe subscription.</p>

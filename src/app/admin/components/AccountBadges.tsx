@@ -1,12 +1,20 @@
 import { format } from "date-fns";
 import {
   ACCOUNT_STATUS_LABELS,
-  getEffectiveAccountStatus,
   TAG_LABELS,
   type AccountStatus,
   type AccountAccessUser,
 } from "@/lib/account-access";
-import { humanizeStripeStatus } from "@/lib/stripe-status";
+import {
+  deriveRosterBillingSource,
+  deriveRosterLifecycle,
+  getRosterNextChange,
+  ROSTER_BILLING_SOURCE_LABELS,
+  ROSTER_LIFECYCLE_LABELS,
+  type RosterBillingInput,
+  type RosterBillingSource,
+  type RosterLifecycle,
+} from "@/lib/roster-billing";
 import type { UserPlan } from "@/lib/tiers";
 import { ADMIN_PLAN_LABELS } from "@/lib/tiers";
 
@@ -32,6 +40,23 @@ const STATUS_STYLES: Record<AccountStatus, string> = {
   PAST_DUE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   CANCELED: "bg-red-500/10 text-red-400 border-red-500/20",
   ARCHIVED: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+};
+
+const LIFECYCLE_STYLES: Record<RosterLifecycle, string> = {
+  ACTIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  TRIAL: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  CANCELING: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  PAST_DUE: "bg-red-500/10 text-red-400 border-red-500/20",
+  ARCHIVED: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+  CANCELED: "bg-red-500/10 text-red-400 border-red-500/20",
+  PENDING: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+};
+
+const BILLING_SOURCE_STYLES: Record<RosterBillingSource, string> = {
+  PAID: "bg-accent-primary/10 text-accent-primary border-accent-primary/20",
+  COMMUNITY: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  COMPED: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+  NONE: "bg-gray-500/10 text-gray-400 border-gray-500/20",
 };
 
 export function TagBadge({ tag }: { tag: string | null }) {
@@ -60,6 +85,24 @@ export function StatusBadge({ status }: { status: AccountStatus }) {
   );
 }
 
+export function RosterLifecycleBadge({ lifecycle }: { lifecycle: RosterLifecycle }) {
+  const style = LIFECYCLE_STYLES[lifecycle];
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${style}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${style.includes("emerald") ? "bg-emerald-400" : style.includes("blue") ? "bg-blue-400" : style.includes("amber") ? "bg-amber-400" : style.includes("red") ? "bg-red-400" : "bg-gray-400"}`} />
+      {ROSTER_LIFECYCLE_LABELS[lifecycle]}
+    </span>
+  );
+}
+
+export function BillingSourceBadge({ source }: { source: RosterBillingSource }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${BILLING_SOURCE_STYLES[source]}`}>
+      {ROSTER_BILLING_SOURCE_LABELS[source]}
+    </span>
+  );
+}
+
 export function CompedBadge({ isComped, reason }: { isComped: boolean; reason?: string | null }) {
   if (!isComped) return null;
   return (
@@ -83,43 +126,48 @@ export function PlanBadge({ plan }: { plan: UserPlan }) {
   );
 }
 
-/**
- * Compact single-cell summary of a user's access state for the roster row.
- * Shows effective status badge (so expired users don't look "Active"),
- * plan, tag, comped dot, and a humanized Stripe sub-line when present.
- */
+/** Compact lifecycle, billing-source, and next-change summary for a roster row. */
 export interface StatusCellUser extends AccountAccessUser {
   plan: UserPlan;
+  organizationId: string | null;
   stripeStatus: string | null;
   stripeSubscriptionId: string | null;
+  billingStatus: string | null;
+  billingSubscriptionId: string | null;
+  billingCancelAt: Date | null;
+  billingCurrentPeriodEnd: Date | null;
   trialEndsAt: Date | null;
   compReason: string | null;
 }
 
 export function StatusCell({ user }: { user: StatusCellUser }) {
-  const effective = getEffectiveAccountStatus(user);
-  const stripe = user.stripeSubscriptionId
-    ? humanizeStripeStatus(user.stripeStatus)
-    : null;
+  const billingInput: RosterBillingInput = {
+    accountStatus: user.accountStatus,
+    isComped: user.isComped,
+    organizationId: user.organizationId,
+    stripeSubscriptionId: user.billingSubscriptionId,
+    stripeStatus: user.billingStatus,
+    stripeCancelAt: user.billingCancelAt,
+    stripeCurrentPeriodEnd: user.billingCurrentPeriodEnd,
+    trialEndsAt: user.trialEndsAt,
+  };
+  const lifecycle = deriveRosterLifecycle(billingInput);
+  const source = deriveRosterBillingSource(billingInput);
+  const nextChange = getRosterNextChange(billingInput, lifecycle);
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
       <div className="flex flex-wrap items-center gap-1">
-        <StatusBadge status={effective} />
+        <RosterLifecycleBadge lifecycle={lifecycle} />
+        <BillingSourceBadge source={source} />
         <PlanBadge plan={user.plan} />
         {user.internalTag && <TagBadge tag={user.internalTag} />}
-        {user.isComped && <CompedBadge isComped reason={user.compReason} />}
       </div>
-      {stripe && (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border w-fit ${stripe.badgeClass}`}>
-          {stripe.label}
-          {user.stripeStatus === "trialing" && user.trialEndsAt && (
-            <span className="text-text-muted font-normal">
-              · ends {format(user.trialEndsAt, "MMM d")}
-            </span>
-          )}
-        </span>
-      )}
+      <span className={`text-xs ${lifecycle === "CANCELING" ? "text-amber-400" : "text-text-muted"}`}>
+        {nextChange.date
+          ? `${nextChange.label} ${format(nextChange.date, "MMM d, yyyy")}`
+          : nextChange.label}
+      </span>
     </div>
   );
 }

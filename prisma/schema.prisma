@@ -36,9 +36,11 @@ model User {
   lastAccessCheckAt DateTime?
 
   // Stripe fields — populated by Stripe webhook integration
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  stripeStatus         String?
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripeStatus           String?
+  stripeCancelAt         DateTime?
+  stripeCurrentPeriodEnd DateTime?
 
   // Trial tracking
   hasUsedTrial             Boolean   @default(false)
@@ -720,10 +722,12 @@ model Organization {
   seatPlan  UserPlan @default(CALENDAR_ONLY)
 
   // Stripe-ready fields — populated by future Stripe webhook integration
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  stripePriceId        String?
-  stripeStatus         String?
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  stripeStatus           String?
+  stripeCancelAt         DateTime?
+  stripeCurrentPeriodEnd DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

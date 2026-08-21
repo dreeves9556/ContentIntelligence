@@ -347,6 +347,8 @@ export async function assignTeamAdmin(
             stripeCustomerId: null,
             stripeSubscriptionId: null,
             stripeStatus: null,
+            stripeCancelAt: null,
+            stripeCurrentPeriodEnd: null,
           },
         });
       }

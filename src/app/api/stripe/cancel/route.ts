@@ -75,21 +75,36 @@ export async function POST() {
 
   try {
     // Cancel at period end — user keeps access until the period finishes
-    await stripe.subscriptions.update(subscriptionId, {
+    const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
     });
+    const currentPeriodEnd = updatedSubscription.items.data[0]?.current_period_end;
+    const stripeCurrentPeriodEnd = currentPeriodEnd
+      ? new Date(currentPeriodEnd * 1000)
+      : null;
+    const stripeCancelAt = updatedSubscription.cancel_at
+      ? new Date(updatedSubscription.cancel_at * 1000)
+      : stripeCurrentPeriodEnd;
 
     // Update local status so UI can show "cancellation scheduled"
     if (isOrgSubscription) {
       // Org subscription
       await prisma.organization.update({
         where: { id: user.organizationId! },
-        data: { stripeStatus: "cancel_at_period_end" },
+        data: {
+          stripeStatus: "cancel_at_period_end",
+          stripeCancelAt,
+          stripeCurrentPeriodEnd,
+        },
       });
     } else {
       await prisma.user.update({
         where: { id: user.id },
-        data: { stripeStatus: "cancel_at_period_end" },
+        data: {
+          stripeStatus: "cancel_at_period_end",
+          stripeCancelAt,
+          stripeCurrentPeriodEnd,
+        },
       });
     }
 

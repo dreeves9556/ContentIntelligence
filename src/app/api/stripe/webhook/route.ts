@@ -223,6 +223,23 @@ function getEffectiveSeatLimit(subscription: Stripe.Subscription, fallback: numb
   return fallback;
 }
 
+function getSubscriptionBillingDates(subscription: Stripe.Subscription): {
+  stripeCancelAt: Date | null;
+  stripeCurrentPeriodEnd: Date | null;
+} {
+  const currentPeriodEnd = subscription.items.data[0]?.current_period_end;
+  const periodEnd = currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : null;
+  const cancelAt = subscription.cancel_at
+    ? new Date(subscription.cancel_at * 1000)
+    : subscription.cancel_at_period_end
+      ? periodEnd
+      : null;
+  return {
+    stripeCancelAt: cancelAt,
+    stripeCurrentPeriodEnd: periodEnd,
+  };
+}
+
 /** Check if a user should be protected from webhook modifications.
  *  ADMIN users and comped users are never overwritten by webhook events. */
 async function isProtectedUser(userId: string): Promise<boolean> {
@@ -310,6 +327,7 @@ async function fulfillSoloCheckout(userId: string, customerId: string, subscript
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       stripeStatus: subscription.status,
+      ...getSubscriptionBillingDates(subscription),
       plan: "PRO",
       accountStatus: stripeStatusToAccountStatus(subscription.status),
       isComped: false,
@@ -342,12 +360,15 @@ async function processSwitchFromCommunity(userId: string, orgId: string) {
   // Schedule org subscription cancellation at period end
   if (org.stripeSubscriptionId) {
     try {
-      await stripe.subscriptions.update(org.stripeSubscriptionId, {
+      const updatedSubscription = await stripe.subscriptions.update(org.stripeSubscriptionId, {
         cancel_at_period_end: true,
       });
       await prisma.organization.update({
         where: { id: orgId },
-        data: { stripeStatus: "cancel_at_period_end" },
+        data: {
+          stripeStatus: "cancel_at_period_end",
+          ...getSubscriptionBillingDates(updatedSubscription),
+        },
       });
       console.log(`[STRIPE WEBHOOK] Org ${orgId} subscription scheduled to cancel at period end`);
     } catch (err) {
@@ -450,6 +471,7 @@ async function fulfillCommunityCheckout(
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId,
         stripeStatus: subscription.status,
+        ...getSubscriptionBillingDates(subscription),
       },
     });
     organizationId = existingOrg.id;
@@ -464,6 +486,7 @@ async function fulfillCommunityCheckout(
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId,
         stripeStatus: subscription.status,
+        ...getSubscriptionBillingDates(subscription),
       },
     });
     organizationId = newOrg.id;
@@ -560,6 +583,7 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscriptionId,
           stripeStatus,
+          ...getSubscriptionBillingDates(subscription),
         },
       });
       organizationId = existingOrg.id;
@@ -573,6 +597,7 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscriptionId,
           stripeStatus,
+          ...getSubscriptionBillingDates(subscription),
         },
       });
       organizationId = newOrg.id;
@@ -670,6 +695,7 @@ async function handlePublicCheckoutCompleted(session: Stripe.Checkout.Session) {
             stripeCustomerId: customerId,
             stripeSubscriptionId: subscriptionId,
             stripeStatus: effectiveStatus,
+            ...getSubscriptionBillingDates(subscription),
             plan: "PRO",
             accountStatus: stripeStatusToAccountStatus(effectiveStatus),
             isComped: false,
@@ -830,13 +856,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
     if (org) {
       const quantity = getEffectiveSeatLimit(subscription, org.seatLimit);
-      const effectiveStatus = subscription.cancel_at_period_end
+      const effectiveStatus = subscription.cancel_at_period_end || subscription.cancel_at
         ? "cancel_at_period_end"
         : subscription.status;
       await prisma.organization.update({
         where: { id: org.id },
         data: {
           stripeStatus: effectiveStatus,
+          ...getSubscriptionBillingDates(subscription),
           seatLimit: quantity,
         },
       });
@@ -880,12 +907,12 @@ async function updateUserFromSubscription(userId: string, subscription: Stripe.S
   // If cancel_at_period_end is true, keep the user's current status until the
   // period ends. Store a synthetic status so the UI can show "cancellation scheduled".
   // During a trial, preserve TRIAL (not ACTIVE) so the UI reflects the trial state.
-  const effectiveStatus = subscription.cancel_at_period_end
+  const effectiveStatus = subscription.cancel_at_period_end || subscription.cancel_at
     ? "cancel_at_period_end"
     : subscription.status;
 
   let accountStatus: "ACTIVE" | "TRIAL" | "PAST_DUE" | "CANCELED" | "EXPIRED";
-  if (subscription.cancel_at_period_end) {
+  if (subscription.cancel_at_period_end || subscription.cancel_at) {
     // Keep current status — trial users stay TRIAL, active users stay ACTIVE
     if (subscription.status === "trialing") {
       accountStatus = "TRIAL";
@@ -901,6 +928,7 @@ async function updateUserFromSubscription(userId: string, subscription: Stripe.S
     data: {
       stripeSubscriptionId: subscription.id,
       stripeStatus: effectiveStatus,
+      ...getSubscriptionBillingDates(subscription),
       accountStatus,
       hasUsedTrial: true, // Trial has ended — mark as consumed (safety net for paths that don't set it at checkout)
       ...(subscription.trial_end && subscription.status === "trialing"
@@ -987,6 +1015,8 @@ async function downgradeUser(userId: string, deletedSubscriptionId?: string) {
       stripeSubscriptionId: null,
       stripeCustomerId: null,
       stripeStatus: "canceled",
+      stripeCancelAt: null,
+      stripeCurrentPeriodEnd: null,
       trialEndsAt: null,
     },
   });
@@ -1018,6 +1048,8 @@ async function downgradeOrganization(orgId: string, deletedSubscriptionId?: stri
       stripeStatus: "canceled",
       stripeSubscriptionId: null,
       stripeCustomerId: null,
+      stripeCancelAt: null,
+      stripeCurrentPeriodEnd: null,
     },
   });
 
@@ -1118,7 +1150,10 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     await prisma.organization.update({
       where: { id: org.id },
       data: {
-        stripeStatus: subscription.status,
+        stripeStatus: subscription.cancel_at_period_end || subscription.cancel_at
+          ? "cancel_at_period_end"
+          : subscription.status,
+        ...getSubscriptionBillingDates(subscription),
       },
     });
     return;
@@ -1140,7 +1175,10 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      stripeStatus: subscription.status,
+      stripeStatus: subscription.cancel_at_period_end || subscription.cancel_at
+        ? "cancel_at_period_end"
+        : subscription.status,
+      ...getSubscriptionBillingDates(subscription),
       accountStatus: stripeStatusToAccountStatus(subscription.status),
       hasUsedTrial: true, // First real payment — trial is consumed (safety net)
       ...(subscription.status === "trialing" && subscription.trial_end

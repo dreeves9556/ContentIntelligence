@@ -339,6 +339,8 @@ export async function removeTeamMember(
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         stripeStatus: null,
+        stripeCancelAt: null,
+        stripeCurrentPeriodEnd: null,
       },
     });
     return { success: true };

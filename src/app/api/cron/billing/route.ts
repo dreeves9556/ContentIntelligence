@@ -102,6 +102,13 @@ export async function GET(request: Request) {
   for (const user of staleTrials) {
     try {
       const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId!);
+      const currentPeriodEnd = sub.items.data[0]?.current_period_end;
+      const stripeCurrentPeriodEnd = currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : null;
+      const stripeCancelAt = sub.cancel_at
+        ? new Date(sub.cancel_at * 1000)
+        : sub.cancel_at_period_end
+          ? stripeCurrentPeriodEnd
+          : null;
 
       if (sub.status === "canceled" || sub.status === "unpaid" || sub.status === "incomplete_expired") {
         // Subscription is dead — full downgrade (same as handleSubscriptionDeleted)
@@ -113,6 +120,8 @@ export async function GET(request: Request) {
             stripeStatus: sub.status,
             stripeSubscriptionId: null,
             stripeCustomerId: null,
+            stripeCancelAt: null,
+            stripeCurrentPeriodEnd: null,
             hasUsedTrial: true, // Trial is consumed — prevent repeat trials
             trialEndsAt: null,
           },
@@ -125,7 +134,11 @@ export async function GET(request: Request) {
           where: { id: user.id },
           data: {
             accountStatus: stripeStatusToAccountStatus(sub.status),
-            stripeStatus: sub.status,
+            stripeStatus: sub.cancel_at_period_end || sub.cancel_at
+              ? "cancel_at_period_end"
+              : sub.status,
+            stripeCancelAt,
+            stripeCurrentPeriodEnd,
             hasUsedTrial: true, // Trial is consumed — prevent repeat trials
             trialEndsAt: null,
           },

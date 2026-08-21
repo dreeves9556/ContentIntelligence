@@ -16,6 +16,7 @@
     "stripe:setup-catalog": "tsx scripts/setup-stripe-catalog.ts",
     "stripe:verify-pricing": "tsx scripts/verify-stripe-pricing.ts",
     "stripe:migrate-solo-pricing": "tsx scripts/migrate-solo-pricing.ts",
+    "stripe:backfill-roster-billing": "tsx scripts/backfill-roster-billing.ts",
     "stripe:check-env": "tsx scripts/check-stripe-env.ts",
     "postinstall": "prisma generate"
   },

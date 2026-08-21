@@ -13,6 +13,14 @@ import {
   getEffectiveAccountStatus,
 } from "@/lib/account-access";
 import { StatusCell } from "./AccountBadges";
+import {
+  deriveRosterBillingSource,
+  deriveRosterLifecycle,
+  getRosterNextChange,
+  type RosterBillingInput,
+  type RosterBillingSource,
+  type RosterLifecycle,
+} from "@/lib/roster-billing";
 import BulkActionBar from "./BulkActionBar";
 import ClientDetailDrawer, { type DrawerUser } from "./ClientDetailDrawer";
 import ResendWelcomeButton from "./ResendWelcomeButton";
@@ -37,6 +45,10 @@ export interface RosterUser {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripeStatus: string | null;
+  billingSubscriptionId: string | null;
+  billingStatus: string | null;
+  billingCancelAt: Date | null;
+  billingCurrentPeriodEnd: Date | null;
   trialEndsAt: Date | null;
   hasUsedTrial: boolean;
   _count?: {
@@ -62,9 +74,12 @@ type QuickFilter =
   | "ALL"
   | "CLIENTS"
   | "TEAM"
+  | "ACTIVE"
   | "TRIALS"
-  | "NEEDS_ATTENTION"
+  | "CANCELING"
+  | "ARCHIVED"
   | "COMPED"
+  | "NEEDS_ATTENTION"
   | "PAST_DUE"
   | "EXPIRED_LOGIN";
 
@@ -75,11 +90,14 @@ const PAGE_SIZE = 50;
 
 const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
   { key: "ALL", label: "All" },
+  { key: "ACTIVE", label: "Active" },
+  { key: "TRIALS", label: "Trials" },
+  { key: "CANCELING", label: "Canceling" },
+  { key: "ARCHIVED", label: "Archived" },
+  { key: "COMPED", label: "Comped" },
+  { key: "NEEDS_ATTENTION", label: "Needs Attention" },
   { key: "CLIENTS", label: "Clients" },
   { key: "TEAM", label: "Team & Admins" },
-  { key: "TRIALS", label: "Trials" },
-  { key: "NEEDS_ATTENTION", label: "Needs Attention" },
-  { key: "COMPED", label: "Comped" },
   { key: "PAST_DUE", label: "Past Due" },
   { key: "EXPIRED_LOGIN", label: "Expired Login" },
 ];
@@ -92,6 +110,27 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 function daysUntil(date: Date): number {
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function getRosterBillingInput(user: RosterUser): RosterBillingInput {
+  return {
+    accountStatus: user.accountStatus,
+    isComped: user.isComped,
+    organizationId: user.organizationId,
+    stripeSubscriptionId: user.billingSubscriptionId,
+    stripeStatus: user.billingStatus,
+    stripeCancelAt: user.billingCancelAt,
+    stripeCurrentPeriodEnd: user.billingCurrentPeriodEnd,
+    trialEndsAt: user.trialEndsAt,
+  };
+}
+
+function getLifecycle(user: RosterUser): RosterLifecycle {
+  return deriveRosterLifecycle(getRosterBillingInput(user));
+}
+
+function getBillingSource(user: RosterUser): RosterBillingSource {
+  return deriveRosterBillingSource(getRosterBillingInput(user));
 }
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -111,14 +150,20 @@ function matchesQuickFilter(u: RosterUser, qf: QuickFilter, expiredEmails?: Set<
       return u.role === "USER";
     case "TEAM":
       return u.role === "TEAM_ADMIN" || u.role === "ADMIN";
+    case "ACTIVE":
+      return getLifecycle(u) === "ACTIVE" && getBillingSource(u) === "PAID";
     case "TRIALS":
-      return u.stripeStatus === "trialing" || u.accountStatus === "TRIAL";
+      return getLifecycle(u) === "TRIAL";
+    case "CANCELING":
+      return getLifecycle(u) === "CANCELING";
+    case "ARCHIVED":
+      return getLifecycle(u) === "ARCHIVED";
     case "NEEDS_ATTENTION":
       return getAttentionReason(u) !== null;
     case "COMPED":
-      return u.isComped;
+      return getBillingSource(u) === "COMPED";
     case "PAST_DUE":
-      return u.stripeStatus === "past_due" || u.accountStatus === "PAST_DUE";
+      return getLifecycle(u) === "PAST_DUE";
     case "EXPIRED_LOGIN":
       // User has an expired password-setup token AND no activity — they
       // never completed initial login. Skip active users even if a stale
@@ -133,10 +178,15 @@ function matchesQuickFilter(u: RosterUser, qf: QuickFilter, expiredEmails?: Set<
  * Surfaced on the row so the "Needs Attention" chip is self-explanatory.
  */
 function getAttentionReason(u: RosterUser): string | null {
+  const lifecycle = getLifecycle(u);
   const eff = getEffectiveAccountStatus(u);
+  if (lifecycle === "CANCELING") {
+    const next = getRosterNextChange(getRosterBillingInput(u), lifecycle);
+    return next.date ? `Cancels ${format(next.date, "MMM d")} · no renewal` : next.label;
+  }
   if (eff === "EXPIRED") return "Access expired";
   if (eff === "PAST_DUE") return "Payment past due";
-  if (eff === "TRIAL") {
+  if (lifecycle === "TRIAL") {
     if (u.trialEndsAt) {
       const d = daysUntil(u.trialEndsAt);
       if (d < 0) return `Trial ended ${Math.abs(d)}d ago`;
@@ -197,14 +247,14 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
           cmp = (a.name || a.email || a.id).localeCompare(b.name || b.email || b.id);
           break;
         case "status": {
-          const ea = getEffectiveAccountStatus(a);
-          const eb = getEffectiveAccountStatus(b);
+          const ea = getLifecycle(a);
+          const eb = getLifecycle(b);
           cmp = ea.localeCompare(eb);
           break;
         }
         case "expires": {
-          const ta = a.accessExpiresAt?.getTime() ?? Infinity;
-          const tb = b.accessExpiresAt?.getTime() ?? Infinity;
+          const ta = getRosterNextChange(getRosterBillingInput(a), getLifecycle(a)).date?.getTime() ?? Infinity;
+          const tb = getRosterNextChange(getRosterBillingInput(b), getLifecycle(b)).date?.getTime() ?? Infinity;
           cmp = ta - tb;
           break;
         }
@@ -228,16 +278,17 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
   // Summary strip counts (computed from full list, not filtered)
   const totalClients = users.filter((u) => u.role === "USER").length;
   const teamCount = users.filter((u) => u.role === "TEAM_ADMIN" || u.role === "ADMIN").length;
+  const activeCount = users.filter((u) => getLifecycle(u) === "ACTIVE" && getBillingSource(u) === "PAID").length;
+  const trialCount = users.filter((u) => getLifecycle(u) === "TRIAL").length;
+  const cancelingCount = users.filter((u) => getLifecycle(u) === "CANCELING").length;
+  const archivedCount = users.filter((u) => getLifecycle(u) === "ARCHIVED").length;
+  const compedCount = users.filter((u) => getBillingSource(u) === "COMPED").length;
   const trialsEndingSoon = users.filter((u) => {
-    const isTrial = u.stripeStatus === "trialing" || u.accountStatus === "TRIAL";
-    if (!isTrial || !u.trialEndsAt) return false;
+    if (getLifecycle(u) !== "TRIAL" || !u.trialEndsAt) return false;
     const d = daysUntil(u.trialEndsAt);
     return d >= 0 && d <= 7;
   }).length;
-  const pastDueCount = users.filter(
-    (u) => u.stripeStatus === "past_due" || u.accountStatus === "PAST_DUE"
-  ).length;
-  const compedCount = users.filter((u) => u.isComped).length;
+  const pastDueCount = users.filter((u) => getLifecycle(u) === "PAST_DUE").length;
   const expiredLoginCount = users.filter(
     (u) => u.email && expiredTokenEmails?.has(u.email) && u.status === "PENDING"
   ).length;
@@ -303,27 +354,24 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
   }
 
   const summaryStats = [
-    { label: "Clients", value: totalClients, onClick: () => setQuickFilter("CLIENTS") },
-    { label: "Team & Admins", value: teamCount, onClick: () => setQuickFilter("TEAM") },
+    { label: "Active", value: activeCount, onClick: () => setQuickFilter("ACTIVE") },
+    { label: "Trials", value: trialCount, onClick: () => setQuickFilter("TRIALS") },
     {
-      label: "Trials ending ≤7d",
-      value: trialsEndingSoon,
-      onClick: () => setQuickFilter("NEEDS_ATTENTION"),
-      highlight: trialsEndingSoon > 0,
+      label: "Canceling",
+      value: cancelingCount,
+      onClick: () => setQuickFilter("CANCELING"),
+      highlight: cancelingCount > 0,
     },
-    {
-      label: "Past due",
-      value: pastDueCount,
-      onClick: () => setQuickFilter("PAST_DUE"),
-      highlight: pastDueCount > 0,
-    },
+    { label: "Archived", value: archivedCount, onClick: () => setQuickFilter("ARCHIVED") },
     { label: "Comped", value: compedCount, onClick: () => setQuickFilter("COMPED") },
     {
-      label: "Expired login",
-      value: expiredLoginCount,
-      onClick: () => setQuickFilter("EXPIRED_LOGIN"),
-      highlight: expiredLoginCount > 0,
+      label: "Needs attention",
+      value: cancelingCount + pastDueCount + trialsEndingSoon + expiredLoginCount,
+      onClick: () => setQuickFilter("NEEDS_ATTENTION"),
+      highlight: cancelingCount + pastDueCount + trialsEndingSoon + expiredLoginCount > 0,
     },
+    { label: "Clients", value: totalClients, onClick: () => setQuickFilter("CLIENTS") },
+    { label: "Team & Admins", value: teamCount, onClick: () => setQuickFilter("TEAM") },
   ];
 
   return (
@@ -481,7 +529,7 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
                 </th>
                 <th className="text-left py-3 px-3 text-xs font-medium text-text-muted uppercase tracking-wider">
                   <button onClick={() => setSort("expires")} className="inline-flex items-center gap-1 hover:text-text-primary">
-                    Expires <SortIcon col="expires" sortKey={sortKey} sortDir={sortDir} />
+                    Next change <SortIcon col="expires" sortKey={sortKey} sortDir={sortDir} />
                   </button>
                 </th>
                 <th className="text-left py-3 px-3 text-xs font-medium text-text-muted uppercase tracking-wider">Activity</th>
@@ -494,6 +542,8 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
                 const cal = user._count?.calendars ?? 0;
                 const zernio = user._count?.zernioAccounts ?? 0;
                 const totalActivity = q + cal + zernio;
+                const lifecycle = getLifecycle(user);
+                const nextChange = getRosterNextChange(getRosterBillingInput(user), lifecycle);
                 return (
                   <tr
                     key={user.id}
@@ -533,14 +583,14 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
                       })()}
                     </td>
                     <td className="py-3 px-3">
-                      {user.accessExpiresAt ? (
-                        <div>
-                          <p className="text-xs text-text-primary">{format(user.accessExpiresAt, "MMM d, yyyy")}</p>
-                          <p className="text-xs text-text-muted">{user.expirationAction.replace(/_/g, " ").toLowerCase()}</p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-text-muted">No expiry</span>
-                      )}
+                      <div>
+                        {nextChange.date && (
+                          <p className={`text-xs ${lifecycle === "CANCELING" ? "text-amber-400" : "text-text-primary"}`}>
+                            {format(nextChange.date, "MMM d, yyyy")}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-muted">{nextChange.label}</p>
+                      </div>
                     </td>
                     <td className="py-3 px-3">
                       {totalActivity === 0 ? (
@@ -583,6 +633,8 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
             const cal = user._count?.calendars ?? 0;
             const zernio = user._count?.zernioAccounts ?? 0;
             const totalActivity = q + cal + zernio;
+            const lifecycle = getLifecycle(user);
+            const nextChange = getRosterNextChange(getRosterBillingInput(user), lifecycle);
             return (
               <button
                 key={user.id}
@@ -617,11 +669,10 @@ export default function AdminRosterClient({ users, currentUserId, expiredTokenEm
                     </p>
                   ) : null;
                 })()}
-                {user.accessExpiresAt && (
-                  <p className="text-xs text-text-muted">
-                    Expires {format(user.accessExpiresAt, "MMM d, yyyy")} · {user.expirationAction.replace(/_/g, " ").toLowerCase()}
-                  </p>
-                )}
+                <p className={`text-xs ${lifecycle === "CANCELING" ? "text-amber-400" : "text-text-muted"}`}>
+                  {nextChange.date && `${nextChange.label} ${format(nextChange.date, "MMM d, yyyy")}`}
+                  {!nextChange.date && nextChange.label}
+                </p>
                 {totalActivity > 0 && (
                   <p className="text-xs text-text-muted">
                     {q > 0 && <>{q} questionnaire{q !== 1 ? "s" : ""} · </>}

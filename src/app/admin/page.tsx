@@ -14,6 +14,17 @@ async function getUsers(): Promise<RosterUser[]> {
       createdAt: "desc",
     },
     include: {
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          stripeCustomerId: true,
+          stripeSubscriptionId: true,
+          stripeStatus: true,
+          stripeCancelAt: true,
+          stripeCurrentPeriodEnd: true,
+        },
+      },
       _count: {
         select: {
           questionnaires: true,
@@ -25,36 +36,43 @@ async function getUsers(): Promise<RosterUser[]> {
     },
   });
 
-  return users.map((user) => ({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    plan: (user.plan ?? "PRO") as UserPlan,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt ?? null,
-    lastAccessCheckAt: user.lastAccessCheckAt ?? null,
-    status:
-      user.role === "ADMIN" ||
-      (user._count?.questionnaires ?? 0) > 0 ||
-      (user._count?.profileSurveys ?? 0) > 0 ||
-      (user._count?.calendars ?? 0) > 0
-        ? ("ACTIVE" as const)
-        : ("PENDING" as const),
-    accountStatus: user.accountStatus,
-    internalTag: user.internalTag,
-    isComped: user.isComped,
-    compReason: user.compReason,
-    accessExpiresAt: user.accessExpiresAt,
-    expirationAction: user.expirationAction,
-    organizationId: user.organizationId,
-    stripeCustomerId: user.stripeCustomerId,
-    stripeSubscriptionId: user.stripeSubscriptionId,
-    stripeStatus: user.stripeStatus,
-    trialEndsAt: user.trialEndsAt,
-    hasUsedTrial: user.hasUsedTrial,
-    _count: user._count,
-  }));
+  return users.map((user) => {
+    const billingOwner = user.organization ?? user;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      plan: (user.plan ?? "PRO") as UserPlan,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt ?? null,
+      lastAccessCheckAt: user.lastAccessCheckAt ?? null,
+      status:
+        user.role === "ADMIN" ||
+        (user._count?.questionnaires ?? 0) > 0 ||
+        (user._count?.profileSurveys ?? 0) > 0 ||
+        (user._count?.calendars ?? 0) > 0
+          ? ("ACTIVE" as const)
+          : ("PENDING" as const),
+      accountStatus: user.accountStatus,
+      internalTag: user.internalTag,
+      isComped: user.isComped,
+      compReason: user.compReason,
+      accessExpiresAt: user.accessExpiresAt,
+      expirationAction: user.expirationAction,
+      organizationId: user.organizationId,
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId: user.stripeSubscriptionId,
+      stripeStatus: user.stripeStatus,
+      billingSubscriptionId: billingOwner.stripeSubscriptionId,
+      billingStatus: billingOwner.stripeStatus,
+      billingCancelAt: billingOwner.stripeCancelAt,
+      billingCurrentPeriodEnd: billingOwner.stripeCurrentPeriodEnd,
+      trialEndsAt: user.trialEndsAt,
+      hasUsedTrial: user.hasUsedTrial,
+      _count: user._count,
+    };
+  });
 }
 
 /**
