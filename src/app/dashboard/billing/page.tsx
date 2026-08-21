@@ -15,6 +15,8 @@ export default async function BillingPage() {
     where: { id: session.user.id },
     select: {
       id: true,
+      name: true,
+      email: true,
       plan: true,
       stripeCustomerId: true,
       stripeSubscriptionId: true,
@@ -104,6 +106,8 @@ export default async function BillingPage() {
         canManageSeats={canManageSeats}
         orgAdminEmail={orgAdminEmail}
         userRole={user.role}
+        userName={user.name}
+        userEmail={user.email}
         trialEndsAt={user.trialEndsAt}
         hasUsedTrial={user.hasUsedTrial}
       />

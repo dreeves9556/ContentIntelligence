@@ -1,17 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, User, Users, Minus, Plus } from "lucide-react";
+import { Check, Loader2, User, Users } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
+import CommunityInquiryForm from "@/components/CommunityInquiryForm";
 import type { BillingInterval } from "@/lib/pricing";
-import {
-  calculateCommunityTotal,
-  formatCurrency,
-  COMMUNITY_MIN_SEATS,
-  COMMUNITY_MAX_SEATS,
-  SOLO_MONTHLY_CENTS,
-  SOLO_ANNUAL_CENTS,
-} from "@/lib/pricing";
+import { formatCurrency, SOLO_MONTHLY_CENTS, SOLO_ANNUAL_CENTS } from "@/lib/pricing";
 
 const SOLO_FEATURES: (string | { text: string; emphasized?: boolean })[] = [
   { text: "7-day free trial", emphasized: true },
@@ -26,7 +20,6 @@ const SOLO_FEATURES: (string | { text: string; emphasized?: boolean })[] = [
 ];
 
 const COMMUNITY_FEATURES = [
-  { text: "7-day free trial", emphasized: true },
   "Everything in Solo Membership",
   "Seat-based access for teams",
   "Team roster management",
@@ -37,14 +30,8 @@ const COMMUNITY_FEATURES = [
 
 export function PricingSection() {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
-  const [seats, setSeats] = useState(3);
-  const [orgName, setOrgName] = useState("");
   const [soloLoading, setSoloLoading] = useState(false);
-  const [communityLoading, setCommunityLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const communityTotal = calculateCommunityTotal(seats, billingInterval);
-  const perSeat = seats > 0 ? communityTotal / seats : 0;
 
   async function handleSoloCheckout() {
     setError(null);
@@ -65,41 +52,6 @@ export function PricingSection() {
       setError("Network error. Please try again.");
     } finally {
       setSoloLoading(false);
-    }
-  }
-
-  async function handleCommunityCheckout() {
-    setError(null);
-    if (seats < COMMUNITY_MIN_SEATS) {
-      setError(`Communities membership requires at least ${COMMUNITY_MIN_SEATS} seats.`);
-      return;
-    }
-    if (!orgName.trim()) {
-      setError("Organization name is required.");
-      return;
-    }
-    setCommunityLoading(true);
-    try {
-      const res = await fetch("/api/stripe/public-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          purchaseType: "community",
-          billingInterval,
-          seats,
-          organizationName: orgName.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to start checkout");
-        return;
-      }
-      if (data.url) window.location.href = data.url;
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setCommunityLoading(false);
     }
   }
 
@@ -219,10 +171,10 @@ export function PricingSection() {
           {/* Communities */}
           <div className="bg-background-secondary rounded-xl border-2 border-accent-primary/30 p-6 sm:p-8 flex flex-col relative">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex gap-2">
-              <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                7-Day Free Trial
-              </span>
               <span className="bg-accent-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
+                Custom Plans
+              </span>
+              <span className="bg-background-card text-text-primary text-xs font-semibold px-3 py-1 rounded-full border border-border-primary">
                 For Teams & Brokerages
               </span>
             </div>
@@ -237,107 +189,20 @@ export function PricingSection() {
               </h3>
             </div>
 
-            {/* Seat slider */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-text-primary">Seats</label>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setSeats((s) => Math.max(COMMUNITY_MIN_SEATS, s - 1))}
-                    className="w-8 h-8 rounded-lg bg-background-card border border-border-primary flex items-center justify-center hover:border-accent-primary/30 transition-colors"
-                  >
-                    <Minus className="h-3.5 w-3.5 text-text-primary" />
-                  </button>
-                  <span className="text-lg font-bold text-text-primary w-8 text-center">
-                    {seats}
-                  </span>
-                  <button
-                    onClick={() => setSeats((s) => Math.min(COMMUNITY_MAX_SEATS, s + 1))}
-                    className="w-8 h-8 rounded-lg bg-background-card border border-border-primary flex items-center justify-center hover:border-accent-primary/30 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-text-primary" />
-                  </button>
-                </div>
-              </div>
-              <input
-                type="range"
-                min={COMMUNITY_MIN_SEATS}
-                max={COMMUNITY_MAX_SEATS}
-                value={seats}
-                onChange={(e) => setSeats(Number(e.target.value))}
-                className="w-full accent-accent-primary"
-              />
-              <div className="flex justify-between text-xs text-text-muted mt-1">
-                <span>{COMMUNITY_MIN_SEATS} seats</span>
-                <span>{COMMUNITY_MAX_SEATS} seats</span>
-              </div>
-            </div>
-
-            {/* Org name */}
-            <div className="mb-4">
-              <label className="text-sm font-medium text-text-primary block mb-1">
-                Organization name
-              </label>
-              <input
-                type="text"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                placeholder="e.g. Springfield Realty"
-                className="w-full px-3 py-2 bg-background-card border border-border-primary rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary/50"
-              />
-            </div>
-
-            {/* Price */}
-            <div className="mb-4">
-              <span className="text-3xl font-bold text-text-primary">
-                {formatCurrency(communityTotal)}
-              </span>
-              <span className="text-sm text-text-muted">
-                /{billingInterval === "monthly" ? "month" : "year"}
-              </span>
-              <p className="text-xs text-text-muted mt-1">
-                {formatCurrency(perSeat)}/seat
-              </p>
-              {billingInterval === "annual" && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-xs text-green-400">Two months free</p>
-                  <p className="text-xs text-text-muted">
-                    Annual pricing equals monthly seat total × 10
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    Monthly equivalent: {formatCurrency(communityTotal / 12)}/mo
-                  </p>
-                </div>
-              )}
-            </div>
+            <p className="text-sm text-text-muted mb-6">
+              Communities plans are tailored to your team. Tell us what you need and we&apos;ll work out the right fit together.
+            </p>
 
             <ul className="space-y-2 mb-8 flex-1">
-              {COMMUNITY_FEATURES.map((feature, idx) => {
-                const text = typeof feature === "string" ? feature : feature.text;
-                const emphasized = typeof feature === "object" && feature.emphasized;
-                return (
-                  <li key={idx} className={`flex items-start gap-2 text-sm ${emphasized ? "text-text-primary font-semibold" : "text-text-muted"}`}>
-                    <Check className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
-                    {text}
-                  </li>
-                );
-              })}
+              {COMMUNITY_FEATURES.map((feature) => (
+                <li key={feature} className="flex items-start gap-2 text-sm text-text-muted">
+                  <Check className="h-4 w-4 text-accent-primary shrink-0 mt-0.5" />
+                  {feature}
+                </li>
+              ))}
             </ul>
 
-            <button
-              onClick={handleCommunityCheckout}
-              disabled={communityLoading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors text-sm"
-            >
-              {communityLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Redirecting to checkout…
-                </>
-              ) : (
-                "Start 7-Day Free Trial"
-              )}
-            </button>
+            <CommunityInquiryForm />
           </div>
         </Reveal>
 
@@ -346,7 +211,7 @@ export function PricingSection() {
         )}
 
         <p className="text-center text-xs text-text-muted mt-6">
-          Secure checkout powered by Stripe. All memberships include a 7-day free trial. Cancel anytime.
+          Solo checkout is powered by Stripe and includes a 7-day free trial. Communities plans are arranged directly with our team.
         </p>
       </div>
     </section>

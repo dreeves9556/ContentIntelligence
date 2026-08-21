@@ -2,17 +2,13 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, Loader2, CreditCard, User, Users, Minus, Plus, AlertTriangle, Trash2, XCircle, ArrowRightLeft, Sparkles } from "lucide-react";
+import { Check, Loader2, CreditCard, User, Users, AlertTriangle, Trash2, XCircle, ArrowRightLeft, Sparkles } from "lucide-react";
 import type { UserPlan } from "@/lib/tiers";
 import { PUBLIC_PLAN_LABELS } from "@/lib/tiers";
 import type { BillingInterval } from "@/lib/pricing";
-import {
-  calculateCommunityTotal,
-  formatCurrency,
-  SOLO_MONTHLY_CENTS,
-  SOLO_ANNUAL_CENTS,
-} from "@/lib/pricing";
+import { formatCurrency, SOLO_MONTHLY_CENTS, SOLO_ANNUAL_CENTS } from "@/lib/pricing";
 import { trialDaysRemaining } from "@/lib/trial";
+import CommunityInquiryForm from "@/components/CommunityInquiryForm";
 import SeatManager from "./SeatManager";
 
 interface BillingClientProps {
@@ -30,6 +26,8 @@ interface BillingClientProps {
   canManageSeats: boolean;
   orgAdminEmail: string | null;
   userRole: string;
+  userName: string | null;
+  userEmail: string | null;
   trialEndsAt: Date | null;
   hasUsedTrial: boolean;
 }
@@ -46,7 +44,7 @@ const SOLO_FEATURES = [
 
 const COMMUNITY_FEATURES = [
   "Everything in Solo Membership",
-  "Seat-based graduated pricing",
+  "Custom seat-based access",
   "Team roster management",
   "Shared content calendar",
   "Admin controls & roles",
@@ -67,15 +65,14 @@ export default function BillingClient({
   canManageSeats,
   orgAdminEmail,
   userRole,
+  userName,
+  userEmail,
   trialEndsAt,
   hasUsedTrial,
 }: BillingClientProps) {
   const searchParams = useSearchParams();
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
-  const [seats, setSeats] = useState(3);
-  const [checkoutOrgName, setCheckoutOrgName] = useState("");
   const [soloLoading, setSoloLoading] = useState(false);
-  const [communityLoading, setCommunityLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -102,9 +99,6 @@ export default function BillingClient({
   const isTrial = accountStatus === "TRIAL";
   const trialDaysLeft = trialEndsAt ? trialDaysRemaining(new Date(trialEndsAt)) : 0;
 
-  const communityTotal = calculateCommunityTotal(seats, billingInterval);
-  const perSeat = seats > 0 ? communityTotal / seats : 0;
-
   async function handleSoloCheckout() {
     // If TEAM_ADMIN with community membership, show switch modal instead
     if (isTeamAdminSwitching) {
@@ -129,41 +123,6 @@ export default function BillingClient({
       setError("Network error. Please try again.");
     } finally {
       setSoloLoading(false);
-    }
-  }
-
-  async function handleCommunityCheckout() {
-    setError(null);
-    if (seats < 2) {
-      setError("Communities membership requires at least 2 seats.");
-      return;
-    }
-    if (!checkoutOrgName.trim()) {
-      setError("Organization name is required.");
-      return;
-    }
-    setCommunityLoading(true);
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          purchaseType: "community",
-          billingInterval,
-          seats,
-          organizationName: checkoutOrgName.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to start checkout");
-        return;
-      }
-      if (data.url) window.location.href = data.url;
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setCommunityLoading(false);
     }
   }
 
@@ -460,69 +419,9 @@ export default function BillingClient({
             </div>
           ) : (
             <>
-              {/* Seat selector */}
-              <div className="mb-3">
-                <label className="text-xs text-text-muted uppercase tracking-wider mb-1.5 block">
-                  Seats (min 2)
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSeats(Math.max(2, seats - 1))}
-                    className="p-2 rounded-lg border border-border-primary text-text-muted hover:text-text-primary hover:bg-background-secondary transition-colors"
-                    disabled={seats <= 2}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="number"
-                    min={2}
-                    max={25}
-                    value={seats}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      if (!isNaN(v)) setSeats(Math.max(2, Math.min(25, v)));
-                    }}
-                    className="w-16 text-center bg-background-secondary border border-border-primary rounded-lg py-2 text-sm font-medium text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                  />
-                  <button
-                    onClick={() => setSeats(Math.min(25, seats + 1))}
-                    className="p-2 rounded-lg border border-border-primary text-text-muted hover:text-text-primary hover:bg-background-secondary transition-colors"
-                    disabled={seats >= 25}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Organization name */}
-              <div className="mb-3">
-                <label className="text-xs text-text-muted uppercase tracking-wider mb-1.5 block">
-                  Organization Name
-                </label>
-                <input
-                  type="text"
-                  value={checkoutOrgName}
-                  onChange={(e) => setCheckoutOrgName(e.target.value)}
-                  placeholder="e.g. KW Legacy Team"
-                  className="w-full bg-background-secondary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                />
-              </div>
-
-              {/* Price display */}
-              <div className="mb-4">
-                <span className="text-3xl font-bold text-text-primary">
-                  {formatCurrency(communityTotal)}
-                </span>
-                <span className="text-sm text-text-muted">
-                  /{billingInterval === "monthly" ? "month" : "year"}
-                </span>
-                <p className="text-xs text-text-muted mt-1">
-                  {formatCurrency(perSeat)}/seat
-                </p>
-                {billingInterval === "annual" && (
-                  <p className="text-xs text-green-400 mt-1">Two months free</p>
-                )}
-              </div>
+              <p className="text-sm text-text-muted mb-6">
+                Communities plans are tailored to your team. Send an inquiry and we&apos;ll work out the right fit together.
+              </p>
 
               <ul className="space-y-2 mb-6 flex-1">
                 {COMMUNITY_FEATURES.map((f) => (
@@ -533,14 +432,7 @@ export default function BillingClient({
                 ))}
               </ul>
 
-              <button
-                onClick={handleCommunityCheckout}
-                disabled={communityLoading || !stripeCheckoutReady}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 bg-accent-primary text-white"
-              >
-                {communityLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Start Communities Membership
-              </button>
+              <CommunityInquiryForm initialName={userName} initialEmail={userEmail} />
             </>
           )}
         </div>

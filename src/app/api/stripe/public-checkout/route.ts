@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { getStripe, getAppUrl } from "@/lib/stripe";
 import { getPriceId, isStripeCheckoutConfigured } from "@/lib/stripe-config";
 import type { PurchaseType, BillingInterval } from "@/lib/pricing";
-import { COMMUNITY_MIN_SEATS, COMMUNITY_MAX_SEATS } from "@/lib/pricing";
 import { buildTrialSubscriptionData } from "@/lib/trial";
 import { checkActionRateLimit } from "@/lib/rate-limiter";
 
@@ -64,6 +63,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (purchaseType === "community") {
+    return NextResponse.json(
+      { error: "Communities plans are arranged directly with our team." },
+      { status: 410 }
+    );
+  }
+
   if (billingInterval !== "monthly" && billingInterval !== "annual") {
     return NextResponse.json(
       { error: "Invalid billing interval. Must be 'monthly' or 'annual'." },
@@ -71,24 +77,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let seats = 1;
-  if (purchaseType === "community") {
-    seats = Number(body.seats);
-    if (!Number.isInteger(seats) || seats < COMMUNITY_MIN_SEATS || seats > COMMUNITY_MAX_SEATS) {
-      return NextResponse.json(
-        { error: `Communities membership requires ${COMMUNITY_MIN_SEATS}–${COMMUNITY_MAX_SEATS} seats.` },
-        { status: 400 }
-      );
-    }
-
-    const organizationName = body.organizationName?.trim();
-    if (!organizationName || organizationName.length < 2) {
-      return NextResponse.json(
-        { error: "Organization name is required (min 2 characters)." },
-        { status: 400 }
-      );
-    }
-  }
+  const seats = 1;
 
   const priceId = getPriceId(purchaseType, billingInterval);
   if (!priceId) {

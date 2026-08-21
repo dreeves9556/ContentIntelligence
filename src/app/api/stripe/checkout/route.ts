@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getStripe, getAppUrl } from "@/lib/stripe";
 import { getPriceId, isStripeCheckoutConfigured } from "@/lib/stripe-config";
-import type { PurchaseType, BillingInterval } from "@/lib/stripe-config";
+import type { BillingInterval } from "@/lib/stripe-config";
 import { isTrialEligible, buildTrialSubscriptionData } from "@/lib/trial";
 
 export async function POST(request: Request) {
@@ -32,9 +32,15 @@ export async function POST(request: Request) {
   }
 
   // Validate purchaseType
-  if (body.purchaseType !== "solo" && body.purchaseType !== "community") {
+  if (body.purchaseType === "community") {
     return NextResponse.json(
-      { error: "purchaseType is required and must be 'solo' or 'community'." },
+      { error: "Communities plans are arranged directly with our team." },
+      { status: 410 }
+    );
+  }
+  if (body.purchaseType !== "solo") {
+    return NextResponse.json(
+      { error: "purchaseType is required and must be 'solo'." },
       { status: 400 }
     );
   }
@@ -47,34 +53,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const purchaseType = body.purchaseType as PurchaseType;
+  const purchaseType = "solo" as const;
   const billingInterval = body.billingInterval as BillingInterval;
-  let seats = 1;
-  let organizationName: string | undefined;
-
-  if (purchaseType === "solo") {
-    // Solo: always quantity 1, ignore seats/orgName
-    seats = 1;
-  } else {
-    // Community: require seats >= 2 and organizationName
-    const rawSeats = Math.floor(body.seats ?? 0);
-    if (!Number.isInteger(rawSeats) || rawSeats < 2) {
-      return NextResponse.json(
-        { error: "seats is required for community and must be an integer >= 2." },
-        { status: 400 }
-      );
-    }
-    seats = rawSeats;
-
-    const orgName = body.organizationName?.trim();
-    if (!orgName) {
-      return NextResponse.json(
-        { error: "organizationName is required for community checkout." },
-        { status: 400 }
-      );
-    }
-    organizationName = orgName;
-  }
+  const seats = 1;
 
   // Server maps purchase type/interval to env price IDs — client cannot send arbitrary price IDs
   const priceId = getPriceId(purchaseType, billingInterval);
@@ -136,7 +117,6 @@ export async function POST(request: Request) {
     seats: String(seats),
     appPlan: "PRO",
     ...(trialEligible ? { trialGranted: "true" } : {}),
-    ...(organizationName ? { organizationName } : {}),
   };
 
   try {
