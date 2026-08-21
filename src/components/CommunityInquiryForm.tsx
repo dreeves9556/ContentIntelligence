@@ -11,6 +11,7 @@ interface CommunityInquiryFormProps {
 interface FormFields {
   name: string;
   email: string;
+  phone: string;
   organization: string;
   estimatedMembers: string;
   message: string;
@@ -19,6 +20,7 @@ interface FormFields {
 const EMPTY_FIELDS: FormFields = {
   name: "",
   email: "",
+  phone: "",
   organization: "",
   estimatedMembers: "",
   message: "",
@@ -74,7 +76,7 @@ export default function CommunityInquiryForm({
       <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-400" role="status">
         <div className="flex items-start gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-          <p>Thanks. Dylan will be in touch to discuss a custom Communities plan.</p>
+          <p>Thanks. Our Team will be in touch to discuss a custom Communities plan.</p>
         </div>
       </div>
     );
@@ -115,6 +117,23 @@ export default function CommunityInquiryForm({
             onChange={(event) => updateField("email", event.target.value)}
             className="w-full px-3 py-2 bg-background-card border border-border-primary rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary/50"
             placeholder="you@company.com"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="community-inquiry-phone" className="text-sm font-medium text-text-primary block mb-1">
+            Phone number
+          </label>
+          <input
+            id="community-inquiry-phone"
+            name="phone"
+            type="tel"
+            required
+            maxLength={30}
+            autoComplete="tel"
+            value={fields.phone}
+            onChange={(event) => updateField("phone", event.target.value)}
+            className="w-full px-3 py-2 bg-background-card border border-border-primary rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary/50"
+            placeholder="(555) 123-4567"
           />
         </div>
       </div>

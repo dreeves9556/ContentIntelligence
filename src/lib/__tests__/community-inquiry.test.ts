@@ -12,6 +12,7 @@ function assert(condition: boolean, label: string): void {
 const validInquiry = {
   name: "Dylan Ballard",
   email: "prospect@example.com",
+  phone: "(555) 123-4567",
   organization: "Springfield Realty",
   estimatedMembers: "10-20",
   message: "We would like to discuss a custom plan for our team.",
@@ -40,6 +41,10 @@ assert(
 assert(
   !validateCommunityInquiry({ ...validInquiry, estimatedMembers: "" }).success,
   "Missing member estimate is rejected"
+);
+assert(
+  !validateCommunityInquiry({ ...validInquiry, phone: "123" }).success,
+  "Invalid phone number is rejected"
 );
 
 if (failures > 0) process.exitCode = 1;

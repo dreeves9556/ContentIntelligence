@@ -5,6 +5,7 @@ export const COMMUNITY_INQUIRY_RECIPIENT = "dylanballard@kw.com";
 export interface CommunityInquiry {
   name: string;
   email: string;
+  phone: string;
   organization: string;
   estimatedMembers: string;
   message: string;
@@ -38,6 +39,7 @@ export function validateCommunityInquiry(
   const body = input as Record<string, unknown>;
   const name = readString(body.name);
   const email = readString(body.email).toLowerCase();
+  const phone = readString(body.phone);
   const organization = readString(body.organization);
   const estimatedMembers = readString(body.estimatedMembers);
   const message = readString(body.message);
@@ -48,6 +50,9 @@ export function validateCommunityInquiry(
   }
   if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
     return { success: false, error: "Please enter a valid email address." };
+  }
+  if (phone.length < 7 || phone.length > 30) {
+    return { success: false, error: "Please enter a valid phone number." };
   }
   if (organization.length < 2 || organization.length > 120) {
     return { success: false, error: "Please enter your organization." };
@@ -64,7 +69,7 @@ export function validateCommunityInquiry(
 
   return {
     success: true,
-    data: { name, email, organization, estimatedMembers, message, requestId },
+    data: { name, email, phone, organization, estimatedMembers, message, requestId },
   };
 }
 
@@ -86,6 +91,7 @@ export async function sendCommunityInquiry(
           "",
           `Name: ${inquiry.name}`,
           `Email: ${inquiry.email}`,
+          `Phone: ${inquiry.phone}`,
           `Organization: ${inquiry.organization}`,
           `Estimated members: ${inquiry.estimatedMembers}`,
           "",

@@ -170,11 +170,11 @@ export function PricingSection() {
 
           {/* Communities */}
           <div className="bg-background-secondary rounded-xl border-2 border-accent-primary/30 p-6 sm:p-8 flex flex-col relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex gap-2">
-              <span className="bg-accent-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center gap-3 whitespace-nowrap">
+              <span className="shrink-0 bg-accent-primary text-white text-xs font-semibold px-4 py-2 rounded-full leading-none">
                 Custom Plans
               </span>
-              <span className="bg-background-card text-text-primary text-xs font-semibold px-3 py-1 rounded-full border border-border-primary">
+              <span className="shrink-0 bg-background-card text-text-primary text-xs font-semibold px-4 py-2 rounded-full border border-border-primary leading-none">
                 For Teams & Brokerages
               </span>
             </div>
