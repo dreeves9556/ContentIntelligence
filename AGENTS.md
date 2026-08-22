@@ -278,3 +278,27 @@ npx --yes vercel@58.7.1 redeploy <deployment-url> --target production --scope co
 ```
 
 Always use `--scope content-intelligence --project my-app`. Without the link/project flags, the CLI can inspect the separate `content-intelligence` project instead. Do not print or pull secret values. `vercel link` may update the ignored `.env.local` with a Vercel OIDC token.
+
+## Production database safety — unbaselined database
+
+Production is an existing, unbaselined Supabase PostgreSQL database. It has no reliable `_prisma_migrations` history and was historically synchronized with `prisma db push`. Production must receive only a separately reviewed, additive SQL artifact through the approved Supabase Dashboard SQL Editor workflow described in `PRODUCTION_DATABASE_RUNBOOK.md`.
+
+Before any local, agent-driven, script-driven, CI, or Prisma database command, prove that the datasource is a disposable local database or an explicitly approved staging project. Production operations follow only the separately approved Supabase Dashboard SQL Editor workflow in `PRODUCTION_DATABASE_RUNBOOK.md`. Display only sanitized hostname, database name, database user, environment/project, and PostgreSQL version. An unknown datasource is never assumed safe.
+
+Prisma command classes:
+
+- `prisma migrate dev` and `prisma migrate reset`: disposable local databases only.
+- `prisma migrate deploy` and `prisma migrate status`: baselined, migration-managed non-production databases only; never production while it is unbaselined.
+- `prisma db push`, `prisma db pull`, `prisma db execute`, `prisma db seed`, and Prisma Studio: never production; use only after explicit target proof for disposable local or approved staging databases.
+- `prisma validate`, `prisma format`, and `prisma generate`: allowed locally without production credentials, using placeholder or confirmed-safe non-production environment values; never with a production or unknown datasource.
+- Schema diff/resolve and equivalent Prisma workflows: never against production or an unknown datasource.
+
+Never run raw SQL from a local shell against production. Never create `_prisma_migrations`, mark migrations applied, edit migration history, or mix `db push` and Prisma Migrate without a baselining plan. Production credential values must never be hardcoded, committed, placed in client code, copied into local shells, Prisma processes, agents, scripts, files, chat, or logs, or printed, serialized, returned, or exposed. Approved production server runtime code may reference credentials only through provider-managed environment variables as described below.
+
+Production changes require Daniel’s explicit approval, a verified backup or restore point, sanitized target verification, read-only preflight and exact schema comparison, exact SQL review, narrowly scoped idempotent SQL, and read-only post-change/application/log verification. Preserve migration files for fresh databases and do not touch unrelated untracked diagnostic scripts or routes.
+
+For production SQL, use one explicit transaction where PostgreSQL supports it, with a short `lock_timeout` and reasonable `statement_timeout`; any error must roll back the entire artifact. Do not use destructive statements, including `DROP`, `TRUNCATE`, `DELETE`, table replacement, destructive alteration, cleanup, or migration-history manipulation. Do not use `CASCADE` by default, including `ON DELETE CASCADE`; Design Templates relationships must use `RESTRICT` or `SET NULL` unless separately reviewed and approved.
+
+The production Supabase Dashboard SQL Editor executes through `current_user = postgres`; that role is expected there and does not prove target identity. Verify the Supabase organization, project name, project reference, provider hostname, database name, and PostgreSQL version together. Production credential values may exist only in approved provider-managed encrypted secret stores such as Vercel Production environment variables. Approved production server runtime code may read `process.env.DATABASE_URL` and `process.env.SUPABASE_SERVICE_ROLE_KEY`; never hardcode, commit, place them in `NEXT_PUBLIC_*`, bundle them into client code, copy them into local agents/scripts/shells/files/chat, or print, log, serialize, return, or expose them.
+
+See `PRODUCTION_DATABASE_RUNBOOK.md` for the complete approval, target verification, backup, SQL, Storage, rollout, rollback, and incident process.
