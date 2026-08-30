@@ -1,5 +1,9 @@
 import type { QuestionnaireFormData } from "./questionnaire-actions";
 import type { TrendHeadline } from "./rss-trends";
+import {
+  getPrimaryGoalDisplayLabel,
+  isRealEstateLeadershipIndustry,
+} from "./industry-config";
 
 type ProfileSurveyRow = { surveyType: string; answersJson: unknown };
 
@@ -103,11 +107,88 @@ const LOCAL_MAYOR_LABELS: Record<string, string> = {
   topGyms: "Top 5 gyms/fitness spots (what stands out)",
 };
 
+const LEADERSHIP_SURVEY_LABEL_OVERRIDES: Record<string, Record<string, string>> = {
+  LOCAL_MAYOR: {
+    fierceDebate: "What is the most fiercely debated issue among real estate professionals in your market?",
+    underratedNeighborhood: "What part of your market offers the biggest opportunity for agents over the next five years?",
+  },
+  TRENCH_WARFARE: {
+    wildestStory: "Wildest situation handled while leading agents or running a brokerage",
+    negotiationStyle: "Leadership style in three words",
+    mostCommonDM: "Number one question agents or leaders ask",
+    trophyRoomWin: "Agent, team, recruiting, or brokerage win that once seemed impossible",
+    objectionCrusher: "Most common reason an agent hesitates to make a career or brokerage change, and the response",
+  },
+  ORIGIN_STORY: {
+    yearOneFailure: "Leadership decision, recruiting miss, or team failure that changed how they lead",
+    agentPetPeeve: "Biggest pet peeve about real estate leadership or brokerage culture",
+  },
+  CLIENT_AVATAR: {
+    favoriteClientType: "Type of agent or leader they most want to attract and develop",
+    clientBiggestFear: "Biggest fear an ideal agent has about changing brokerages or advancing their career",
+    clientRedFlag: "Red flag that tells them an agent may not be the right fit for the organization",
+    clientMisbeliefs: "What agents wrongly believe they need to do first to grow their career",
+    clientDreamOutcome: "What an ideal agent ultimately wants from their career and brokerage",
+    beforeAfterStory: "Real agent or leadership before-and-after story they are allowed to use",
+  },
+  WEEKLY_CONTEXT: {
+    professionalUpdates: "Recruiting conversations, agent coaching, training sessions, team wins, company initiatives, leadership decisions, meetings, and market changes",
+  },
+  MONTHLY_CONTEXT: {
+    businessChanges: "What is changing in the brokerage, team, or leadership role this month",
+    newGoals: "Recruiting, retention, growth, culture, or leadership priorities this month",
+  },
+  STORY_REFRESH: {
+    recentWins: "New agent success stories, recruiting wins, or leadership wins",
+    newStories: "New recruiting conversations, leadership lessons, or brokerage culture moments",
+    newObservations: "Market or industry observations shaping the leadership perspective",
+    newClientStories: "New agent, recruit, coaching, or leadership interactions worth sharing",
+    whatsChanging: "What is changing in the brokerage, team, or local real estate market right now",
+  },
+  OFFER_FUNNEL: {
+    mainOffer: "Brokerage affiliation, agent recruiting, confidential career conversations, training, coaching, development, team opportunities, leadership consulting, or speaking offer",
+    offerForWho: "People this offer is for, such as prospective recruits, current agents, team leaders, brokers, or the local community",
+    leadMagnet: "Recruiting resource, training event, coaching workshop, agent development guide, or leadership resource",
+    commonObjections: "Reasons an agent might hesitate to evaluate a brokerage, join a team, attend training, or begin coaching",
+  },
+  PROOF_BANK: {
+    bestTestimonials: "Agent wins, recruiting conversations, leadership testimonials, or culture feedback",
+    clientWins: "Agent development, production improvement, recruiting, retention, culture, or team-growth wins",
+    beforeAfterStories: "Agent, team, or culture before-and-after stories",
+    numbersAndStats: "Verified agent development, recruiting, retention, team growth, or brokerage milestones",
+    caseStudyDetails: "Verified agent, recruiting, coaching, culture, or brokerage growth story",
+  },
+  COMPLIANCE_GUARDRAILS: {
+    requiredDisclaimers: "Required brokerage or franchise disclosures, fair housing language, recruiting disclosures, and license or affiliation notices",
+    forbiddenClaims: "Unverified recruiting, employment, compensation, commission, split, income, earnings, production, or guaranteed-result claims",
+    regulatedTopics: "Fair housing, recruiting and employment-related claims, independent-contractor language, compensation or split claims, income and production claims",
+    companyRules: "Brokerage or franchise rules, approval processes, recruiting guidelines, confidentiality requirements, and license-affiliation rules",
+    approvalProcess: "Approval required for recruiting, compensation, earnings, agent-result, brokerage, or client-confidentiality content",
+    wordsToAvoidForCompliance: "Words that create risk around recruiting, employment, compensation, earnings, production, fair housing, or confidentiality",
+    sensitiveTopics: "Agent or client confidentiality, private recruiting conversations, internal disputes, protected information, or required-to-avoid topics",
+    licenseOrCredentialRules: "License and brokerage-affiliation requirements, franchise disclosures, independent-contractor language, and company approval language",
+  },
+};
+
+function getSurveyLabels(surveyType: string, industry?: string): Record<string, string> {
+  const base = surveyType === "LOCAL_MAYOR" ? LOCAL_MAYOR_LABELS : SURVEY_LABELS[surveyType] ?? {};
+  if (!isRealEstateLeadershipIndustry(industry)) return base;
+  return { ...base, ...(LEADERSHIP_SURVEY_LABEL_OVERRIDES[surveyType] ?? {}) };
+}
+
 const INDUSTRY_LABELS: Record<string, Record<string, string>> = {
   "Real Estate": {
     yearsLicensed: "Years licensed",
     niche: "Niche",
     biggestMisconception: "Biggest misconception buyers/sellers have",
+  },
+  "Real Estate Leadership": {
+    leadershipRole: "Real estate leadership role",
+    brokerageScale: "Brokerage, team, or organization context",
+    primaryLeadershipAudience: "Primary leadership audience",
+    leadershipFocus: "Leadership focus areas",
+    stillServingClients: "Still personally serving buyers and sellers",
+    leadershipMisconception: "Leadership or brokerage culture misconception",
   },
   "Fitness / Personal Training": {
     loveTrainingMost: "Who you love training most",
@@ -151,6 +232,31 @@ function buildIndustryBlock(answers: QuestionnaireFormData): string {
   }
   if (lines.length <= 1) return "";
   return `<industry_context>\n${lines.join("\n")}\n</industry_context>`;
+}
+
+export function buildRealEstateLeadershipStrategyBlock(answers: QuestionnaireFormData): string {
+  if (!isRealEstateLeadershipIndustry(answers.industry)) return "";
+
+  const leadershipAnswers = answers.industryAnswers ?? {};
+  const audience = leadershipAnswers.primaryLeadershipAudience || "Not provided";
+  const focus = leadershipAnswers.leadershipFocus || "Not provided";
+  const stillServing = leadershipAnswers.stillServingClients || "Not provided";
+
+  return `<industry_content_strategy>
+The creator is a Real Estate Leadership professional. Treat them primarily as a brokerage owner, operator, recruiter, coach, mentor, or team and regional leader, not as an ordinary buyer- or seller-facing agent. Prioritize leadership, agent development, recruiting, retention, culture, brokerage growth, sales systems, operations, technology, and the leader's perspective on market change.
+
+PERSONAL bucket: center the leader's personal journey, leadership lessons and failures, values, convictions, the human side of running a brokerage, why they chose leadership, and permitted family, routines, hobbies, and life-outside-work details. Use personal stories that help agents trust and relate to them.
+EXPERT bucket: center recruiting and retention, coaching and training, agent development, brokerage culture, leadership decisions, accountability, systems, operations, technology, industry opinions, myth-busting, team building, future leaders, and market changes from a brokerage leader's perspective.
+LOCAL bucket: center local opportunities for agents, community involvement, local organizations and businesses, why this market is a strong place to build a real estate career, the brokerage's local presence and service, community leadership, and supported local housing or economic changes.
+
+PRIMARY LEADERSHIP AUDIENCE: ${audience}
+LEADERSHIP FOCUS: ${focus}
+STILL SERVING BUYERS AND SELLERS: ${stillServing}
+
+Use the primary leadership audience to decide who each post addresses. Do not treat every agent as a recruit and do not make every post a recruiting pitch. If the audience includes buyers and sellers and the creator still serves consumers, create a deliberate mixed strategy. Otherwise, do not default to homebuyer or seller tips, listing promotions, showing stories, or buy-or-sell calls to action. Use consumer content only when the audience, still-serving answer, offer, and supplied context support it.
+
+Natural conversation directions may include confidential career conversations, brokerage evaluation, agent training, coaching resources, practical leadership, and asking whether agents are getting the support they need. Follow the creator's preferred CTA, offer, voice, feedback, freshness context, Brand Brain, anti-brand words, and compliance guardrails. Never invent agents, testimonials, conversations, brokerage statistics, production results, recruiting outcomes, retention numbers, or success stories.
+</industry_content_strategy>`;
 }
 
 function buildVoiceBlock(answers: QuestionnaireFormData): string {
@@ -243,12 +349,12 @@ function buildContentPreferencesBlock(answers: QuestionnaireFormData): string {
   return `<content_preferences>\n${parts.join("\n")}\n</content_preferences>`;
 }
 
-function buildLocalMayorBlock(profileSurveys: ProfileSurveyRow[]): string {
+function buildLocalMayorBlock(profileSurveys: ProfileSurveyRow[], industry?: string): string {
   const survey = profileSurveys.find((s) => s.surveyType === "LOCAL_MAYOR");
   if (!survey) return "";
   const answers = (survey.answersJson ?? {}) as Record<string, string>;
   const parts: string[] = [];
-  for (const [key, label] of Object.entries(LOCAL_MAYOR_LABELS)) {
+  for (const [key, label] of Object.entries(getSurveyLabels("LOCAL_MAYOR", industry))) {
     if (hasText(answers[key])) {
       parts.push(`- ${label}: ${answers[key]}`);
     }
@@ -257,7 +363,7 @@ function buildLocalMayorBlock(profileSurveys: ProfileSurveyRow[]): string {
   return `<local_mayor>\nThis is the user's hyper-local knowledge. Use these specific spots, opinions, and neighbourhood insights to make "Local" bucket content feel authentic and specific, not generic. Reference real business names and details.\n${parts.join("\n")}\n</local_mayor>`;
 }
 
-function buildOfferFunnelBlock(profileSurveys: ProfileSurveyRow[]): string {
+function buildOfferFunnelBlock(profileSurveys: ProfileSurveyRow[], industry?: string): string {
   const survey = profileSurveys.find((s) => s.surveyType === "OFFER_FUNNEL");
   if (!survey) return "";
   const answers = (survey.answersJson ?? {}) as Record<string, string>;
@@ -275,8 +381,9 @@ function buildOfferFunnelBlock(profileSurveys: ProfileSurveyRow[]): string {
     proofPoints: "Supporting proof",
     doNotPromise: "Do NOT promise (hard guardrail)",
   };
+  const resolvedLabels = { ...labels, ...getSurveyLabels("OFFER_FUNNEL", industry) };
   const lines: string[] = [];
-  for (const [key, label] of Object.entries(labels)) {
+  for (const [key, label] of Object.entries(resolvedLabels)) {
     if (hasText(answers[key])) {
       lines.push(`- ${label}: ${answers[key]}`);
     }
@@ -285,7 +392,7 @@ function buildOfferFunnelBlock(profileSurveys: ProfileSurveyRow[]): string {
   return `<offer_funnel>\nWhat the creator is selling and how content should move people toward action. Use this strategically — not every post needs a CTA. Personal bucket content stays personal. Expert and Local bucket content can weave in offers, CTAs, objections, and lead magnets where natural. The "Do NOT promise" field is a hard guardrail — never violate it.\n${lines.join("\n")}\n</offer_funnel>`;
 }
 
-function buildProofBankBlock(profileSurveys: ProfileSurveyRow[]): string {
+function buildProofBankBlock(profileSurveys: ProfileSurveyRow[], industry?: string): string {
   const survey = profileSurveys.find((s) => s.surveyType === "PROOF_BANK");
   if (!survey) return "";
   const answers = (survey.answersJson ?? {}) as Record<string, string>;
@@ -298,8 +405,9 @@ function buildProofBankBlock(profileSurveys: ProfileSurveyRow[]): string {
     permissionLevel: "Permission level",
     proofBoundaries: "Proof boundaries (hard guardrail)",
   };
+  const resolvedLabels = { ...labels, ...getSurveyLabels("PROOF_BANK", industry) };
   const lines: string[] = [];
-  for (const [key, label] of Object.entries(labels)) {
+  for (const [key, label] of Object.entries(resolvedLabels)) {
     if (hasText(answers[key])) {
       lines.push(`- ${label}: ${answers[key]}`);
     }
@@ -308,7 +416,7 @@ function buildProofBankBlock(profileSurveys: ProfileSurveyRow[]): string {
   return `<proof_bank>\nReal proof the creator has approved for use in content. Use these to make hooks and bodies feel earned and specific. NEVER fabricate testimonials, results, or case studies — only use what's listed here. Respect the permission level: if "Anonymized", remove names and identifying details; if "Inspiration only", do not quote directly; if "Private", do not use in generated content at all. The "Proof boundaries" field is a hard guardrail — never share what's listed there.\n${lines.join("\n")}\n</proof_bank>`;
 }
 
-function buildComplianceGuardrailsBlock(profileSurveys: ProfileSurveyRow[]): string {
+function buildComplianceGuardrailsBlock(profileSurveys: ProfileSurveyRow[], industry?: string): string {
   const survey = profileSurveys.find((s) => s.surveyType === "COMPLIANCE_GUARDRAILS");
   if (!survey) return "";
   const answers = (survey.answersJson ?? {}) as Record<string, string>;
@@ -322,8 +430,9 @@ function buildComplianceGuardrailsBlock(profileSurveys: ProfileSurveyRow[]): str
     sensitiveTopics: "Sensitive topics",
     licenseOrCredentialRules: "License / credential rules",
   };
+  const resolvedLabels = { ...labels, ...getSurveyLabels("COMPLIANCE_GUARDRAILS", industry) };
   const lines: string[] = [];
-  for (const [key, label] of Object.entries(labels)) {
+  for (const [key, label] of Object.entries(resolvedLabels)) {
     if (hasText(answers[key])) {
       lines.push(`- ${label}: ${answers[key]}`);
     }
@@ -332,16 +441,16 @@ function buildComplianceGuardrailsBlock(profileSurveys: ProfileSurveyRow[]): str
   return `<compliance_guardrails>\nHARD GUARDRAILS — these rules override Offer, Proof, and all other context blocks. If any conflict arises, always choose the safer, more compliant angle. Never invent legal, financial, medical, or compliance advice. If a topic is regulated or requires a disclaimer, include the specified disclaimer. If content needs approval before posting, note that in the output. Never make forbidden claims or use forbidden words. When in doubt, soften or omit.\n${lines.join("\n")}\n</compliance_guardrails>`;
 }
 
-function buildDeepDiveSurveysBlock(profileSurveys: ProfileSurveyRow[]): string {
+function buildDeepDiveSurveysBlock(profileSurveys: ProfileSurveyRow[], industry?: string): string {
   const blocks: string[] = [];
   for (const survey of profileSurveys) {
     if (survey.surveyType === "LOCAL_MAYOR") continue;
     if (survey.surveyType === "OFFER_FUNNEL") continue;
     if (survey.surveyType === "PROOF_BANK") continue;
     if (survey.surveyType === "COMPLIANCE_GUARDRAILS") continue;
-    const labels = SURVEY_LABELS[survey.surveyType];
+    const labels = getSurveyLabels(survey.surveyType, industry);
     const tag = SURVEY_XML_TAG[survey.surveyType];
-    if (!labels || !tag) continue;
+    if (Object.keys(labels).length === 0 || !tag) continue;
     const answers = (survey.answersJson ?? {}) as Record<string, string>;
     const lines: string[] = [];
     for (const [key, label] of Object.entries(labels)) {
@@ -394,7 +503,8 @@ function buildSeasonalContextBlock(answers: QuestionnaireFormData): string {
 function buildGoalAndGuardrailBlocks(answers: QuestionnaireFormData): string {
   const parts: string[] = [];
   if (hasText(answers.primaryGoal)) {
-    parts.push(`<primary_goal>\nThe user's primary marketing goal this month is: "${answers.primaryGoal}". Every piece of content, especially the CTA, should ladder up to this goal.\n</primary_goal>`);
+    const goalLabel = getPrimaryGoalDisplayLabel(answers.industry, answers.primaryGoal);
+    parts.push(`<primary_goal>\nThe user's primary marketing goal this month is: "${goalLabel}". Every piece of content, especially the CTA, should ladder up to this goal.\n</primary_goal>`);
   }
   if (hasText(answers.antiBrandWords)) {
     parts.push(`<vocabulary_guardrails>\nThe user has explicitly banned these words and phrases from ALL content. Do NOT use them anywhere (hook, body, cta, caption, directions): ${answers.antiBrandWords}\n</vocabulary_guardrails>`);
@@ -425,6 +535,9 @@ export function buildUserProfileXml(ctx: PromptContext): string {
   const industryBlock = buildIndustryBlock(answers);
   if (industryBlock) blocks.push(industryBlock);
 
+  const industryStrategy = buildRealEstateLeadershipStrategyBlock(answers);
+  if (industryStrategy) blocks.push(industryStrategy);
+
   const story = hasText(answers.personalStory)
     ? `<personal_story>\n${answers.personalStory}\n</personal_story>`
     : "";
@@ -454,7 +567,7 @@ export function buildUserProfileXml(ctx: PromptContext): string {
   const boundaries = buildBoundariesBlock(answers);
   if (boundaries) blocks.push(boundaries);
 
-  const complianceGuardrails = buildComplianceGuardrailsBlock(profileSurveys);
+  const complianceGuardrails = buildComplianceGuardrailsBlock(profileSurveys, answers.industry);
   if (complianceGuardrails) blocks.push(complianceGuardrails);
 
   const personal = buildPersonalContextBlock(answers);
@@ -463,16 +576,16 @@ export function buildUserProfileXml(ctx: PromptContext): string {
   const formatting = buildFormattingBlock(answers);
   if (formatting) blocks.push(formatting);
 
-  const localMayor = buildLocalMayorBlock(profileSurveys);
+  const localMayor = buildLocalMayorBlock(profileSurveys, answers.industry);
   if (localMayor) blocks.push(localMayor);
 
-  const offerFunnel = buildOfferFunnelBlock(profileSurveys);
+  const offerFunnel = buildOfferFunnelBlock(profileSurveys, answers.industry);
   if (offerFunnel) blocks.push(offerFunnel);
 
-  const proofBank = buildProofBankBlock(profileSurveys);
+  const proofBank = buildProofBankBlock(profileSurveys, answers.industry);
   if (proofBank) blocks.push(proofBank);
 
-  const deepDives = buildDeepDiveSurveysBlock(profileSurveys);
+  const deepDives = buildDeepDiveSurveysBlock(profileSurveys, answers.industry);
   if (deepDives) blocks.push(deepDives);
 
   return blocks.join("\n\n");
@@ -510,6 +623,7 @@ BUCKET DEFINITIONS: read these carefully:
 - "Personal" = genuine off-duty human content. Hobbies, passions, family moments, opinions on life, things they geek out about, who they are when they're NOT working. Do NOT tie Personal posts back to their business or add a work lesson at the end. The post should feel like it could exist even if they had a completely different career.
 - "Expert" = professional knowledge, hard-won lessons, industry insights, tips, myth-busting, client stories. Their work expertise front and centre. Even Expert posts should feel like they're coming from a real human with personality, not a corporate newsletter.
 - "Local" = hyper-local content about their city, community, favourite spots, local events, neighbourhood energy. Builds a sense of place and belonging.
+- If the profile includes <industry_content_strategy> for Real Estate Leadership, follow that block's audience and content-mix rules. Treat the creator as a leader, operator, recruiter, coach, or mentor. Do not default to consumer transaction content or make every post a recruiting pitch. Compliance, user-supplied boundaries, offers, proof, and preferred CTAs remain higher priority than generic examples.
 
 Content field definitions (what goes where depends on the format):
 - "hook": the opening line. For Reels: the first line spoken on camera. For Carousels: the headline on the cover slide. For Static: the headline baked onto the image (short, punchy, 1 line). This should be copy-pasteable spoken or on-image text.
@@ -612,7 +726,7 @@ WEEK-OVER-WEEK VARIETY: critical for long-term freshness:
 
 export const CALENDAR_STRATEGY_SYSTEM_PROMPT = `You are an elite personal brand content strategist. Write concise "AI Strategy Notes" (2-3 sentences max) for a creator's upcoming content calendar. It should read like a weekly strategy brief.
 
-The note should explain the balance of content "buckets" for the week: local community content (builds belonging around their city), expert authority (showcases professional expertise), and personal storytelling (human/off-duty moments). Naturally weave in the buckets, format mix, and timing insight.
+The note should explain the balance of content "buckets" for the week: local community content (builds belonging around their city), expert authority (showcases professional expertise), and personal storytelling (human/off-duty moments). Naturally weave in the buckets, format mix, and timing insight. If the profile includes <industry_content_strategy> for Real Estate Leadership, describe the week through leadership, agent development, recruiting, culture, brokerage operations, and the audience selected by the creator. Do not assume every agent is a recruit or every post is a recruiting pitch.
 
 HUMAN WRITING RULES: CRITICAL:
 - Never use em dashes (—) or en dashes (–). Use commas, periods, or parentheses instead.

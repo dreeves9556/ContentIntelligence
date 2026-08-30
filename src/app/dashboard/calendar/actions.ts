@@ -69,6 +69,7 @@ import {
   type CalendarClaimExistingRow,
 } from "@/lib/calendar-claim-service";
 import { replacePromptPlaceholders, replaceStrategySystemPlaceholders, type PromptPlaceholderContext } from "@/lib/prompt-placeholders";
+import { getPrimaryGoalDisplayLabel } from "@/lib/industry-config";
 
 export type ContentFormat = "Reel" | "Carousel" | "Static";
 export type ContentBucket = "Personal" | "Expert" | "Local";
@@ -223,6 +224,13 @@ export async function generateCalendarStrategy(
   });
 
   const answers = (questionnaire?.content ?? {}) as unknown as QuestionnaireFormData;
+  const allProfileSurveys = await prisma.profileSurvey.findMany({
+    where: { userId },
+    select: { surveyType: true, answersJson: true, updatedAt: true },
+  });
+  const profileSurveys = allProfileSurveys.filter(
+    (survey) => !isContextSurveyExpired(survey.surveyType, survey.updatedAt),
+  );
 
   const config = existingConfig ?? await getPlatformConfig();
   const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
@@ -248,7 +256,7 @@ export async function generateCalendarStrategy(
 
   const userProfileXml = buildUserProfileXml({
     answers,
-    profileSurveys: [],
+    profileSurveys,
   });
 
   const defaultUserPrompt = `<calendar_data>
@@ -279,7 +287,8 @@ Write the strategy note now.`;
   //   useful strategy note.
   const formatMixStr = Object.entries(formatCounts).map(([fmt, count]) => `- ${fmt}: ${count}`).join("\n");
   const bucketMixStr = Object.entries(bucketCounts).map(([bucket, count]) => `- ${bucket}: ${count}`).join("\n");
-  const primaryGoal = (answers.primaryGoal ?? "").trim() || "Not specified";
+  const primaryGoal =
+    getPrimaryGoalDisplayLabel(answers.industry, (answers.primaryGoal ?? "").trim()) || "Not specified";
   const antiBrandWords = (answers.antiBrandWords ?? "").trim() || "None specified";
 
   const systemPrompt = replaceStrategySystemPlaceholders(

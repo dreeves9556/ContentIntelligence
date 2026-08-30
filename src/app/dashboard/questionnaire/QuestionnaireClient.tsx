@@ -31,6 +31,11 @@ import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import type { MemoryType } from "@prisma/client";
 import type { CreatorMemoryData } from "@/lib/memory/memory-types";
+import {
+  INDUSTRY_FIELD_OVERRIDES,
+  INDUSTRY_SUBTITLE_OVERRIDES,
+  INDUSTRY_TITLE_OVERRIDES,
+} from "@/lib/industry-config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,181 +73,10 @@ interface SurveyDef {
   disclaimer?: string;
 }
 
-const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
-  LOCAL_MAYOR: {
-    "Real Estate": "Hyper-local knowledge that sets you apart from every out-of-town agent.",
-    "Car Sales": "Hyper-local knowledge that sets you apart from every out-of-town dealer.",
-    "Fitness / Personal Training": "Hyper-local knowledge that sets you apart from every out-of-town trainer.",
-    "Financial Services": "Hyper-local knowledge that sets you apart from every out-of-town advisor.",
-    "Coaching / Consulting": "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
-    Other: "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
-  },
-  TRENCH_WARFARE: {
-    "Real Estate": "Battle-tested wisdom from the deals only real agents survive.",
-    "Car Sales": "Battle-tested wisdom from the deals only real car salesmen survive.",
-    "Fitness / Personal Training": "Battle-tested wisdom from the trenches only real trainers survive.",
-    "Financial Services": "Battle-tested wisdom from the trenches only real advisors survive.",
-    "Coaching / Consulting": "Battle-tested wisdom from the trenches only real practitioners survive.",
-    Other: "Battle-tested wisdom from the trenches only real pros survive.",
-  },
-  OFFER_FUNNEL: {
-    "Real Estate": "Tell the AI what you're selling — listings, consultations, buyer services — and how content should drive leads.",
-    "Car Sales": "Tell the AI what you're selling — vehicles, financing, trade-ins — and how content should drive floor traffic.",
-    "Fitness / Personal Training": "Tell the AI what you're selling — programs, coaching, memberships — and how content should drive signups.",
-    "Financial Services": "Tell the AI what you're offering — reviews, planning, consultations — and how content should drive appointments.",
-    "Coaching / Consulting": "Tell the AI what you're selling — coaching, programs, courses — and how content should drive leads.",
-    Other: "Tell the AI what you are selling, who it is for, and how content should move people toward action.",
-  },
-  PROOF_BANK: {
-    "Real Estate": "Give the AI real wins, testimonials, and deal results it can use to build trust.",
-    "Car Sales": "Give the AI real wins, testimonials, and sales results it can use to build trust.",
-    "Fitness / Personal Training": "Give the AI real transformations, testimonials, and client wins it can use to build trust.",
-    "Financial Services": "Give the AI real outcomes, testimonials, and client results it can use to build trust.",
-    "Coaching / Consulting": "Give the AI real breakthroughs, testimonials, and client wins it can use to build trust.",
-    Other: "Give the AI real proof it can use to make your content more specific and credible.",
-  },
-  COMPLIANCE_GUARDRAILS: {
-    "Real Estate": "Fair housing, brokerage rules, license disclosure — set the guardrails the AI must follow.",
-    "Car Sales": "Financing claims, approval claims, dealership rules — set the guardrails the AI must follow.",
-    "Fitness / Personal Training": "Medical claims, injury claims, supplement rules — set the guardrails the AI must follow.",
-    "Financial Services": "Investment claims, compliance rules, fiduciary language — set the guardrails the AI must follow.",
-    "Coaching / Consulting": "Income claims, guaranteed results, testimonial rules — set the guardrails the AI must follow.",
-    Other: "Set the rules for what the AI should avoid, soften, disclose, or never claim.",
-  },
-};
-
-const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { label?: string; placeholder?: string }>>> = {
-  TRENCH_WARFARE: {
-    "Real Estate": {
-      wildestStory: { label: "Wildest thing you've seen at an inspection or closing?" },
-      negotiationStyle: { label: "Your negotiation style in 3 words?" },
-      trophyRoomWin: { placeholder: "The deal everyone said couldn't be done..." },
-    },
-    "Car Sales": {
-      wildestStory: { label: "Wildest thing you've seen on the lot or in the finance office?" },
-      negotiationStyle: { label: "Your closing style in 3 words?" },
-      trophyRoomWin: { placeholder: "The deal everyone said couldn't be done..." },
-    },
-    "Fitness / Personal Training": {
-      wildestStory: { label: "Wildest thing you've seen in a gym or training session?" },
-      negotiationStyle: { label: "Your sales or closing style in 3 words?" },
-      trophyRoomWin: { placeholder: "The client transformation everyone said was impossible..." },
-    },
-    "Financial Services": {
-      wildestStory: { label: "Wildest thing you've seen in a client's portfolio or tax audit?" },
-      negotiationStyle: { label: "Your negotiation style in 3 words?" },
-      trophyRoomWin: { placeholder: "The outcome everyone said couldn't be done..." },
-    },
-    "Coaching / Consulting": {
-      wildestStory: { label: "Wildest thing you've uncovered during a client discovery call?" },
-      negotiationStyle: { label: "Your sales or closing style in 3 words?" },
-      trophyRoomWin: { placeholder: "The breakthrough everyone said was impossible..." },
-    },
-    Other: {
-      wildestStory: { label: "Wildest thing you've uncovered during a client engagement?" },
-    },
-  },
-  ORIGIN_STORY: {
-    "Real Estate": {
-      agentPetPeeve: { label: "Your biggest pet peeve about other agents?" },
-      yearOneFailure: { placeholder: "The deal that fell apart, the client you lost, and what changed after..." },
-    },
-    "Car Sales": {
-      agentPetPeeve: { label: "Your biggest pet peeve about other car salesmen?" },
-      yearOneFailure: { placeholder: "The deal that fell through, the customer you lost, and what changed after..." },
-    },
-    "Fitness / Personal Training": {
-      agentPetPeeve: { label: "Your biggest pet peeve about other trainers or influencers?" },
-      yearOneFailure: { placeholder: "The client you couldn't help, the program that failed, and what changed after..." },
-    },
-    "Financial Services": {
-      agentPetPeeve: { label: "Your biggest pet peeve about other advisors?" },
-      yearOneFailure: { placeholder: "The client you lost, the portfolio that blew up, and what changed after..." },
-    },
-    "Coaching / Consulting": {
-      agentPetPeeve: { label: "Your biggest pet peeve about others in your industry?" },
-      yearOneFailure: { placeholder: "The engagement that failed, the breakthrough that didn't happen, and what changed after..." },
-    },
-    Other: {
-      agentPetPeeve: { label: "Your biggest pet peeve about others in your industry?" },
-    },
-  },
-  CLIENT_AVATAR: {
-    "Real Estate": {
-      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing..." },
-    },
-    "Car Sales": {
-      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing on the dotted line..." },
-    },
-    "Fitness / Personal Training": {
-      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before committing to a program..." },
-    },
-    "Financial Services": {
-      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before trusting you with their money..." },
-    },
-    "Coaching / Consulting": {
-      clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing up to work with you..." },
-    },
-  },
-  WEEKLY_CONTEXT: {
-    "Real Estate": {
-      professionalUpdates: { placeholder: "Deals in motion, client meetings, showings, deadlines..." },
-    },
-    "Car Sales": {
-      professionalUpdates: { placeholder: "Deals in motion, test drives, deliveries, month-end push, deadlines..." },
-    },
-    "Fitness / Personal Training": {
-      professionalUpdates: { placeholder: "Clients in progress, training sessions, program launches, deadlines..." },
-    },
-    "Financial Services": {
-      professionalUpdates: { placeholder: "Clients in motion, portfolio reviews, meetings, deadlines..." },
-    },
-    "Coaching / Consulting": {
-      professionalUpdates: { placeholder: "Client engagements in motion, sessions, projects, launches, deadlines..." },
-    },
-  },
-  COMPLIANCE_GUARDRAILS: {
-    "Real Estate": {
-      requiredDisclaimers: { placeholder: "Equal Housing Opportunity, fair housing disclaimers, brokerage disclosures..." },
-      forbiddenClaims: { placeholder: "Guaranteed appreciation, guaranteed sale, best rate, risk-free investment..." },
-      regulatedTopics: { placeholder: "Market predictions, lending/mortgage claims, protected-class language, fair housing..." },
-      companyRules: { placeholder: "Brokerage rules, team rules, MLS guidelines, commission disclosures..." },
-      licenseOrCredentialRules: { placeholder: "How your license, brokerage affiliation, or designations should be mentioned..." },
-    },
-    "Car Sales": {
-      requiredDisclaimers: { placeholder: "Price/payment disclaimers, availability disclaimers, financing subject to approval..." },
-      forbiddenClaims: { placeholder: "Guaranteed approval, guaranteed financing, lowest price, risk-free, no credit check guaranteed..." },
-      regulatedTopics: { placeholder: "Financing claims, approval claims, trade-in estimates, warranty claims, pricing..." },
-      companyRules: { placeholder: "Dealership rules, manufacturer guidelines, advertising standards, compliance review..." },
-      licenseOrCredentialRules: { placeholder: "How your dealership affiliation, sales license, or certifications should be mentioned..." },
-    },
-    "Fitness / Personal Training": {
-      requiredDisclaimers: { placeholder: "Results not guaranteed, consult your doctor before starting, not medical advice..." },
-      forbiddenClaims: { placeholder: "Guaranteed weight loss, guaranteed results, cure or treat any condition, spot reduction..." },
-      regulatedTopics: { placeholder: "Medical claims, injury claims, supplement claims, diagnosis language..." },
-      companyRules: { placeholder: "Gym/studio rules, brand guidelines, certification requirements, insurance..." },
-      licenseOrCredentialRules: { placeholder: "How your certifications, training credentials, or affiliations should be mentioned..." },
-    },
-    "Financial Services": {
-      requiredDisclaimers: { placeholder: "Not financial advice, past performance not indicative of future results, consult your advisor..." },
-      forbiddenClaims: { placeholder: "Guaranteed returns, risk-free, guaranteed growth, best investment, tax savings guaranteed..." },
-      regulatedTopics: { placeholder: "Investment advice, tax claims, risk disclosures, fiduciary language, specific recommendations..." },
-      companyRules: { placeholder: "Firm/broker-dealer rules, compliance review, SEC/FINRA guidelines, advertising standards..." },
-      licenseOrCredentialRules: { placeholder: "How your licenses, registrations, designations, or firm affiliation should be mentioned..." },
-    },
-    "Coaching / Consulting": {
-      requiredDisclaimers: { placeholder: "Results not guaranteed, income claims disclaimers, not financial/medical/legal advice..." },
-      forbiddenClaims: { placeholder: "Guaranteed income, guaranteed results, specific earnings claims, cure or treat..." },
-      regulatedTopics: { placeholder: "Income claims, client confidentiality, case-study permissions, testimonial rules..." },
-      companyRules: { placeholder: "Company/brand rules, client confidentiality, NDA restrictions, advertising standards..." },
-      licenseOrCredentialRules: { placeholder: "How your credentials, certifications, or professional affiliations should be mentioned..." },
-    },
-    Other: {
-      regulatedTopics: { placeholder: "Topics that require review or careful wording in your industry..." },
-      forbiddenClaims: { placeholder: "Claims that create legal, regulatory, or brand risk..." },
-    },
-  },
-};
+function resolveTitle(surveyType: string, defaultTitle: string, industry?: string): string {
+  if (!industry) return defaultTitle;
+  return INDUSTRY_TITLE_OVERRIDES[surveyType]?.[industry] ?? defaultTitle;
+}
 
 function resolveSubtitle(surveyType: string, defaultSubtitle: string, industry?: string): string {
   if (!industry) return defaultSubtitle;
@@ -950,7 +784,7 @@ export default function QuestionnaireClient({
         <AccordionRow
           key={survey.type}
           icon={survey.icon}
-          title={survey.title}
+          title={resolveTitle(survey.type, survey.title, industry)}
           subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
           color={survey.color}
           isCompleted={!!existing}
@@ -972,7 +806,7 @@ export default function QuestionnaireClient({
           key={survey.type}
           id={survey.type === "WEEKLY_CONTEXT" ? "weekly-context" : undefined}
           icon={survey.icon}
-          title={survey.title}
+          title={resolveTitle(survey.type, survey.title, industry)}
           subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
           color={survey.color}
           isCompleted={isCurrent}
@@ -1118,7 +952,7 @@ export default function QuestionnaireClient({
             <AccordionRow
               key={survey.type}
               icon={survey.icon}
-              title={survey.title}
+              title={resolveTitle(survey.type, survey.title, industry)}
               subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
               color={survey.color}
               isCompleted={!!existing}
@@ -1149,7 +983,7 @@ export default function QuestionnaireClient({
               key={survey.type}
               id={survey.type === "WEEKLY_CONTEXT" ? "weekly-context" : undefined}
               icon={survey.icon}
-              title={survey.title}
+              title={resolveTitle(survey.type, survey.title, industry)}
               subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
               color={survey.color}
               isCompleted={isCurrent}

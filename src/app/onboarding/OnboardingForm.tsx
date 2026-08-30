@@ -5,17 +5,16 @@ import { useRouter } from "next/navigation";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import { RotatingTagline } from "@/components/RotatingTagline";
 import { PushNotificationManager } from "@/components/PushNotificationManager";
+import {
+  INDUSTRY_HELPER_TEXT,
+  INDUSTRY_OPTIONS,
+  INDUSTRY_QUESTIONS,
+  REAL_ESTATE_LEADERSHIP_INDUSTRY,
+  parseIndustryMultiSelect,
+  serializeIndustryMultiSelect,
+} from "@/lib/industry-config";
 
 const SECTIONS = ["Who You Are", "Your Story", "Industry Deep-Dive", "Content Preferences", "Push Notifications"];
-
-const INDUSTRY_OPTIONS = [
-  "Real Estate",
-  "Car Sales",
-  "Fitness / Personal Training",
-  "Financial Services",
-  "Coaching / Consulting",
-  "Other",
-];
 
 const BRAND_TYPE_OPTIONS = ["Personal Brand", "Business Brand", "Both"];
 
@@ -72,51 +71,6 @@ const STORYTELLING_OPTIONS = [
   "Myth-busting",
   "Question-driven",
 ];
-
-const INDUSTRY_QUESTIONS: Record<string, { key: string; label: string; placeholder?: string }[]> = {
-  "Real Estate": [
-    { key: "yearsLicensed", label: "How long have you been licensed?", placeholder: "e.g. 7 years" },
-    { key: "niche", label: "What is your niche?", placeholder: "e.g. Luxury condos, first-time buyers..." },
-    {
-      key: "biggestMisconception",
-      label: "Biggest misconception buyers/sellers have?",
-      placeholder: "What do clients get wrong most often?",
-    },
-  ],
-  "Fitness / Personal Training": [
-    { key: "loveTrainingMost", label: "Who do you love training most?", placeholder: "Describe your ideal training client..." },
-    {
-      key: "biggestFitnessLie",
-      label: "Biggest lie people believe about fitness?",
-      placeholder: "What myth drives you crazy?",
-    },
-  ],
-  "Financial Services": [
-    { key: "specialization", label: "What is your financial specialization?", placeholder: "e.g. Retirement planning, tax strategy..." },
-    { key: "clientFear", label: "What is your clients' biggest financial fear?", placeholder: "What keeps them up at night?" },
-  ],
-  "Car Sales": [
-    { key: "yearsInCarSales", label: "How long have you been selling cars?", placeholder: "e.g. 6 years" },
-    { key: "dealershipNiche", label: "What do you sell?", placeholder: "e.g. New Toyota, used luxury, lease returns, fleet..." },
-    {
-      key: "biggestBuyerMisconception",
-      label: "Biggest misconception car buyers have?",
-      placeholder: "What do customers get wrong most often?",
-    },
-    {
-      key: "carBrands",
-      label: "Which car brands do you focus on? (optional)",
-      placeholder: "e.g. Toyota, Honda, BMW, Ford...",
-    },
-  ],
-  "Coaching / Consulting": [
-    { key: "transformationDelivered", label: "What transformation do you deliver?", placeholder: "Before → after for your clients..." },
-    { key: "methodologyName", label: "Do you have a named methodology or framework?", placeholder: "e.g. The 3-Phase System..." },
-  ],
-  Other: [
-    { key: "uniqueValue", label: "What makes your business uniquely valuable?", placeholder: "Your differentiator..." },
-  ],
-};
 
 function ProgressBar({ current, total }: { current: number; total: number }) {
   const pct = Math.round(((current + 1) / total) * 100);
@@ -199,6 +153,7 @@ function MultiSelect({
         <button
           key={opt}
           type="button"
+          aria-pressed={selected.includes(opt)}
           onClick={() => toggle(opt)}
           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
             selected.includes(opt)
@@ -228,6 +183,7 @@ function RadioGroup({
         <button
           key={opt}
           type="button"
+          aria-pressed={value === opt}
           onClick={() => onChange(opt)}
           className={`px-5 py-2.5 rounded-lg text-sm font-medium border transition-all ${
             value === opt
@@ -437,6 +393,9 @@ export default function OnboardingForm() {
                     </option>
                   ))}
                 </select>
+                {INDUSTRY_HELPER_TEXT[formData.industry] && (
+                  <p className="mt-2 text-xs text-text-muted">{INDUSTRY_HELPER_TEXT[formData.industry]}</p>
+                )}
               </div>
               <div>
                 <FieldLabel>Brand Type</FieldLabel>
@@ -486,18 +445,46 @@ export default function OnboardingForm() {
               </div>
             ) : (
               <div className="space-y-5">
-                {questions.map((q) => (
-                  <div key={q.key}>
-                    <FieldLabel>{q.label}</FieldLabel>
-                    <TextareaWithCounter
-                      rows={3}
-                      placeholder={q.placeholder}
-                      value={formData.industryAnswers[q.key] ?? ""}
-                      onChange={(v) => setIndustryAnswer(q.key, v)}
-                      max={2000}
-                    />
-                  </div>
-                ))}
+                {questions.map((q) => {
+                  const answer = formData.industryAnswers[q.key] ?? "";
+                  if (q.kind === "multi") {
+                    return (
+                      <div key={q.key}>
+                        <FieldLabel>{q.label}</FieldLabel>
+                        <p className="text-xs text-text-muted mb-3">Select all that apply</p>
+                        <MultiSelect
+                          options={[...(q.options ?? [])]}
+                          selected={parseIndustryMultiSelect(answer)}
+                          onChange={(values) => setIndustryAnswer(q.key, serializeIndustryMultiSelect(values))}
+                        />
+                      </div>
+                    );
+                  }
+                  if (q.kind === "single") {
+                    return (
+                      <div key={q.key}>
+                        <FieldLabel>{q.label}</FieldLabel>
+                        <RadioGroup
+                          options={[...(q.options ?? [])]}
+                          value={answer}
+                          onChange={(value) => setIndustryAnswer(q.key, value)}
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={q.key}>
+                      <FieldLabel>{q.label}</FieldLabel>
+                      <TextareaWithCounter
+                        rows={3}
+                        placeholder={q.placeholder}
+                        value={answer}
+                        onChange={(value) => setIndustryAnswer(q.key, value)}
+                        max={2000}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
@@ -545,7 +532,11 @@ export default function OnboardingForm() {
                   <option value="Brand Awareness">Brand Awareness</option>
                   <option value="Lead Generation">Lead Generation</option>
                   <option value="Event/Webinar Signups">Event / Webinar Signups</option>
-                  <option value="Recruitment/Partnerships">Recruitment / Partnerships</option>
+                  <option value="Recruitment/Partnerships">
+                    {formData.industry === REAL_ESTATE_LEADERSHIP_INDUSTRY
+                      ? "Agent Recruitment & Retention"
+                      : "Recruitment / Partnerships"}
+                  </option>
                   <option value="Education/Authority">Education / Authority</option>
                 </select>
               </div>
