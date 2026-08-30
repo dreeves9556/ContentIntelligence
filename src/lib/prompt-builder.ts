@@ -109,8 +109,8 @@ const LOCAL_MAYOR_LABELS: Record<string, string> = {
 
 const LEADERSHIP_SURVEY_LABEL_OVERRIDES: Record<string, Record<string, string>> = {
   LOCAL_MAYOR: {
-    fierceDebate: "Most fiercely debated issue among real estate professionals in the market",
-    underratedNeighborhood: "Part of the market with the biggest opportunity for agents over the next five years",
+    fierceDebate: "What is the most fiercely debated issue among real estate professionals in your market?",
+    underratedNeighborhood: "What part of your market offers the biggest opportunity for agents over the next five years?",
   },
   TRENCH_WARFARE: {
     wildestStory: "Wildest situation handled while leading agents or running a brokerage",

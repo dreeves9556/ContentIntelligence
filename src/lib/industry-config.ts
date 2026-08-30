@@ -176,6 +176,10 @@ export const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>>
     "Coaching / Consulting": "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
     Other: "Hyper-local knowledge that sets you apart from every out-of-town competitor.",
   },
+  CLIENT_AVATAR: {
+    [REAL_ESTATE_LEADERSHIP_INDUSTRY]:
+      "Understand the agents and leaders you want to attract, develop, and serve.",
+  },
   TRENCH_WARFARE: {
     "Real Estate": "Battle-tested wisdom from the deals only real agents survive.",
     [REAL_ESTATE_LEADERSHIP_INDUSTRY]: "Battle-tested lessons from leading agents and running a brokerage.",
@@ -227,6 +231,16 @@ export const INDUSTRY_FIELD_OVERRIDES: Record<
   string,
   Record<string, Record<string, IndustryFieldOverride>>
 > = {
+  LOCAL_MAYOR: {
+    [REAL_ESTATE_LEADERSHIP_INDUSTRY]: {
+      fierceDebate: {
+        label: "What is the most fiercely debated issue among real estate professionals in your market?",
+      },
+      underratedNeighborhood: {
+        label: "What part of your market offers the biggest opportunity for agents over the next five years?",
+      },
+    },
+  },
   TRENCH_WARFARE: {
     "Real Estate": {
       wildestStory: { label: "Wildest thing you've seen at an inspection or closing?" },
