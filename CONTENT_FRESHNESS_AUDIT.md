@@ -469,7 +469,7 @@ Several surveys have industry-specific subtitles, field labels, and placeholders
 - `INDUSTRY_FIELD_OVERRIDES` — per-survey, per-industry field label/placeholder customization
 - `TRENCH_WARFARE_WILDEST_LABEL` / `ORIGIN_STORY_PETPEEVE_LABEL` — industry-specific question labels
 
-Industries covered: Real Estate, Car Sales, Fitness / Personal Training, Financial Services, Coaching / Consulting, Other.
+Industries covered: Real Estate, Real Estate Leadership, Car Sales, Fitness / Personal Training, Financial Services, Coaching / Consulting, Other.
 
 ### 10.6 Compliance Survey Disclaimer
 

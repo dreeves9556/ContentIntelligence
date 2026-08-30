@@ -31,6 +31,7 @@ import { MobileDisclosure } from "@/components/mobile/MobileDisclosure";
 import type { QuestionnaireFormData } from "@/lib/questionnaire-actions";
 import type { MemoryType } from "@prisma/client";
 import type { CreatorMemoryData } from "@/lib/memory/memory-types";
+import { INDUSTRY_TITLE_OVERRIDES } from "@/lib/industry-config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ interface SurveyDef {
 const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   LOCAL_MAYOR: {
     "Real Estate": "Hyper-local knowledge that sets you apart from every out-of-town agent.",
+    "Real Estate Leadership": "Hyper-local market and community insight that strengthens your leadership and brokerage brand.",
     "Car Sales": "Hyper-local knowledge that sets you apart from every out-of-town dealer.",
     "Fitness / Personal Training": "Hyper-local knowledge that sets you apart from every out-of-town trainer.",
     "Financial Services": "Hyper-local knowledge that sets you apart from every out-of-town advisor.",
@@ -79,6 +81,7 @@ const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   },
   TRENCH_WARFARE: {
     "Real Estate": "Battle-tested wisdom from the deals only real agents survive.",
+    "Real Estate Leadership": "Battle-tested lessons from leading agents and running a brokerage.",
     "Car Sales": "Battle-tested wisdom from the deals only real car salesmen survive.",
     "Fitness / Personal Training": "Battle-tested wisdom from the trenches only real trainers survive.",
     "Financial Services": "Battle-tested wisdom from the trenches only real advisors survive.",
@@ -87,6 +90,7 @@ const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   },
   OFFER_FUNNEL: {
     "Real Estate": "Tell the AI what you're selling — listings, consultations, buyer services — and how content should drive leads.",
+    "Real Estate Leadership": "Recruiting, brokerage opportunities, training, coaching, and how content should start the right conversations.",
     "Car Sales": "Tell the AI what you're selling — vehicles, financing, trade-ins — and how content should drive floor traffic.",
     "Fitness / Personal Training": "Tell the AI what you're selling — programs, coaching, memberships — and how content should drive signups.",
     "Financial Services": "Tell the AI what you're offering — reviews, planning, consultations — and how content should drive appointments.",
@@ -95,6 +99,7 @@ const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   },
   PROOF_BANK: {
     "Real Estate": "Give the AI real wins, testimonials, and deal results it can use to build trust.",
+    "Real Estate Leadership": "Agent wins, recruiting results, testimonials, and brokerage growth that make your leadership credible.",
     "Car Sales": "Give the AI real wins, testimonials, and sales results it can use to build trust.",
     "Fitness / Personal Training": "Give the AI real transformations, testimonials, and client wins it can use to build trust.",
     "Financial Services": "Give the AI real outcomes, testimonials, and client results it can use to build trust.",
@@ -103,6 +108,7 @@ const INDUSTRY_SUBTITLE_OVERRIDES: Record<string, Record<string, string>> = {
   },
   COMPLIANCE_GUARDRAILS: {
     "Real Estate": "Fair housing, brokerage rules, license disclosure — set the guardrails the AI must follow.",
+    "Real Estate Leadership": "Fair housing, recruiting claims, compensation and earnings claims, brokerage rules, and confidentiality.",
     "Car Sales": "Financing claims, approval claims, dealership rules — set the guardrails the AI must follow.",
     "Fitness / Personal Training": "Medical claims, injury claims, supplement rules — set the guardrails the AI must follow.",
     "Financial Services": "Investment claims, compliance rules, fiduciary language — set the guardrails the AI must follow.",
@@ -117,6 +123,13 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
       wildestStory: { label: "Wildest thing you've seen at an inspection or closing?" },
       negotiationStyle: { label: "Your negotiation style in 3 words?" },
       trophyRoomWin: { placeholder: "The deal everyone said couldn't be done..." },
+    },
+    "Real Estate Leadership": {
+      wildestStory: { label: "Wildest situation you’ve handled while leading agents or running a brokerage?" },
+      negotiationStyle: { label: "Describe your leadership style in three words." },
+      mostCommonDM: { label: "What is the number one question agents or leaders ask you?" },
+      trophyRoomWin: { placeholder: "The agent, team, recruiting, or brokerage win that once seemed impossible..." },
+      objectionCrusher: { label: "What is the most common reason an agent hesitates to make a career or brokerage change, and how do you respond?" },
     },
     "Car Sales": {
       wildestStory: { label: "Wildest thing you've seen on the lot or in the finance office?" },
@@ -147,6 +160,10 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
       agentPetPeeve: { label: "Your biggest pet peeve about other agents?" },
       yearOneFailure: { placeholder: "The deal that fell apart, the client you lost, and what changed after..." },
     },
+    "Real Estate Leadership": {
+      agentPetPeeve: { label: "Your biggest pet peeve about real estate leadership or brokerage culture?" },
+      yearOneFailure: { placeholder: "The leadership decision, recruiting miss, or team failure that changed how you lead..." },
+    },
     "Car Sales": {
       agentPetPeeve: { label: "Your biggest pet peeve about other car salesmen?" },
       yearOneFailure: { placeholder: "The deal that fell through, the customer you lost, and what changed after..." },
@@ -168,6 +185,14 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     },
   },
   CLIENT_AVATAR: {
+    "Real Estate Leadership": {
+      favoriteClientType: { label: "Describe the type of agent or leader you most want to attract and develop." },
+      clientBiggestFear: { label: "What is the single biggest fear your ideal agent has about changing brokerages or advancing their career?" },
+      clientRedFlag: { label: "What red flag tells you an agent may not be the right fit for your organization?" },
+      clientMisbeliefs: { label: "What do agents wrongly believe they need to do first to grow their career?" },
+      clientDreamOutcome: { label: "What does your ideal agent ultimately want from their career and brokerage?" },
+      beforeAfterStory: { label: "Share a real agent or leadership before-and-after story you are allowed to use." },
+    },
     "Real Estate": {
       clientBiggestFear: { placeholder: "The thing that keeps them awake at 2am before signing..." },
     },
@@ -185,6 +210,9 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     },
   },
   WEEKLY_CONTEXT: {
+    "Real Estate Leadership": {
+      professionalUpdates: { placeholder: "Recruiting conversations, agent coaching, training sessions, team wins, company initiatives, leadership decisions, meetings, and market changes..." },
+    },
     "Real Estate": {
       professionalUpdates: { placeholder: "Deals in motion, client meetings, showings, deadlines..." },
     },
@@ -201,7 +229,49 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
       professionalUpdates: { placeholder: "Client engagements in motion, sessions, projects, launches, deadlines..." },
     },
   },
+  MONTHLY_CONTEXT: {
+    "Real Estate Leadership": {
+      businessChanges: { label: "What is changing in your brokerage, team, or leadership role this month?" },
+      newGoals: { label: "What recruiting, retention, growth, culture, or leadership priorities are you focused on this month?" },
+    },
+  },
+  STORY_REFRESH: {
+    "Real Estate Leadership": {
+      recentWins: { label: "Any new agent success stories, recruiting wins, or leadership wins since you last updated this?" },
+      newStories: { label: "Any new recruiting conversations, leadership lessons, or brokerage culture moments?" },
+      newObservations: { label: "What market or industry observations are shaping your leadership perspective?" },
+      newClientStories: { label: "Any new agent, recruit, coaching, or leadership interactions worth sharing?" },
+      whatsChanging: { label: "What is changing in your brokerage, team, or local real estate market right now?" },
+    },
+  },
+  OFFER_FUNNEL: {
+    "Real Estate Leadership": {
+      mainOffer: { placeholder: "Brokerage affiliation, agent recruiting, confidential career conversations, training events, coaching or development programs, team opportunities, leadership consulting, or speaking..." },
+      offerForWho: { placeholder: "Agents you want to recruit, agents already in your organization, team leaders, brokers, or your local community..." },
+      leadMagnet: { placeholder: "A recruiting resource, training event, coaching workshop, agent development guide, or leadership resource..." },
+      commonObjections: { placeholder: "Why might an agent hesitate to evaluate a brokerage, join a team, attend training, or begin coaching?" },
+    },
+  },
+  PROOF_BANK: {
+    "Real Estate Leadership": {
+      bestTestimonials: { placeholder: "Agent wins, recruiting conversations, leadership testimonials, or culture feedback you have permission to share..." },
+      clientWins: { label: "List agent development, production improvement, recruiting, retention, culture, or team-growth wins you helped create." },
+      beforeAfterStories: { placeholder: "An agent, team, or culture before-and-after story you are allowed to share..." },
+      numbersAndStats: { placeholder: "Verified agent development, recruiting, retention, team growth, brokerage milestones, or other experience markers..." },
+      caseStudyDetails: { placeholder: "Describe one verified agent, recruiting, coaching, culture, or brokerage growth story. Do not include unapproved claims." },
+    },
+  },
   COMPLIANCE_GUARDRAILS: {
+    "Real Estate Leadership": {
+      requiredDisclaimers: { placeholder: "Required brokerage or franchise disclosures, fair housing language, recruiting disclosures, and license or affiliation notices..." },
+      forbiddenClaims: { placeholder: "Unverified recruiting, employment, compensation, commission, split, income, earnings, production, or guaranteed-result claims..." },
+      regulatedTopics: { placeholder: "Fair housing, recruiting and employment-related claims, independent-contractor language, compensation or split claims, income and production claims..." },
+      companyRules: { placeholder: "Brokerage or franchise rules, required approval processes, recruiting guidelines, confidentiality requirements, and license-affiliation rules..." },
+      approvalProcess: { placeholder: "Who must approve recruiting, compensation, earnings, agent-result, brokerage, or client-confidentiality content before posting?" },
+      wordsToAvoidForCompliance: { placeholder: "Words that create risk around recruiting, employment, compensation, earnings, production, fair housing, or confidentiality..." },
+      sensitiveTopics: { placeholder: "Agent or client confidentiality, private recruiting conversations, internal disputes, protected information, or topics your company requires you to avoid..." },
+      licenseOrCredentialRules: { placeholder: "License and brokerage-affiliation requirements, franchise disclosures, independent-contractor language, or company approval language..." },
+    },
     "Real Estate": {
       requiredDisclaimers: { placeholder: "Equal Housing Opportunity, fair housing disclaimers, brokerage disclosures..." },
       forbiddenClaims: { placeholder: "Guaranteed appreciation, guaranteed sale, best rate, risk-free investment..." },
@@ -243,6 +313,11 @@ const INDUSTRY_FIELD_OVERRIDES: Record<string, Record<string, Record<string, { l
     },
   },
 };
+
+function resolveTitle(surveyType: string, defaultTitle: string, industry?: string): string {
+  if (!industry) return defaultTitle;
+  return INDUSTRY_TITLE_OVERRIDES[surveyType]?.[industry] ?? defaultTitle;
+}
 
 function resolveSubtitle(surveyType: string, defaultSubtitle: string, industry?: string): string {
   if (!industry) return defaultSubtitle;
@@ -950,7 +1025,7 @@ export default function QuestionnaireClient({
         <AccordionRow
           key={survey.type}
           icon={survey.icon}
-          title={survey.title}
+          title={resolveTitle(survey.type, survey.title, industry)}
           subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
           color={survey.color}
           isCompleted={!!existing}
@@ -972,7 +1047,7 @@ export default function QuestionnaireClient({
           key={survey.type}
           id={survey.type === "WEEKLY_CONTEXT" ? "weekly-context" : undefined}
           icon={survey.icon}
-          title={survey.title}
+          title={resolveTitle(survey.type, survey.title, industry)}
           subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
           color={survey.color}
           isCompleted={isCurrent}
@@ -1118,7 +1193,7 @@ export default function QuestionnaireClient({
             <AccordionRow
               key={survey.type}
               icon={survey.icon}
-              title={survey.title}
+              title={resolveTitle(survey.type, survey.title, industry)}
               subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
               color={survey.color}
               isCompleted={!!existing}
@@ -1149,7 +1224,7 @@ export default function QuestionnaireClient({
               key={survey.type}
               id={survey.type === "WEEKLY_CONTEXT" ? "weekly-context" : undefined}
               icon={survey.icon}
-              title={survey.title}
+              title={resolveTitle(survey.type, survey.title, industry)}
               subtitle={resolveSubtitle(survey.type, survey.subtitle, industry)}
               color={survey.color}
               isCompleted={isCurrent}

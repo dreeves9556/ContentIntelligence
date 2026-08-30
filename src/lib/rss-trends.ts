@@ -35,6 +35,11 @@ const INDUSTRY_FEEDS: Record<string, RssFeedConfig[]> = {
     { name: "HousingWire", url: "https://www.housingwire.com/feed/", category: "business" },
     { name: "Realtor Magazine", url: "https://magazine.realtor/feed", category: "content_marketing" },
   ],
+  "Real Estate Leadership": [
+    { name: "Inman News", url: "https://www.inman.com/feed/", category: "business" },
+    { name: "HousingWire", url: "https://www.housingwire.com/feed/", category: "business" },
+    { name: "Realtor Magazine", url: "https://magazine.realtor/feed", category: "content_marketing" },
+  ],
   "Car Sales": [
     { name: "Automotive News", url: "https://www.autonews.com/rss", category: "business" },
     { name: "KBB News", url: "https://www.kbb.com/rss/", category: "content_marketing" },

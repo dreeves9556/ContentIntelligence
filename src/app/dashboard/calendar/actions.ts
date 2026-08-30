@@ -223,6 +223,13 @@ export async function generateCalendarStrategy(
   });
 
   const answers = (questionnaire?.content ?? {}) as unknown as QuestionnaireFormData;
+  const allProfileSurveys = await prisma.profileSurvey.findMany({
+    where: { userId },
+    select: { surveyType: true, answersJson: true, updatedAt: true },
+  });
+  const profileSurveys = allProfileSurveys.filter(
+    (survey) => !isContextSurveyExpired(survey.surveyType, survey.updatedAt),
+  );
 
   const config = existingConfig ?? await getPlatformConfig();
   const apiKey = config.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? null;
@@ -248,7 +255,7 @@ export async function generateCalendarStrategy(
 
   const userProfileXml = buildUserProfileXml({
     answers,
-    profileSurveys: [],
+    profileSurveys,
   });
 
   const defaultUserPrompt = `<calendar_data>
